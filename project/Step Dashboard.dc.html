@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/nocturne-6cd0eed5-43bd-40e8-9e93-c4bd292c6682/styles.css">
+  <script src="_ds/nocturne-6cd0eed5-43bd-40e8-9e93-c4bd292c6682/_ds_bundle.js"></script>
+  <style>
+    html, body { margin: 0; background: #161826; }
+    #sd-root { --color-warn: #e0a94a; --color-crit: #e0645c; --color-warn-fill: #e0a94a; --color-crit-fill: #e0645c; }
+    #sd-root, #sd-root * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  </style>
+</helmet>
+<div id="sd-root" style="position:relative;width:480px;height:320px;display:flex;flex-direction:column;overflow:hidden;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);font-variant-numeric:tabular-nums;user-select:none;-webkit-user-select:none;cursor:none">
+
+  <div style="height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 var(--space-4);border-bottom:1px solid var(--color-neutral-800)">
+    <div style="display:flex;align-items:center;gap:var(--space-3);min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;flex:none;color:var(--color-neutral-500)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"></path></svg>
+        <span id="sd-outtemp" style="font-size:14px;color:var(--color-text)">--&deg;</span>
+        <span id="sd-outplace" style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase">--</span>
+      </div>
+      <button id="sd-notice" onPointerDown="{{ tapNotice }}" style="display:none;align-items:center;gap:7px;height:34px;max-width:300px;padding:0;background:transparent;border:0;color:var(--color-warn);font-family:inherit;font-size:14px;text-align:left">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 3.5L1.8 21h20.4L12 3.5z"></path><path d="M12 9.5v5.2M12 17.6v.1"></path></svg>
+        <span id="sd-notice-txt" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">--</span>
+      </button>
+    </div>
+    <div onPointerDown="{{ tapWifi }}" style="display:flex;align-items:center;gap:var(--space-4);height:34px;padding-left:var(--space-4);font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-neutral-500)">
+      <svg id="sd-wifi" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke-width="2" stroke-linecap="round" style="display:none;flex:none">
+        <path id="sd-wa3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--color-neutral-800)"></path>
+        <path id="sd-wa2" d="M6 12.2a9 9 0 0112 0" stroke="var(--color-neutral-800)"></path>
+        <path id="sd-wa1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--color-neutral-800)"></path>
+        <circle id="sd-wa0" cx="12" cy="19.4" r="1.1" fill="var(--color-neutral-800)" stroke="none"></circle>
+      </svg>
+      <svg id="sd-bt" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;flex:none">
+        <path d="M7 7l10 10-5 4V3l5 4L7 17"></path>
+      </svg>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:14px;flex:none">
+        <span id="sd-sig0" style="width:3px;height:4px;border-radius:1px;background:var(--color-neutral-800)"></span>
+        <span id="sd-sig1" style="width:3px;height:6px;border-radius:1px;background:var(--color-neutral-800)"></span>
+        <span id="sd-sig2" style="width:3px;height:8px;border-radius:1px;background:var(--color-neutral-800)"></span>
+        <span id="sd-sig3" style="width:3px;height:11px;border-radius:1px;background:var(--color-neutral-800)"></span>
+        <span id="sd-sig4" style="width:3px;height:14px;border-radius:1px;background:var(--color-neutral-800)"></span>
+      </div>
+      <span id="sd-tech" style="font-size:11px;letter-spacing:0.06em;color:var(--color-text)">--</span>
+      <span id="sd-clock" style="font-size:15px;letter-spacing:0.02em;color:var(--color-text)">--:--</span>
+      <button id="sd-status-btn" onPointerDown="{{ tapWifi }}" style="display:flex;align-items:center;gap:var(--space-2);height:34px;padding:0 0 0 var(--space-2);background:transparent;border:0;color:inherit;font:inherit;font-size:12px;letter-spacing:0.06em;text-transform:uppercase">
+        <span id="sd-dot" style="width:9px;height:9px;border-radius:50%;background:var(--color-accent)"></span>
+        <span id="sd-stxt">demo</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="sd-panes" style="flex:1;position:relative">
+
+    <div id="sd-p0" style="position:absolute;inset:0;display:flex;gap:var(--space-3);padding:var(--space-3) var(--space-4)">
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+        <div style="display:flex;align-items:flex-end;gap:var(--space-3)">
+          <div id="sd-speed" style="font-size:118px;font-weight:600;line-height:0.86;letter-spacing:-0.04em">0</div>
+          <div style="padding-bottom:14px;display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:19px;letter-spacing:0.06em;color:var(--color-neutral-500)">km/u</div>
+            <div style="font-size:12px;letter-spacing:0.06em;color:var(--color-neutral-500)">max <span id="sd-vmaxtxt">0</span></div>
+          </div>
+        </div>
+        <div style="height:7px;background:var(--color-neutral-900);border-radius:var(--radius-sm);overflow:hidden;margin-top:var(--space-4)">
+          <div id="sd-speedbar" style="height:100%;width:0%;background:var(--color-accent)"></div>
+        </div>
+      </div>
+      <div style="width:168px;flex:none;display:flex;flex-direction:column;gap:var(--space-3)">
+        <div id="sd-batcard" style="flex:1;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center">
+          <div id="sd-bat-k" style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Batterij</div>
+          <div style="font-size:34px;font-weight:500;line-height:1"><span id="sd-bat">0</span><span id="sd-bat-u" style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">%</span></div>
+          <div id="sd-battrack" style="height:9px;background:var(--color-neutral-900);border-radius:var(--radius-sm);overflow:hidden;margin-top:var(--space-2)">
+            <div id="sd-batbar" style="height:100%;width:0%;background:var(--color-accent)"></div>
+          </div>
+        </div>
+        <div id="sd-rangecard" style="flex:1;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center">
+          <div id="sd-range-k" style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Bereik ca.</div>
+          <div style="font-size:34px;font-weight:500;line-height:1"><span id="sd-range">0</span><span id="sd-range-u" style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">km</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sd-p1" style="position:absolute;inset:0;display:none;padding:var(--space-3) var(--space-4)">
+      <div style="display:grid;width:100%;gap:var(--space-3);grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr">
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Motor &deg;C</div>
+          <div id="sd-tm" style="font-size:34px;font-weight:500;line-height:1">0</div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">FET &deg;C</div>
+          <div id="sd-tf" style="font-size:34px;font-weight:500;line-height:1">0</div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Duty</div>
+          <div style="font-size:34px;font-weight:500;line-height:1"><span id="sd-duty">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">%</span></div>
+          <div style="height:6px;background:var(--color-neutral-900);border-radius:var(--radius-sm);overflow:hidden;margin-top:var(--space-1)">
+            <div id="sd-dutybar" style="height:100%;width:0%;background:var(--color-accent)"></div>
+          </div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Motorstroom</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-im">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">A</span></div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Accustroom</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-ib">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">A</span></div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">RPM</div>
+          <div id="sd-rpm" style="font-size:26px;font-weight:500;line-height:1">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sd-p2" style="position:absolute;inset:0;display:none;padding:var(--space-3) var(--space-4)">
+      <div style="display:grid;width:100%;gap:var(--space-3);grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr">
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Accuvoltage</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-vv">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">V</span></div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Cel</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-vc">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">V</span></div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Accupercentage</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-bat2">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">%</span></div>
+          <div style="height:6px;background:var(--color-neutral-900);border-radius:var(--radius-sm);overflow:hidden;margin-top:var(--space-1)">
+            <div id="sd-bat2bar" style="height:100%;width:0%;background:var(--color-accent)"></div>
+          </div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Verbruikt</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-wh">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">Wh</span></div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Afstand</div>
+          <div style="font-size:26px;font-weight:500;line-height:1"><span id="sd-trip">0</span><span style="font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px">km</span></div>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);display:flex;flex-direction:column;justify-content:center;gap:var(--space-1)">
+          <div style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2">Wh / km</div>
+          <div id="sd-whkm" style="font-size:26px;font-weight:500;line-height:1">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sd-net" style="position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:var(--space-2);background:var(--color-bg);padding:var(--space-3) var(--space-4);z-index:2">
+    <div style="display:flex;gap:var(--space-2);flex:none">
+      <button id="sd-seg-wifi" onPointerDown="{{ tapWifi }}" style="flex:1;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-accent);border-radius:var(--radius-md);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Wi-Fi</button>
+      <button id="sd-seg-bt" onPointerDown="{{ tapBt }}" style="flex:1;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Bluetooth</button>
+      <button id="sd-net-close" onPointerDown="{{ closeNet }}" style="width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div id="sd-netlist" style="flex:1;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none"></div>
+  </div>
+
+  <div id="sd-sys" style="position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:var(--space-2);background:var(--color-bg);padding:var(--space-3) var(--space-4);z-index:4">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none">
+      <div style="font-size:13px;letter-spacing:0.10em;text-transform:uppercase;color:var(--color-neutral-500)">Systeem</div>
+      <button onPointerDown="{{ closeSys }}" style="width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:var(--space-2);flex:none">
+      <div style="height:46px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);width:74px;flex:none">Wi-Fi</span>
+        <span id="sd-sys-wifi" style="font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">--</span>
+      </div>
+      <div style="height:46px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);width:74px;flex:none">Mobiel</span>
+        <span id="sd-sys-cell" style="font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">--</span>
+      </div>
+    </div>
+    <div style="margin-top:auto;display:flex;gap:var(--space-2);flex:none">
+      <button onPointerDown="{{ openNetFromSys }}" style="flex:1;height:56px;background:transparent;color:var(--color-text);border:1px solid var(--color-accent);border-radius:var(--radius-md);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Verbindingen</button>
+      <button onPointerDown="{{ openSettings }}" style="flex:1;height:56px;background:transparent;color:var(--color-text);border:1px solid var(--color-accent);border-radius:var(--radius-md);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Instellingen</button>
+      <button id="sd-desktop" onPointerDown="{{ tapDesktop }}" style="flex:1;height:56px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Desktop</button>
+    </div>
+  </div>
+
+  <div id="sd-set" style="position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:var(--space-2);background:var(--color-bg);padding:var(--space-3) var(--space-4);z-index:4">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none">
+      <div style="font-size:13px;letter-spacing:0.10em;text-transform:uppercase;color:var(--color-neutral-500)">Instellingen</div>
+      <button onPointerDown="{{ closeSettings }}" style="width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none">
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Thema</span>
+        <button id="sd-th-auto" onPointerDown="{{ themeAuto }}" style="width:66px;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;text-transform:uppercase">Auto</button>
+        <button id="sd-th-light" onPointerDown="{{ themeLight }}" style="width:66px;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;text-transform:uppercase">Licht</button>
+        <button id="sd-th-dark" onPointerDown="{{ themeDark }}" style="width:66px;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;text-transform:uppercase">Donker</button>
+      </div>
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Temp waarschuwing</span>
+        <button onPointerDown="{{ warnDown }}" style="width:56px;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:20px">&minus;</button>
+        <span id="sd-set-warn" style="width:64px;text-align:center;font-size:18px">70&deg;</span>
+        <button onPointerDown="{{ warnUp }}" style="width:56px;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:20px">+</button>
+      </div>
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Temp kritiek</span>
+        <button onPointerDown="{{ critDown }}" style="width:56px;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:20px">&minus;</button>
+        <span id="sd-set-crit" style="width:64px;text-align:center;font-size:18px">90&deg;</span>
+        <button onPointerDown="{{ critUp }}" style="width:56px;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:20px">+</button>
+      </div>
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Schermhelderheid</span>
+        <button onPointerDown="{{ brightDown }}" style="width:56px;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:20px">&minus;</button>
+        <span id="sd-set-bright" style="width:78px;text-align:center;font-size:18px">80 %</span>
+        <button onPointerDown="{{ brightUp }}" style="width:56px;height:44px;background:transparent;color:var(--color-text);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:20px">+</button>
+      </div>
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Startscherm</span>
+        <button id="sd-st-0" onPointerDown="{{ startRit }}" style="width:66px;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;text-transform:uppercase">Rit</button>
+        <button id="sd-st-1" onPointerDown="{{ startMotor }}" style="width:66px;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;text-transform:uppercase">Motor</button>
+        <button id="sd-st-2" onPointerDown="{{ startAccu }}" style="width:66px;height:44px;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;text-transform:uppercase">Accu</button>
+      </div>
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Topsnelheid</span>
+        <button onPointerDown="{{ resetTop }}" style="height:44px;padding:0 var(--space-4);background:transparent;color:var(--color-text);border:1px solid var(--color-accent);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Reset</button>
+      </div>
+      <div style="min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+        <span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--color-neutral-500);flex:1">Rit-teller</span>
+        <button onPointerDown="{{ resetTrip }}" style="height:44px;padding:0 var(--space-4);background:transparent;color:var(--color-text);border:1px solid var(--color-accent);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;letter-spacing:0.09em;text-transform:uppercase">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sd-notices" style="position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:var(--space-2);background:var(--color-bg);padding:var(--space-3) var(--space-4);z-index:3">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none">
+      <div style="font-size:13px;letter-spacing:0.10em;text-transform:uppercase;color:var(--color-neutral-500)">Meldingen</div>
+      <button id="sd-notices-close" onPointerDown="{{ closeNotices }}" style="width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div id="sd-noticelist" style="flex:1;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none"></div>
+  </div>
+
+  <div id="sd-alarm" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:var(--space-3);padding:var(--space-6) var(--space-8);background:var(--color-crit);color:#161826;z-index:5">
+    <div style="display:flex;align-items:center;gap:var(--space-4)">
+      <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"></path><path d="M12 9.5v5.2M12 17.6v.1"></path></svg>
+      <div style="font-size:44px;font-weight:600;letter-spacing:-0.02em;line-height:1">WARNING</div>
+    </div>
+    <div id="sd-alarm-msg" style="font-size:22px;line-height:1.25;align-self:center;text-align:center;white-space:pre-line">Motortemperatuur te hoog</div>
+    <button id="sd-alarm-close" onPointerDown="{{ tapAlarm }}" style="height:56px;min-width:160px;align-self:center;margin-top:var(--space-2);padding:0 var(--space-6);background:transparent;color:#161826;border:2px solid #161826;border-radius:var(--radius-md);font-family:inherit;font-size:16px;letter-spacing:0.09em;text-transform:uppercase">Bevestigen</button>
+  </div>
+
+  <div style="height:16px;flex:none;display:flex;align-items:center;justify-content:center;gap:var(--space-2)">
+    <span id="sd-dot0" style="width:6px;height:6px;border-radius:50%;background:var(--color-accent)"></span>
+    <span id="sd-dot1" style="width:6px;height:6px;border-radius:50%;background:var(--color-neutral-800)"></span>
+    <span id="sd-dot2" style="width:6px;height:6px;border-radius:50%;background:var(--color-neutral-800)"></span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:480,&quot;height&quot;:320},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Auto&quot;,&quot;Donker&quot;,&quot;Licht&quot;],&quot;default&quot;:&quot;Auto&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Gedrag&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Rit&quot;,&quot;Motor&quot;,&quot;Accu&quot;],&quot;default&quot;:&quot;Rit&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Gedrag&quot;},&quot;forceDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Gedrag&quot;},&quot;pollMs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:150,&quot;min&quot;:100,&quot;max&quot;:500,&quot;step&quot;:10,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Gedrag&quot;},&quot;speedMax&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:35,&quot;min&quot;:20,&quot;max&quot;:80,&quot;step&quot;:5,&quot;unit&quot;:&quot;km/u&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Schaal&quot;},&quot;packWh&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1147,&quot;min&quot;:200,&quot;max&quot;:2000,&quot;step&quot;:50,&quot;unit&quot;:&quot;Wh&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Bereik&quot;},&quot;whPerKm&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:18,&quot;min&quot;:8,&quot;max&quot;:60,&quot;step&quot;:1,&quot;unit&quot;:&quot;Wh/km&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Bereik&quot;},&quot;tempWarn&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:100,&quot;min&quot;:40,&quot;max&quot;:120,&quot;step&quot;:5,&quot;unit&quot;:&quot;°C&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Waarschuwingen&quot;},&quot;tempCrit&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:90,&quot;min&quot;:60,&quot;max&quot;:120,&quot;step&quot;:5,&quot;unit&quot;:&quot;°C&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Waarschuwingen&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+
+      tapNotice: (e) => {
+        e.preventDefault();
+        if (!(this.noticeList || []).length) return;
+        this.renderNotices();
+        this.el("notices").style.display = "flex";
+      },
+      closeNotices: (e) => { e.preventDefault(); this.el("notices").style.display = "none"; },
+      tapAlarm: (e) => {
+        e.preventDefault();
+        clearTimeout(this.blink);
+        this.blink = null;
+        this.alarm.acked[this.alarm.level] = true;
+        this.el("alarm").style.display = "none";
+      },
+      tapWifi: (e) => { e.preventDefault(); this.openSys(); },
+      tapBt: (e) => { e.preventDefault(); this.openNet("bt"); },
+      closeSys: (e) => { e.preventDefault(); this.el("sys").style.display = "none"; },
+      openNetFromSys: (e) => { e.preventDefault(); this.el("sys").style.display = "none"; this.openNet("wifi"); },
+      openSettings: (e) => { e.preventDefault(); this.el("sys").style.display = "none"; this.renderSettings(); this.el("set").style.display = "flex"; },
+      closeSettings: (e) => { e.preventDefault(); this.el("set").style.display = "none"; this.openSys(); },
+      tapDesktop: (e) => {
+        e.preventDefault();
+        const b = this.el("desktop");
+        b.textContent = "Verlaten\u2026";
+        fetch("/desktop", { method: "POST" })
+          .then((r) => { if (!r.ok) throw 0; b.textContent = "Desktop"; })
+          .catch(() => { b.textContent = "Niet beschikbaar"; setTimeout(() => { b.textContent = "Desktop"; }, 2000); });
+      },
+      themeAuto: (e) => { e.preventDefault(); this.setTheme("Auto"); },
+      themeLight: (e) => { e.preventDefault(); this.setTheme("Licht"); },
+      themeDark: (e) => { e.preventDefault(); this.setTheme("Donker"); },
+      warnDown: (e) => { e.preventDefault(); this.bump("tempWarn", -5, 40, 120); },
+      warnUp: (e) => { e.preventDefault(); this.bump("tempWarn", 5, 40, 120); },
+      critDown: (e) => { e.preventDefault(); this.bump("tempCrit", -5, 50, 130); },
+      critUp: (e) => { e.preventDefault(); this.bump("tempCrit", 5, 50, 130); },
+      whDown: (e) => { e.preventDefault(); this.bump("packWh", -50, 200, 2000); },
+      whUp: (e) => { e.preventDefault(); this.bump("packWh", 50, 200, 2000); },
+      vmaxDown: (e) => { e.preventDefault(); this.bump("speedMax", -5, 20, 80); },
+      vmaxUp: (e) => { e.preventDefault(); this.bump("speedMax", 5, 20, 80); },
+      whkmDown: (e) => { e.preventDefault(); this.bump("whPerKm", -1, 8, 60); },
+      whkmUp: (e) => { e.preventDefault(); this.bump("whPerKm", 1, 8, 60); },
+      brightDown: (e) => { e.preventDefault(); this.setBright(-10); },
+      brightUp: (e) => { e.preventDefault(); this.setBright(10); },
+      startRit: (e) => { e.preventDefault(); this.pickStart(0); },
+      startMotor: (e) => { e.preventDefault(); this.pickStart(1); },
+      startAccu: (e) => { e.preventDefault(); this.pickStart(2); },
+      resetTop: (e) => {
+        e.preventDefault();
+        this.topSpeed = 0;
+        this.cache = {};
+        this.paint();
+      },
+      resetTrip: (e) => {
+        e.preventDefault();
+        this.dm.trip = 0; this.dm.wh = 0;
+        fetch("/reset-trip", { method: "POST" }).catch(() => {});
+        this.cache = {};
+        this.paint();
+      },
+      closeNet: (e) => { e.preventDefault(); this.el("net").style.display = "none"; },
+    };
+  }
+
+  wantLight() {
+    const t = this.cfg.theme;
+    if (t === "Licht") return true;
+    if (t === "Donker") return false;
+    const now = new Date();
+    const m = now.getHours() * 60 + now.getMinutes();
+    return m >= 450 && m < 1080;   // 07:30 – 18:00
+  }
+
+  notices(d) {
+    const warn = this.cfg.tempWarn, crit = this.cfg.tempCrit;
+    const out = [];
+    if (this.mode === "off") out.push({ lv: 2, t: "Geen VESC-verbinding" });
+    const tm = d.temp_motor || 0, tf = d.temp_fet || 0;
+    if (tm >= crit) out.push({ lv: 2, t: "Motor " + tm.toFixed(0) + "\u00b0C \u2014 stop en laat afkoelen" });
+    else if (tm >= warn) out.push({ lv: 1, t: "Motor " + tm.toFixed(0) + "\u00b0C \u2014 verminder belasting" });
+    if (tf >= crit) out.push({ lv: 2, t: "FET " + tf.toFixed(0) + "\u00b0C \u2014 stop en laat afkoelen" });
+    else if (tf >= warn) out.push({ lv: 1, t: "FET " + tf.toFixed(0) + "\u00b0C \u2014 verminder belasting" });
+    const bp = d.battery_pct || 0;
+    if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% \u2014 bijna leeg" });
+    else if (bp < 20) out.push({ lv: 1, t: "Accu " + bp.toFixed(0) + "% \u2014 laag" });
+    if ((d.duty || 0) > 0.95) out.push({ lv: 1, t: "Duty 95%+ \u2014 geen reserve" });
+    out.sort((a, b) => b.lv - a.lv);
+    return out;
+  }
+
+  paintNotice(d) {
+    const list = this.notices(d);
+    this.noticeList = list;
+    const b = this.el("notice");
+    if (!list.length) {
+      this.ni = 0;
+      if (this.cache.nz !== "0") { this.cache.nz = "0"; b.style.display = "none"; this.el("notices").style.display = "none"; }
+      return;
+    }
+    const sig = list.map((x) => x.lv + x.t).join("|");
+    if (this.el("notices").style.display === "flex" && this.cache.nsig !== sig) {
+      this.cache.nsig = sig;
+      this.renderNotices();
+    }
+    const cur = list[(this.ni || 0) % list.length];
+    const key = cur.lv + "|" + cur.t;
+    if (this.cache.nz === key) return;
+    this.cache.nz = key;
+    b.style.display = "flex";
+    b.style.color = cur.lv === 2 ? "var(--color-crit)" : "var(--color-warn)";
+    this.el("notice-txt").textContent = cur.t;
+  }
+
+  renderNotices() {
+    const list = this.noticeList || [];
+    this.el("noticelist").innerHTML = list.map((nt) => {
+      const c = nt.lv === 2 ? "var(--color-crit)" : "var(--color-warn)";
+      return '<div style="min-height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:8px 14px;'
+        + 'background:var(--color-surface);border:1px solid var(--color-neutral-800);border-left:4px solid ' + c
+        + ';border-radius:var(--radius-md)">'
+        + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" style="flex:none">'
+        + '<path d="M12 3.5L1.8 21h20.4L12 3.5z"></path><path d="M12 9.5v5.2M12 17.6v.1"></path></svg>'
+        + '<div style="font-size:16px;line-height:1.2;color:var(--color-text)">' + nt.t + '</div>'
+        + '<div style="margin-left:auto;flex:none;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:' + c + '">'
+        + (nt.lv === 2 ? "fout" : "let op") + '</div></div>';
+    }).join("");
+  }
+
+  checkAlarm(d) {
+    const warn = this.cfg.tempWarn, crit = this.cfg.tempCrit;
+    const tm = d.temp_motor || 0, tf = d.temp_fet || 0;
+    const hot = Math.max(tm, tf);
+    const level = hot >= crit ? "crit" : (hot >= warn ? "warn" : null);
+    const a = this.alarm;
+
+    if (!level) {
+      if (a.level) {
+        a.level = null; a.acked = {};
+        clearTimeout(this.blink); this.blink = null;
+        this.el("alarm").style.display = "none";
+      }
+      return;
+    }
+    if (level === a.level) return;
+
+    a.level = level;
+    const el = this.el("alarm");
+    el.style.background = level === "crit" ? "var(--color-crit-fill)" : "var(--color-warn-fill)";
+    el.style.color = level === "crit" ? "#f3f5fe" : "#161826";
+    this.el("alarm-close").style.color = level === "crit" ? "#f3f5fe" : "#161826";
+    this.el("alarm-close").style.borderColor = level === "crit" ? "#f3f5fe" : "#161826";
+    this.el("alarm-msg").textContent =
+      (tm >= tf ? "Motortemperatuur " + tm.toFixed(0) : "FET-temperatuur " + tf.toFixed(0))
+      + "\u00b0C \u2014 " + (level === "crit" ? "stop en laat afkoelen" : "verminder belasting");
+    if (a.acked[level]) return;
+
+    clearInterval(this.blink);
+    let step = 0;
+    el.style.display = "flex";
+    const next = () => {
+      step++;
+      if (step >= 6) { this.blink = null; el.style.display = "flex"; return; }
+      el.style.display = step % 2 === 1 ? "none" : "flex";
+      this.blink = setTimeout(next, 500);
+    };
+    this.blink = setTimeout(next, 500);
+  }
+
+  openNet(tab) {
+    this.net.tab = tab;
+    this.el("net").style.display = "flex";
+    const on = (b, act) => {
+      b.style.color = act ? "var(--color-text)" : "var(--color-neutral-500)";
+      b.style.borderColor = act ? "var(--color-accent)" : "var(--color-neutral-800)";
+    };
+    on(this.el("seg-wifi"), tab === "wifi");
+    on(this.el("seg-bt"), tab === "bt");
+    this.renderNet();
+  }
+
+  renderNet() {
+    const n = this.net, wifi = n.tab === "wifi";
+    const items = wifi ? n.nets : n.devs;
+    const active = wifi ? (n.wifiOn ? n.ssid : null) : (n.btOn ? n.dev : null);
+    this.el("netlist").innerHTML = items.map((it) => {
+      const sel = it === active;
+      return '<button data-name="' + it + '" style="height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;'
+        + 'background:' + (sel ? "var(--color-accent-900)" : "var(--color-surface)") + ';border:1px solid '
+        + (sel ? "var(--color-accent)" : "var(--color-neutral-800)") + ';border-radius:var(--radius-md);color:var(--color-text);'
+        + 'font-family:inherit;font-size:16px;text-align:left">'
+        + '<span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + it + '</span>'
+        + '<span style="font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:' + (sel ? "var(--color-accent-300)" : "var(--color-neutral-500)") + '">'
+        + (sel ? "verbonden" : "verbind") + '</span></button>';
+    }).join("");
+  }
+
+  pickNet(name) {
+    const n = this.net;
+    if (n.tab === "wifi") {
+      if (n.wifiOn && n.ssid === name) { n.wifiOn = false; } else { n.ssid = name; n.wifiOn = true; }
+    } else if (n.btOn && n.dev === name) { n.btOn = false; } else { n.dev = name; n.btOn = true; }
+    this.paintWifi();
+    fetch("/net", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: n.tab, name: name, connect: n.tab === "wifi" ? n.wifiOn : n.btOn })
+    }).catch(() => {});
+    this.renderNet();
+  }
+
+  applyTheme(light) {
+    this.light = light;
+    const r = this.el("root").style;
+    const set = (k, v) => r.setProperty(k, v);
+    if (light) {
+      set("--color-bg", "#f3f5fe");
+      set("--color-surface", "#e4e7f5");
+      set("--color-text", "#292b31");
+      set("--color-neutral-500", "#595d6c");
+      set("--color-neutral-800", "#cfd3e5");
+      set("--color-neutral-900", "#cfd3e5");
+      set("--color-accent", "#5d5294");
+      set("--color-accent-900", "#d2cefd");
+      set("--color-warn", "#8a5d10");
+      set("--color-crit", "#a83229");
+      set("--color-warn-fill", "#e0a94a");
+      set("--color-crit-fill", "#a83229");
+    } else {
+      ["--color-bg", "--color-surface", "--color-text", "--color-neutral-500",
+       "--color-neutral-800", "--color-neutral-900", "--color-accent",
+       "--color-accent-900", "--color-warn", "--color-crit",
+       "--color-warn-fill", "--color-crit-fill"].forEach((k) => r.removeProperty(k));
+    }
+    this.cache = {};
+    if (this.last) this.paint();
+  }
+
+  componentDidMount() {
+    this.view = ["Rit", "Motor", "Accu"].indexOf(this.props.startScreen || "Rit");
+    if (this.view < 0) this.view = 0;
+    this.startView = this.view;
+    this.cfg = {
+      theme: this.props.theme || "Auto",
+      tempWarn: this.props.tempWarn || 70,
+      tempCrit: this.props.tempCrit || 90,
+      packWh: this.props.packWh || 700,
+      whPerKm: this.props.whPerKm || 20,
+      speedMax: this.props.speedMax || 35,
+      bright: 80,
+      start: this.startView || 0
+    };
+    this.mode = "demo";
+    this.fails = 0;
+    this.cache = {};
+    this.dm = { t: 0, spd: 0, tgt: 14, bat: 87, wh: 120, trip: 6.4, tm: 42, tf: 38 };
+    this.last = this.demoTick();
+    this.alarm = { level: null, acked: {} };
+    this.net = {
+      tab: "wifi", wifiOn: true, ssid: "Stepnet", btOn: false, dev: "Pixel 8",
+      nets: ["Stepnet", "Garage-5G", "Hotspot Ruben", "Buren-2G", "Telenet-8F2A", "Proximus-Home", "Werkplaats", "Gast-net"],
+      devs: ["Pixel 8", "Helm-headset", "VESC-BT", "Fietscomputer", "Oortjes L/R", "Actiecam"]
+    };
+    const nl = this.el("netlist");
+    nl.addEventListener("pointerdown", (e) => {
+      const b = e.target.closest("[data-name]");
+      this.nd = b ? { y: e.clientY, x: e.clientX, name: b.dataset.name } : null;
+    });
+    nl.addEventListener("pointerup", (e) => {
+      const d = this.nd;
+      this.nd = null;
+      if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
+      this.pickNet(d.name);
+    });
+    nl.addEventListener("pointercancel", () => { this.nd = null; });
+    this.ni = 0;
+    this.rot = setInterval(() => {
+      if ((this.noticeList || []).length > 1) { this.ni++; if (this.last) this.paintNotice(this.last); }
+    }, 3000);
+    this.applyTheme(this.wantLight());
+    this.show(this.view, true);
+
+    this.poll = setInterval(() => this.fetchData(), Math.max(80, this.props.pollMs || 150));
+    this.tick = setInterval(() => this.paint(), 165);
+    this.fetchData();
+    this.paint();
+    this.fetchWeather();
+    this.wx = setInterval(() => this.fetchWeather(), 300000);
+    this.fetchModem();
+    this.md = setInterval(() => this.fetchModem(), 10000);
+    this.paintWifi();
+    this.fetchWifi();
+    this.wf = setInterval(() => this.fetchWifi(), 10000);
+
+    const pn = this.el("panes");
+    pn.addEventListener("pointerdown", (e) => { this.tp = { x: e.clientX, y: e.clientY }; });
+    pn.addEventListener("pointerup", (e) => {
+      const t = this.tp;
+      this.tp = null;
+      if (!t || Math.abs(e.clientX - t.x) > 12 || Math.abs(e.clientY - t.y) > 12) return;
+      this.show((this.view + 1) % 3, true);
+    });
+    pn.addEventListener("pointercancel", () => { this.tp = null; });
+  }
+
+  componentWillUnmount() { clearInterval(this.poll); clearInterval(this.tick); clearInterval(this.rot); clearInterval(this.wx); clearInterval(this.md); clearInterval(this.wf); clearTimeout(this.blink); }
+
+  el(id) { return document.getElementById("sd-" + id); }
+
+  show(i, force) {
+    i = Math.max(0, Math.min(2, i));
+    if (i === this.view && !force) return;
+    for (let k = 0; k < 3; k++) {
+      this.el("p" + k).style.display = k === i ? "flex" : "none";
+      this.el("dot" + k).style.background = k === i ? "var(--color-accent)" : "var(--color-neutral-800)";
+    }
+    this.view = i;
+    if (this.el("net")) this.el("net").style.display = "none";
+    this.cache = {};
+    this.paint();
+  }
+
+  fetchData() {
+    if (this.props.forceDemo) { this.mode = "demo"; return; }
+    fetch("/data", { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw 0; return r.json(); })
+      .then((d) => { this.fails = 0; this.mode = d && d.connected === false ? "off" : "live"; this.last = d; })
+      .catch(() => { if (++this.fails > 2) this.mode = "demo"; });
+  }
+
+  openSys() {
+    const n = this.net;
+    const lv = this.wifiLevel == null ? 3 : this.wifiLevel;
+    this.el("sys-wifi").textContent = n.wifiOn
+      ? n.ssid + "  \u00b7  " + (lv >= 3 ? "sterk" : lv === 2 ? "matig" : "zwak")
+      : "niet verbonden";
+    this.el("sys-cell").textContent = this.cellBars
+      ? (this.cellTech || "?") + "  \u00b7  " + this.cellBars + "/5"
+      : "geen bereik";
+    this.el("sys").style.display = "flex";
+  }
+
+  setTheme(t) {
+    this.cfg.theme = t;
+    this.applyTheme(this.wantLight());
+    this.renderSettings();
+  }
+
+  bump(key, step, min, max) {
+    this.cfg[key] = Math.max(min, Math.min(max, (this.cfg[key] || 0) + step));
+    if (key === "tempWarn" && this.cfg.tempWarn > this.cfg.tempCrit) this.cfg.tempCrit = this.cfg.tempWarn;
+    if (key === "tempCrit" && this.cfg.tempCrit < this.cfg.tempWarn) this.cfg.tempWarn = this.cfg.tempCrit;
+    this.cache = {};
+    this.renderSettings();
+    this.paint();
+  }
+
+  pickStart(i) {
+    this.cfg.start = i;
+    this.renderSettings();
+    this.el("set").style.display = "none";
+    this.show(i, true);
+  }
+
+  setBright(step) {
+    this.cfg.bright = Math.max(20, Math.min(100, (this.cfg.bright || 80) + step));
+    fetch("/backlight", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: this.cfg.bright })
+    }).catch(() => {});
+    this.renderSettings();
+  }
+
+  renderSettings() {
+    const c = this.cfg;
+    this.el("set-bright").textContent = (c.bright || 80) + " %";
+    [0, 1, 2].forEach((k) => {
+      const b = this.el("st-" + k);
+      const on = (c.start || 0) === k;
+      b.style.color = on ? "var(--color-text)" : "var(--color-neutral-500)";
+      b.style.borderColor = on ? "var(--color-accent)" : "var(--color-neutral-800)";
+    });
+    this.el("set-warn").textContent = c.tempWarn + "\u00b0";
+    this.el("set-crit").textContent = c.tempCrit + "\u00b0";
+    [["th-auto", "Auto"], ["th-light", "Licht"], ["th-dark", "Donker"]].forEach(([id, v]) => {
+      const b = this.el(id);
+      const on = c.theme === v;
+      b.style.color = on ? "var(--color-text)" : "var(--color-neutral-500)";
+      b.style.borderColor = on ? "var(--color-accent)" : "var(--color-neutral-800)";
+    });
+  }
+
+  paintBt() {
+    const on = this.net && this.net.btOn;
+    this.el("bt").style.display = on ? "block" : "none";
+  }
+
+  paintWifi() {
+    this.paintBt();
+    const on = this.net && this.net.wifiOn;
+    this.el("wifi").style.display = on ? "block" : "none";
+    if (!on) return;
+    const lv = Math.max(1, Math.min(3, this.wifiLevel == null ? 3 : this.wifiLevel));
+    const c = lv === 1 ? "var(--color-warn)" : "var(--color-accent)";
+    this.el("wa0").setAttribute("fill", c);
+    for (let k = 1; k <= 3; k++) {
+      this.el("wa" + k).setAttribute("stroke", k <= lv ? c : "var(--color-neutral-800)");
+    }
+  }
+
+  fetchWifi() {
+    // /wifi levert {connected, ssid, level: 0..3}
+    fetch("/wifi", { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw 0; return r.json(); })
+      .then((w) => {
+        this.net.wifiOn = !!w.connected;
+        if (w.ssid) this.net.ssid = w.ssid;
+        this.wifiLevel = w.level;
+        this.paintWifi();
+      })
+      .catch(() => this.paintWifi());
+  }
+
+  fetchModem() {
+    // /modem levert {bars: 0..5, tech: "EDGE"|"2G"|"3G"|"4G"|"5G"}
+    fetch("/modem", { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw 0; return r.json(); })
+      .then((m) => this.paintSignal(m.bars, m.tech))
+      .catch(() => this.paintSignal(4, "5G"));
+  }
+
+  rememberCell(bars, tech) {
+    this.cellBars = Math.max(0, Math.min(5, bars || 0));
+    this.cellTech = tech;
+  }
+
+  paintSignal(bars, tech) {
+    this.rememberCell(bars, tech);
+    const b = this.cellBars;
+    const weak = b <= 1;
+    for (let k = 0; k < 5; k++) {
+      this.el("sig" + k).style.background = k < b
+        ? (weak ? "var(--color-warn)" : "var(--color-accent)")
+        : "var(--color-neutral-800)";
+    }
+    const t = this.el("tech");
+    t.textContent = b === 0 ? "GEEN" : (tech || "--");
+    t.style.color = b === 0 ? "var(--color-neutral-500)" : "var(--color-text)";
+  }
+
+  fetchWeather() {
+    // /weather levert {temp_c, place} — locatie via de 5G-verbinding van de Pi
+    fetch("/weather", { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw 0; return r.json(); })
+      .then((w) => {
+        if (typeof w.temp_c === "number") this.el("outtemp").textContent = w.temp_c.toFixed(0) + "\u00b0";
+        this.el("outplace").textContent = w.place || "";
+      })
+      .catch(() => {
+        this.el("outtemp").textContent = "18\u00b0";
+        this.el("outplace").textContent = "demo";
+      });
+  }
+
+  demoTick() {
+    const dm = this.dm;
+    dm.t += 0.15;
+    if (Math.random() < 0.02) dm.tgt = Math.random() < 0.25 ? 0 : 6 + Math.random() * 32;
+    dm.spd += (dm.tgt - dm.spd) * 0.06;
+    const spd = Math.max(0, dm.spd + Math.sin(dm.t * 1.7) * 0.35);
+    const pw = Math.max(0, spd * 26 + (dm.tgt - dm.spd) * 95 + Math.sin(dm.t) * 30);
+    const v = 50.4 - (100 - dm.bat) * 0.062 - pw / 900;
+    dm.bat -= pw * 0.0000045 + 0.0006;
+    if (dm.bat < 4) dm.bat = 96;
+    dm.wh += pw * 0.0000417;
+    dm.trip += spd * 0.0000417;
+    dm.tm += (30 + pw * 0.055 - dm.tm) * 0.0022;
+    dm.tf += (28 + pw * 0.040 - dm.tf) * 0.0025;
+    return {
+      connected: true, speed_kmh: spd, rpm: spd * 118, erpm: spd * 118 * 15,
+      duty: Math.min(0.97, spd / 42 + pw / 6000), battery_pct: dm.bat, voltage: v,
+      cell_voltage: v / 13, motor_current: pw / Math.max(20, v) * 1.6,
+      battery_current: pw / Math.max(20, v), power_w: pw,
+      temp_motor: dm.tm, temp_fet: dm.tf, wh_used: dm.wh, trip_km: dm.trip
+    };
+  }
+
+  txt(id, s) { if (this.cache["t" + id] !== s) { this.cache["t" + id] = s; this.el(id).textContent = s; } }
+  wide(id, p) {
+    const w = Math.max(0, Math.min(100, p || 0)).toFixed(0) + "%";
+    if (this.cache["w" + id] !== w) { this.cache["w" + id] = w; this.el(id).style.width = w; }
+  }
+  col(id, c) { if (this.cache["c" + id] !== c) { this.cache["c" + id] = c; this.el(id).style.color = c; } }
+  bg(id, c) { if (this.cache["b" + id] !== c) { this.cache["b" + id] = c; this.el(id).style.background = c; } }
+
+  tone(v, warn, crit) {
+    if (v >= crit) return "var(--color-crit)";
+    if (v >= warn) return "var(--color-warn)";
+    return "var(--color-text)";
+  }
+  batTone(v) {
+    if (v < 10) return "var(--color-crit)";
+    if (v < 20) return "var(--color-warn)";
+    return null;
+  }
+
+  paint() {
+    if (this.mode === "demo") this.last = this.demoTick();
+    const d = this.last;
+    if (!d) return;
+    const n = (v, k) => (typeof v === "number" && isFinite(v) ? v : 0).toFixed(k || 0);
+    const warn = this.cfg.tempWarn, crit = this.cfg.tempCrit;
+    const vmax = this.cfg.speedMax;
+
+    this.checkAlarm(d);
+    this.paintNotice(d);
+    if (this.wantLight() !== this.light) this.applyTheme(!this.light);
+    const now = new Date();
+    this.txt("clock", ("0" + now.getHours()).slice(-2) + ":" + ("0" + now.getMinutes()).slice(-2));
+    this.txt("stxt", this.mode === "live" ? "verbonden" : (this.mode === "off" ? "geen vesc" : "demo"));
+    this.bg("dot", this.mode === "live" ? "var(--color-accent)" : (this.mode === "off" ? "var(--color-crit)" : "var(--color-warn)"));
+
+    const bt = this.batTone(d.battery_pct);
+
+    if (this.view === 0) {
+      const lvl = d.battery_pct <= 15 ? "crit" : (d.battery_pct <= 30 ? "warn" : "ok");
+      if (this.cache.batlvl !== lvl) {
+        this.cache.batlvl = lvl;
+        const fill = lvl === "crit" ? "var(--color-crit-fill)" : (lvl === "warn" ? "var(--color-warn-fill)" : "var(--color-surface)");
+        const fg = lvl === "crit" ? "#f3f5fe" : (lvl === "warn" ? "#161826" : "var(--color-text)");
+        const sub = lvl === "ok" ? "var(--color-neutral-500)" : fg;
+        const edge = lvl === "ok" ? "var(--color-neutral-800)" : fill;
+        ["batcard", "rangecard"].forEach((c) => {
+          const e = this.el(c);
+          e.style.background = fill;
+          e.style.borderColor = edge;
+          e.style.color = fg;
+        });
+        ["bat-k", "bat-u", "range-k", "range-u"].forEach((c) => { this.el(c).style.color = sub; });
+        this.el("battrack").style.background = lvl === "ok" ? "var(--color-neutral-900)" : "rgba(22,24,38,0.25)";
+        this.cache.cbat = null; this.cache.crange = null; this.cache.bbatbar = null;
+      }
+      const bfill = lvl === "ok" ? "var(--color-accent)" : (lvl === "crit" ? "#f3f5fe" : "#161826");
+      this.bg("batbar", bfill);
+      this.col("bat", lvl === "ok" ? "var(--color-text)" : "inherit");
+      this.col("range", lvl === "ok" ? "var(--color-text)" : "inherit");
+    }
+    if (this.view === 0) {
+      this.topSpeed = Math.max(this.topSpeed || 0, d.speed_kmh || 0);
+      this.txt("vmaxtxt", n(this.topSpeed));
+      this.txt("speed", n(d.speed_kmh));
+      this.wide("speedbar", d.speed_kmh / vmax * 100);
+      this.txt("bat", n(d.battery_pct));
+      this.wide("batbar", d.battery_pct);
+      const packWh = this.cfg.packWh;
+      const whkm = d.trip_km > 0.3 ? d.wh_used / d.trip_km : this.cfg.whPerKm;
+      const range = Math.max(0, packWh * d.battery_pct / 100) / Math.max(5, whkm);
+      this.txt("range", n(range, 1));
+    } else if (this.view === 1) {
+      this.txt("tm", n(d.temp_motor));
+      this.col("tm", this.tone(d.temp_motor, warn, crit));
+      this.txt("tf", n(d.temp_fet));
+      this.col("tf", this.tone(d.temp_fet, warn, crit));
+      this.txt("duty", n(d.duty * 100));
+      this.wide("dutybar", d.duty * 100);
+      this.txt("im", n(d.motor_current, 1));
+      this.txt("ib", n(d.battery_current, 1));
+      this.txt("rpm", n(d.rpm));
+    } else {
+      this.txt("vv", n(d.voltage, 1));
+      this.txt("vc", n(d.cell_voltage, 2));
+      this.txt("bat2", n(d.battery_pct));
+      this.col("bat2", bt || "var(--color-text)");
+      this.wide("bat2bar", d.battery_pct);
+      this.bg("bat2bar", bt || "var(--color-accent)");
+      this.txt("wh", n(d.wh_used));
+      this.txt("trip", n(d.trip_km, 1));
+      this.txt("whkm", d.trip_km > 0.2 ? n(d.wh_used / d.trip_km, 1) : "\u2014");
+    }
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=480,height=320,initial-scale=1,user-scalable=no">
+<title>Step Dashboard</title>
+<style>
+:root{
+  --bg:#161826; --surface:#232532; --surface-2:#292b31; --text:#e9e9ed;
+  --muted:#9397ab; --line:#3f424d; --accent:#968ae0; --accent-dim:#5d5294;
+  --warn:#e0a94a; --crit:#e0645c; --warn-fill:#e0a94a; --crit-fill:#e0645c;
+}
+body.light{
+  --bg:#f3f5fe; --surface:#e4e7f5; --surface-2:#cfd3e5; --text:#292b31;
+  --muted:#595d6c; --line:#cfd3e5; --accent:#5d5294; --accent-dim:#796cbf;
+  --warn:#8a5d10; --crit:#a83229; --warn-fill:#e0a94a; --crit-fill:#a83229;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;width:480px;height:320px;overflow:hidden}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:system-ui,-apple-system,"DejaVu Sans",sans-serif;
+  font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+  user-select:none; -webkit-user-select:none;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  cursor:none;
+}
+#app{position:relative;width:480px;height:320px;display:flex;flex-direction:column}
+
+/* ── top bar ───────────────────────────────────────────── */
+#top{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:0 10px;border-bottom:1px solid var(--line)}
+#topleft{display:flex;align-items:center;gap:10px;min-width:0}
+#outside{display:flex;align-items:center;gap:5px;flex:none;color:var(--muted)}
+#outside svg{flex:none}
+#outtemp{font-size:14px;color:var(--text)}
+#outplace{font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+#notice{display:none;align-items:center;gap:7px;height:34px;max-width:300px;padding:0;background:transparent;border:0;color:var(--warn);font:inherit;font-size:14px;text-align:left}
+#notice.on{display:flex}
+#notice.crit{color:var(--crit)}
+#notice svg{flex:none}
+#noticetxt{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+#status{display:flex;align-items:center;gap:10px;height:34px;padding-left:10px;font-size:12px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted)}
+#statusbtn{display:flex;align-items:center;gap:6px;height:34px;padding:0 0 0 6px;background:transparent;border:0;color:inherit;font:inherit;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+#sys,#settings{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:6px;background:var(--bg);padding:8px 10px;z-index:4}
+#sys.on,#settings.on{display:flex}
+.ovhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+.xbtn{width:56px;height:44px;flex:none;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.inforows{display:flex;flex-direction:column;gap:6px;flex:none}
+.inforow{height:46px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:16px}
+.inforow .lbl{width:74px;flex:none}
+.lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.sysbtns{margin-top:auto;display:flex;gap:6px;flex:none}
+.pbtn,.sbtn{flex:1;height:56px;background:transparent;color:var(--text);border:1px solid var(--accent);border-radius:8px;font:inherit;font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+.sbtn{color:var(--muted);border-color:var(--line)}
+#setlist{flex:1;display:flex;flex-direction:column;gap:6px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
+#setlist::-webkit-scrollbar{width:0}
+.setrow{min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.setrow .lbl{flex:1}
+.startseg{width:66px;height:44px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font:inherit;font-size:13px;text-transform:uppercase}
+.startseg.on{color:var(--text);border-color:var(--accent)}
+.seg{width:66px;height:44px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font:inherit;font-size:13px;text-transform:uppercase}
+.seg.on{color:var(--text);border-color:var(--accent)}
+.step{width:56px;height:44px;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:4px;font:inherit;font-size:20px}
+.val{width:64px;text-align:center;font-size:18px}
+.val.wide{width:78px}
+#notices{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:6px;background:var(--bg);padding:8px 10px;z-index:3}
+#notices.on{display:flex}
+#noticeshead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+#noticesclose{width:56px;height:44px;flex:none;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center}
+#noticelist{flex:1;display:flex;flex-direction:column;gap:6px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
+#noticelist::-webkit-scrollbar{width:0}
+#noticelist .row{min-height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px}
+#noticelist .row.crit{border-left-color:var(--crit)}
+#noticelist .row .msg{font-size:16px;line-height:1.2}
+#noticelist .row .lv{margin-left:auto;flex:none;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--warn)}
+#noticelist .row.crit .lv{color:var(--crit)}
+#noticelist .row svg{flex:none;color:var(--warn)}
+#noticelist .row.crit svg{color:var(--crit)}
+#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:9px;padding:17px 22px;background:var(--crit-fill);color:#161826;z-index:5}
+#alarm.on{display:flex}
+#alarmhead{display:flex;align-items:center;gap:11px}
+#alarmtitle{font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
+#alarmmsg{font-size:22px;line-height:1.25;align-self:center;text-align:center;white-space:pre-line}
+#alarmclose{height:56px;min-width:160px;align-self:center;margin-top:6px;padding:0 17px;background:transparent;color:#161826;border:2px solid #161826;border-radius:8px;font:inherit;font-size:16px;letter-spacing:.09em;text-transform:uppercase}
+#net{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:6px;background:var(--bg);padding:8px 10px;z-index:2}
+#net.on{display:flex}
+#netseg{display:flex;gap:6px;flex:none}
+#netseg button,#netclose{height:44px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+#netseg button{flex:1}
+#netseg button.on{color:var(--text);border-color:var(--accent)}
+#netclose{width:56px;flex:none;display:flex;align-items:center;justify-content:center}
+#netlist{flex:1;display:flex;flex-direction:column;gap:6px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
+#netlist::-webkit-scrollbar{width:0}
+#netlist button{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;font-size:16px;text-align:left}
+#netlist button.sel{background:var(--accent-dim);border-color:var(--accent)}
+#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#netlist .st{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+#netlist button.sel .st{color:var(--text)}
+#wifiico,#btico{display:none;flex:none}
+#sig{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+#sig span{width:3px;border-radius:1px;background:var(--line)}
+#sig span:nth-child(1){height:4px}
+#sig span:nth-child(2){height:6px}
+#sig span:nth-child(3){height:8px}
+#sig span:nth-child(4){height:11px}
+#sig span:nth-child(5){height:14px}
+#sig span.on{background:var(--accent)}
+#sig span.weak{background:var(--warn)}
+#tech{font-size:11px;letter-spacing:.06em;color:var(--text);margin-right:2px}
+#clock{font-size:15px;letter-spacing:.02em;color:var(--text);margin-right:5px}
+#dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+#dot.demo{background:var(--warn)}
+#dot.off{background:var(--crit)}
+
+/* ── panes ─────────────────────────────────────────────── */
+#panes{flex:1;position:relative}
+.pane{position:absolute;inset:0;display:none;padding:8px 10px}
+.pane.on{display:flex}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:6px 9px;display:flex;flex-direction:column;justify-content:center}
+.k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);line-height:1.2}
+.v{font-family:inherit;font-weight:500;line-height:1}
+.u{font-size:12px;color:var(--muted);font-weight:400;margin-left:3px}
+
+/* speed */
+#p1{gap:9px}
+#speedbox{flex:1;display:flex;flex-direction:column;justify-content:center}
+#speed{font-size:118px;font-weight:600;line-height:.86;letter-spacing:-.04em}
+#speedrow{display:flex;align-items:flex-end;gap:8px}
+#speedunit{font-size:19px;color:var(--muted);letter-spacing:.06em;padding-bottom:14px}
+#vmaxtxt{font-size:12px;letter-spacing:.06em;margin-top:2px}
+#bar{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;margin-top:12px}
+#barfill{height:100%;width:0%;background:var(--accent)}
+#side{width:168px;flex:none;display:flex;flex-direction:column;gap:9px}
+#side .card{flex:1}
+#batbar{height:9px;background:var(--surface-2);border-radius:4px;overflow:hidden;margin-top:6px}
+#batfill{height:100%;width:0%;background:var(--accent)}
+.big{font-size:34px}
+.mid{font-size:26px}
+
+/* grid panes */
+.grid{display:grid;gap:8px;width:100%}
+#p2 .grid{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
+#p3 .grid{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr}
+#p2 .card,#p3 .card{gap:3px}
+.trk{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:5px}
+.trk > i{display:block;height:100%;width:0%;background:var(--accent)}
+
+.card.low{background:var(--warn-fill);border-color:var(--warn-fill);color:#161826}
+.card.low .k,.card.low .u{color:#161826}
+.card.low #batfill{background:#161826}
+.card.low #batbar{background:rgba(22,24,38,.25)}
+.card.empty{background:var(--crit-fill);border-color:var(--crit-fill);color:#f3f5fe}
+.card.empty .k,.card.empty .u{color:#f3f5fe}
+.card.empty #batfill{background:#f3f5fe}
+.card.empty #batbar{background:rgba(22,24,38,.25)}
+.card.low #bat,.card.empty #bat,.card.low #range,.card.empty #range{color:inherit}
+.warn{color:var(--warn)} .crit{color:var(--crit)}
+.fill-warn{background:var(--warn)!important} .fill-crit{background:var(--crit)!important}
+
+/* ── tabs ──────────────────────────────────────────────── */
+#dots{height:16px;flex:none;display:flex;align-items:center;justify-content:center;gap:6px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.dot.on{background:var(--accent)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div id="topleft">
+    <div id="outside">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
+      <span id="outtemp">--&deg;</span>
+      <span id="outplace">--</span>
+    </div>
+    <button id="notice">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <span id="noticetxt">--</span>
+    </button>
+    </div>
+    <div id="status"><svg id="wifiico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke-width="2" stroke-linecap="round">
+      <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0"/>
+      <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0"/>
+      <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0"/>
+      <circle id="wadot" cx="12" cy="19.4" r="1.1" stroke="none"/>
+    </svg><svg id="btico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg><div id="sig"><span></span><span></span><span></span><span></span><span></span></div><span id="tech">--</span><span id="clock">--:--</span><button id="statusbtn"><span id="dot"></span><span id="stxt">demo</span></button></div>
+  </div>
+
+  <div id="panes">
+    <!-- 1 · RIT -->
+    <div class="pane on" id="p1">
+      <div id="speedbox">
+        <div id="speedrow"><div id="speed">0</div><div id="speedunit">km/u<div id="vmaxtxt">max 0</div></div></div>
+        <div id="bar"><div id="barfill"></div></div>
+      </div>
+      <div id="side">
+        <div class="card" id="batcard">
+          <div class="k">Batterij</div>
+          <div class="v big" id="bat">0<span class="u">%</span></div>
+          <div id="batbar"><div id="batfill"></div></div>
+        </div>
+        <div class="card" id="rangecard">
+          <div class="k">Bereik ca.</div>
+          <div class="v big" id="range">0<span class="u">km</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · MOTOR -->
+    <div class="pane" id="p2">
+      <div class="grid">
+        <div class="card"><div class="k">Motor °C</div><div class="v big" id="tm">0</div></div>
+        <div class="card"><div class="k">FET °C</div><div class="v big" id="tf">0</div></div>
+        <div class="card"><div class="k">Duty</div><div class="v big" id="duty">0<span class="u">%</span></div>
+          <div class="trk"><i id="dutyf"></i></div></div>
+        <div class="card"><div class="k">Motorstroom</div><div class="v mid" id="im">0<span class="u">A</span></div></div>
+        <div class="card"><div class="k">Accustroom</div><div class="v mid" id="ib">0<span class="u">A</span></div></div>
+        <div class="card"><div class="k">RPM</div><div class="v mid" id="rpm">0</div></div>
+      </div>
+    </div>
+
+    <!-- 3 · ACCU -->
+    <div class="pane" id="p3">
+      <div class="grid">
+        <div class="card"><div class="k">Accuvoltage</div><div class="v mid" id="vv">0<span class="u">V</span></div></div>
+        <div class="card"><div class="k">Cel</div><div class="v mid" id="vc">0<span class="u">V</span></div></div>
+        <div class="card"><div class="k">Accupercentage</div><div class="v mid" id="bat2">0<span class="u">%</span></div>
+          <div class="trk"><i id="bat2f"></i></div></div>
+        <div class="card"><div class="k">Verbruikt</div><div class="v mid" id="wh">0<span class="u">Wh</span></div></div>
+        <div class="card"><div class="k">Afstand</div><div class="v mid" id="trip">0<span class="u">km</span></div></div>
+        <div class="card"><div class="k">Wh / km</div><div class="v mid" id="whkm">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sys">
+    <div class="ovhead">
+      <div class="k">Systeem</div>
+      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="inforows">
+      <div class="inforow"><span class="lbl">Wi-Fi</span><span id="syswifi">--</span></div>
+      <div class="inforow"><span class="lbl">Mobiel</span><span id="syscell">--</span></div>
+    </div>
+    <div class="sysbtns">
+      <button id="sysnet" class="pbtn">Verbindingen</button>
+      <button id="sysset" class="pbtn">Instellingen</button>
+      <button id="sysdesk" class="sbtn">Desktop</button>
+    </div>
+  </div>
+
+  <div id="settings">
+    <div class="ovhead">
+      <div class="k">Instellingen</div>
+      <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <div id="setlist">
+      <div class="setrow"><span class="lbl">Thema</span>
+        <button class="seg" data-theme="Auto">Auto</button>
+        <button class="seg" data-theme="Licht">Licht</button>
+        <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp waarschuwing</span>
+        <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
+        <span class="val" id="setwarn">70&deg;</span>
+        <button class="step" data-k="tempWarn" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp kritiek</span>
+        <button class="step" data-k="tempCrit" data-d="-5">&minus;</button>
+        <span class="val" id="setcrit">90&deg;</span>
+        <button class="step" data-k="tempCrit" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Schermhelderheid</span>
+        <button class="step bright" data-d="-10">&minus;</button>
+        <span class="val wide" id="setbright">80 %</span>
+        <button class="step bright" data-d="10">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Startscherm</span>
+        <button class="startseg" data-i="0">Rit</button>
+        <button class="startseg" data-i="1">Motor</button>
+        <button class="startseg" data-i="2">Accu</button>
+      </div>
+      <div class="setrow"><span class="lbl">Topsnelheid</span>
+        <button id="toprst" class="pbtn" style="flex:none;height:44px;padding:0 12px">Reset</button>
+      </div>
+      <div class="setrow"><span class="lbl">Rit-teller</span>
+        <button id="triprst" class="pbtn" style="flex:none;height:44px;padding:0 12px">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notices">
+    <div id="noticeshead">
+      <div class="k">Meldingen</div>
+      <button id="noticesclose"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="noticelist"></div>
+  </div>
+
+  <div id="alarm">
+    <div id="alarmhead">
+      <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <div id="alarmtitle">WARNING</div>
+    </div>
+    <div id="alarmmsg">Motortemperatuur te hoog</div>
+    <button id="alarmclose">Bevestigen</button>
+  </div>
+
+  <div id="net">
+    <div id="netseg">
+      <button id="segwifi" class="on">Wi-Fi</button>
+      <button id="segbt">Bluetooth</button>
+      <button id="netclose"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="netlist"></div>
+  </div>
+
+  <div id="dots">
+    <span class="dot on"></span><span class="dot"></span><span class="dot"></span>
+  </div>
+</div>
+
+<script>
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var panes = [$("p1"),$("p2"),$("p3")];
+var dots  = [].slice.call(document.querySelectorAll(".dot"));
+var view = 0;
+
+function show(i){
+  i = i < 0 ? 0 : (i > 2 ? 2 : i);
+  if (i === view) return;
+  panes[view].className = "pane";
+  dots[view].className = "dot";
+  view = i;
+  panes[i].className = "pane on";
+  dots[i].className = "dot on";
+  $("net").classList.remove("on");
+  paint(last, true);
+}
+
+/* touch: tik op het scherm wisselt van pagina */
+/* systeempaneel + instellingen */
+var cfg = { theme:"Auto", tempWarn:70, tempCrit:90, packWh:700, whPerKm:20, speedMax:35, bright:80, start:0 };
+var cell = { bars:0, tech:null };
+function openSys(){
+  var lv = wifiLevel == null ? 3 : wifiLevel;
+  $("syswifi").textContent = net.wifiOn
+    ? net.ssid + "  \u00b7  " + (lv >= 3 ? "sterk" : lv === 2 ? "matig" : "zwak")
+    : "niet verbonden";
+  $("syscell").textContent = cell.bars ? (cell.tech || "?") + "  \u00b7  " + cell.bars + "/5" : "geen bereik";
+  $("sys").classList.add("on");
+}
+function renderSettings(){
+  $("setbright").textContent = cfg.bright + " %";
+  [].slice.call(document.querySelectorAll(".startseg")).forEach(function(b){
+    b.className = "startseg" + (+b.dataset.i === cfg.start ? " on" : "");
+  });
+  $("setwarn").textContent = cfg.tempWarn + "\u00b0";
+  $("setcrit").textContent = cfg.tempCrit + "\u00b0";
+  [].slice.call(document.querySelectorAll(".seg")).forEach(function(b){
+    b.className = "seg" + (b.dataset.theme === cfg.theme ? " on" : "");
+  });
+}
+function bump(key, step){
+  var lim = { tempWarn:[40,120], tempCrit:[50,130], packWh:[200,2000], speedMax:[20,80], whPerKm:[8,60] }[key];
+  cfg[key] = Math.max(lim[0], Math.min(lim[1], cfg[key] + step));
+  if (key === "tempWarn" && cfg.tempWarn > cfg.tempCrit) cfg.tempCrit = cfg.tempWarn;
+  if (key === "tempCrit" && cfg.tempCrit < cfg.tempWarn) cfg.tempWarn = cfg.tempCrit;
+  TW = cfg.tempWarn; TC = cfg.tempCrit; PACK_WH = cfg.packWh; VMAX = cfg.speedMax; WHKM = cfg.whPerKm;
+  cacheT = {}; cacheS = {};
+  renderSettings();
+}
+$("status").addEventListener("pointerdown", function(e){ e.preventDefault(); openSys(); });
+$("sysclose").addEventListener("pointerdown", function(e){ e.preventDefault(); $("sys").classList.remove("on"); });
+$("sysnet").addEventListener("pointerdown", function(e){ e.preventDefault(); $("sys").classList.remove("on"); openNet("wifi"); });
+$("sysset").addEventListener("pointerdown", function(e){ e.preventDefault(); $("sys").classList.remove("on"); renderSettings(); $("settings").classList.add("on"); });
+$("setclose").addEventListener("pointerdown", function(e){ e.preventDefault(); $("settings").classList.remove("on"); openSys(); });
+$("sysdesk").addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  var b = $("sysdesk");
+  b.textContent = "Verlaten\u2026";
+  fetch("/desktop", { method:"POST" }).then(function(r){
+    if (!r.ok) throw 0;
+    b.textContent = "Desktop";
+  })["catch"](function(){
+    b.textContent = "Niet beschikbaar";
+    setTimeout(function(){ b.textContent = "Desktop"; }, 2000);
+  });
+});
+$("toprst").addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  topSpeed = 0;
+  cacheT = {}; cacheS = {};
+});
+$("triprst").addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  dm.trip = 0; dm.wh = 0;
+  fetch("/reset-trip", { method:"POST" })["catch"](function(){});
+  cacheT = {}; cacheS = {};
+});
+$("setlist").addEventListener("pointerdown", function(e){
+  var br = e.target.closest(".step.bright");
+  if (br) {
+    e.preventDefault();
+    cfg.bright = Math.max(20, Math.min(100, cfg.bright + (+br.dataset.d)));
+    fetch("/backlight", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ level: cfg.bright }) })["catch"](function(){});
+    renderSettings();
+    return;
+  }
+  var s = e.target.closest(".step");
+  if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
+  var t = e.target.closest(".seg");
+  if (t) { e.preventDefault(); cfg.theme = t.dataset.theme; autoTheme(true); renderSettings(); return; }
+  var s2 = e.target.closest(".startseg");
+  if (s2) {
+    e.preventDefault();
+    cfg.start = +s2.dataset.i;
+    renderSettings();
+    $("settings").classList.remove("on");
+    show(cfg.start);
+  }
+});
+
+/* wifi- en bluetoothsterkte in de topbalk */
+var wifiLevel = null;
+function paintWifi(){
+  if (!window.net) return;
+  $("btico").style.display = net.btOn ? "block" : "none";
+  $("wifiico").style.display = net.wifiOn ? "block" : "none";
+  if (!net.wifiOn) return;
+  var lv = Math.max(1, Math.min(3, wifiLevel == null ? 3 : wifiLevel));
+  var c = lv === 1 ? "var(--warn)" : "var(--accent)";
+  $("wadot").setAttribute("fill", c);
+  [].slice.call(document.querySelectorAll("#wifiico .wa")).forEach(function(p){
+    p.setAttribute("stroke", +p.dataset.lv <= lv ? c : "var(--line)");
+  });
+}
+function fetchWifi(){
+  if (!window.net) return;
+  fetch("/wifi", { cache:"no-store" }).then(function(r){
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function(w){
+    net.wifiOn = !!w.connected;
+    if (w.ssid) net.ssid = w.ssid;
+    wifiLevel = w.level;
+    paintWifi();
+  })["catch"](function(){ paintWifi(); });
+}
+setTimeout(fetchWifi, 0);
+setInterval(fetchWifi, 10000);
+
+/* mobiel bereik — /modem geeft {bars:0..5, tech:"EDGE|2G|3G|4G|5G"} */
+var sigbars = [].slice.call(document.querySelectorAll("#sig span"));
+function paintSignal(bars, tech){
+  var b = Math.max(0, Math.min(5, bars || 0));
+  cell.bars = b; cell.tech = tech;
+  var weak = b <= 1;
+  sigbars.forEach(function(s, k){ s.className = k < b ? (weak ? "weak" : "on") : ""; });
+  var t = $("tech");
+  t.textContent = b === 0 ? "GEEN" : (tech || "--");
+  t.style.color = b === 0 ? "var(--muted)" : "var(--text)";
+}
+function fetchModem(){
+  fetch("/modem", { cache:"no-store" }).then(function(r){
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function(m){ paintSignal(m.bars, m.tech); })["catch"](function(){ paintSignal(4, "5G"); });
+}
+fetchModem();
+setInterval(fetchModem, 10000);
+
+/* buitentemperatuur — /weather geeft {temp_c, place}, locatie via 5G */
+function fetchWeather(){
+  fetch("/weather", { cache:"no-store" }).then(function(r){
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function(w){
+    if (typeof w.temp_c === "number") $("outtemp").textContent = w.temp_c.toFixed(0) + "\u00b0";
+    $("outplace").textContent = w.place || "";
+  })["catch"](function(){
+    $("outtemp").textContent = "18\u00b0";
+    $("outplace").textContent = "demo";
+  });
+}
+fetchWeather();
+setInterval(fetchWeather, 300000);
+
+/* meldingen in de topbalk */
+var noticeList = [];
+function notices(d){
+  var out = [];
+  if (MODE === "off") out.push({ lv:2, t:"Geen VESC-verbinding" });
+  var tm = d.temp_motor || 0, tf = d.temp_fet || 0, bp = d.battery_pct || 0;
+  if (tm >= TC) out.push({ lv:2, t:"Motor " + tm.toFixed(0) + "\u00b0C \u2014 stop en laat afkoelen" });
+  else if (tm >= TW) out.push({ lv:1, t:"Motor " + tm.toFixed(0) + "\u00b0C \u2014 verminder belasting" });
+  if (tf >= TC) out.push({ lv:2, t:"FET " + tf.toFixed(0) + "\u00b0C \u2014 stop en laat afkoelen" });
+  else if (tf >= TW) out.push({ lv:1, t:"FET " + tf.toFixed(0) + "\u00b0C \u2014 verminder belasting" });
+  if (bp < 10) out.push({ lv:2, t:"Accu " + bp.toFixed(0) + "% \u2014 bijna leeg" });
+  else if (bp < 20) out.push({ lv:1, t:"Accu " + bp.toFixed(0) + "% \u2014 laag" });
+  if ((d.duty || 0) > 0.95) out.push({ lv:1, t:"Duty 95%+ \u2014 geen reserve" });
+  out.sort(function(a,b){ return b.lv - a.lv; });
+  return out;
+}
+var ni = 0;
+function paintNotice(d){
+  noticeList = notices(d);
+  var b = $("notice");
+  if (!noticeList.length) {
+    ni = 0;
+    if (cacheS.nz !== "0") { cacheS.nz = "0"; b.className = ""; $("notices").classList.remove("on"); }
+    return;
+  }
+  var sig = noticeList.map(function(x){ return x.lv + x.t; }).join("|");
+  if ($("notices").classList.contains("on") && cacheS.nsig !== sig) { cacheS.nsig = sig; renderNotices(); }
+  var cur = noticeList[ni % noticeList.length];
+  var key = cur.lv + "|" + cur.t;
+  if (cacheS.nz === key) return;
+  cacheS.nz = key;
+  b.className = "on" + (cur.lv === 2 ? " crit" : "");
+  $("noticetxt").textContent = cur.t;
+}
+setInterval(function(){
+  if (noticeList.length > 1) { ni++; paintNotice(last); }
+}, 3000);
+function renderNotices(){
+  $("noticelist").innerHTML = noticeList.map(function(nt){
+    return '<div class="row' + (nt.lv === 2 ? " crit" : "") + '">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>' +
+      '<div class="msg">' + nt.t + '</div>' +
+      '<div class="lv">' + (nt.lv === 2 ? "fout" : "let op") + '</div></div>';
+  }).join("");
+}
+$("notice").addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  if (!noticeList.length) return;
+  renderNotices();
+  $("notices").classList.add("on");
+});
+$("noticesclose").addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  $("notices").classList.remove("on");
+});
+
+/* temperatuur-alarm */
+var TW = 70, TC = 90, VMAX = 35, WHKM = 20;
+var topSpeed = 0;   // drempels (amber / rood) + volle snelheidsbalk
+var alarm = { level:null, acked:{} };
+var blink = null;
+function checkAlarm(d){
+  var tm = d.temp_motor || 0, tf = d.temp_fet || 0, hot = Math.max(tm, tf);
+  var level = hot >= TC ? "crit" : (hot >= TW ? "warn" : null);
+  var el = $("alarm");
+  if (!level) {
+    if (alarm.level) {
+      alarm.level = null; alarm.acked = {};
+      clearTimeout(blink); blink = null;
+      el.classList.remove("on");
+    }
+    return;
+  }
+  if (level === alarm.level) return;
+  alarm.level = level;
+  el.style.background = level === "crit" ? "var(--crit-fill)" : "var(--warn-fill)";
+  el.style.color = level === "crit" ? "#f3f5fe" : "#161826";
+  $("alarmclose").style.color = level === "crit" ? "#f3f5fe" : "#161826";
+  $("alarmclose").style.borderColor = level === "crit" ? "#f3f5fe" : "#161826";
+  $("alarmmsg").textContent =
+    (tm >= tf ? "Motortemperatuur " + tm.toFixed(0) : "FET-temperatuur " + tf.toFixed(0)) +
+    "\u00b0C \u2014 " + (level === "crit" ? "stop en laat afkoelen" : "verminder belasting");
+  if (alarm.acked[level]) return;
+  clearTimeout(blink);
+  var step = 0;
+  el.classList.add("on");
+  var next = function(){
+    step++;
+    if (step >= 6) { blink = null; el.classList.add("on"); return; }
+    if (step % 2 === 1) el.classList.remove("on"); else el.classList.add("on");
+    blink = setTimeout(next, 500);
+  };
+  blink = setTimeout(next, 500);
+}
+$("alarmclose").addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  clearTimeout(blink); blink = null;
+  alarm.acked[alarm.level] = true;
+  $("alarm").classList.remove("on");
+});
+
+/* netwerk / bluetooth */
+var net = {
+  tab:"wifi", wifiOn:true, ssid:"Stepnet", btOn:false, dev:"Pixel 8",
+  nets:["Stepnet","Garage-5G","Hotspot Ruben","Buren-2G","Telenet-8F2A","Proximus-Home","Werkplaats","Gast-net"],
+  devs:["Pixel 8","Helm-headset","VESC-BT","Fietscomputer","Oortjes L/R","Actiecam"]
+};
+function renderNet(){
+  var wifi = net.tab === "wifi";
+  var items = wifi ? net.nets : net.devs;
+  var active = wifi ? (net.wifiOn ? net.ssid : null) : (net.btOn ? net.dev : null);
+  $("netlist").innerHTML = items.map(function(it){
+    var sel = it === active;
+    return '<button data-name="' + it + '"' + (sel ? ' class="sel"' : '') + '><span class="nm">' + it +
+      '</span><span class="st">' + (sel ? "verbonden" : "verbind") + '</span></button>';
+  }).join("");
+}
+function openNet(tab){
+  net.tab = tab;
+  $("net").classList.add("on");
+  $("segwifi").className = tab === "wifi" ? "on" : "";
+  $("segbt").className = tab === "bt" ? "on" : "";
+  renderNet();
+}
+function pickNet(name){
+  if (net.tab === "wifi") {
+    if (net.wifiOn && net.ssid === name) net.wifiOn = false; else { net.ssid = name; net.wifiOn = true; }
+  } else if (net.btOn && net.dev === name) net.btOn = false; else { net.dev = name; net.btOn = true; }
+  paintWifi();
+  fetch("/net", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ kind:net.tab, name:name, connect: net.tab === "wifi" ? net.wifiOn : net.btOn })
+  })["catch"](function(){});
+  renderNet();
+}
+$("segwifi").addEventListener("pointerdown", function(e){ e.preventDefault(); openNet("wifi"); });
+$("segbt").addEventListener("pointerdown", function(e){ e.preventDefault(); openNet("bt"); });
+$("netclose").addEventListener("pointerdown", function(e){ e.preventDefault(); $("net").classList.remove("on"); });
+var nd = null;
+$("netlist").addEventListener("pointerdown", function(e){
+  var b = e.target.closest("[data-name]");
+  nd = b ? { x:e.clientX, y:e.clientY, name:b.dataset.name } : null;
+});
+$("netlist").addEventListener("pointerup", function(e){
+  var d = nd; nd = null;
+  if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
+  pickNet(d.name);
+});
+$("netlist").addEventListener("pointercancel", function(){ nd = null; });
+/* light / dark — automatisch: 07:30-18:00 licht, daarbuiten donker */
+function autoTheme(force){
+  var d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  var light = cfg.theme === "Licht" ? true : cfg.theme === "Donker" ? false : (m >= 450 && m < 1080);
+  if (force) { document.body.classList.toggle("light", light); cacheT = {}; cacheS = {}; return; }
+  if (light !== document.body.classList.contains("light")) {
+    document.body.classList.toggle("light", light);
+    cacheT = {}; cacheS = {};
+  }
+}
+
+var tp = null;
+var pn = $("panes");
+pn.addEventListener("pointerdown", function(e){ tp = { x:e.clientX, y:e.clientY }; });
+pn.addEventListener("pointerup", function(e){
+  var t = tp; tp = null;
+  if (!t || Math.abs(e.clientX - t.x) > 12 || Math.abs(e.clientY - t.y) > 12) return;
+  show((view + 1) % 3);
+});
+pn.addEventListener("pointercancel", function(){ tp = null; });
+document.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+
+/* ── data ──────────────────────────────────────────────── */
+var MODE = "demo";              // "live" | "demo" | "off"
+var PACK_WH = 700;              // accucapaciteit voor de bereikschatting
+var liveFails = 0;
+var dm = { t:0, spd:0, tgt:14, bat:87, wh:120, trip:6.4, tm:42, tf:38 };
+var last = demoTick(0);
+
+function poll(){
+  fetch("/data", { cache: "no-store" }).then(function(r){
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function(d){
+    liveFails = 0;
+    MODE = d && d.connected === false ? "off" : "live";
+    last = d;
+  })["catch"](function(){
+    liveFails++;
+    if (liveFails > 2) { MODE = "demo"; last = demoTick(performance.now()); }
+  });
+}
+setInterval(poll, 150);
+
+/* demo ride simulation */
+function demoTick(now){
+  dm.t += 0.15;
+  if (Math.random() < 0.02) dm.tgt = Math.random() < 0.25 ? 0 : 6 + Math.random() * 32;
+  dm.spd += (dm.tgt - dm.spd) * 0.06;
+  var spd = Math.max(0, dm.spd + Math.sin(dm.t * 1.7) * 0.35);
+  var accel = (dm.tgt - dm.spd);
+  var pw = Math.max(0, spd * 26 + accel * 95 + Math.sin(dm.t) * 30);
+  var v = 50.4 - (100 - dm.bat) * 0.062 - pw / 900;
+  dm.bat -= pw * 0.0000045 + 0.0006;
+  if (dm.bat < 4) dm.bat = 96;
+  dm.wh += pw * 0.0000417;
+  dm.trip += spd * 0.0000417;
+  dm.tm += (30 + pw * 0.055 - dm.tm) * 0.0022;
+  dm.tf += (28 + pw * 0.040 - dm.tf) * 0.0025;
+  return {
+    connected:true, speed_kmh:spd, rpm:spd * 118, erpm:spd * 118 * 15,
+    duty:Math.min(0.97, spd / 42 + pw / 6000), battery_pct:dm.bat, voltage:v,
+    cell_voltage:v / 13, motor_current:pw / Math.max(20, v) * 1.6,
+    battery_current:pw / Math.max(20, v), power_w:pw,
+    temp_motor:dm.tm, temp_fet:dm.tf, wh_used:dm.wh, trip_km:dm.trip
+  };
+}
+
+/* ── render (≈6 Hz, only touched nodes) ───────────────── */
+var cacheT = {}, cacheS = {};
+function txt(id, s){ if (cacheT[id] !== s) { cacheT[id] = s; $(id).firstChild.nodeValue = s; } }
+function wide(id, pct){
+  pct = Math.max(0, Math.min(100, pct)).toFixed(0) + "%";
+  if (cacheS[id] !== pct) { cacheS[id] = pct; $(id).style.width = pct; }
+}
+function cls(id, c){ var e = $(id); if (cacheS["c" + id] !== c) { cacheS["c" + id] = c; e.className = c; } }
+function tempCls(v){ return v >= TC ? "crit" : (v >= TW ? "warn" : ""); }
+function batCls(v){ return v < 10 ? "crit" : (v < 20 ? "warn" : ""); }
+function n(v, d){ return (typeof v === "number" && isFinite(v) ? v : 0).toFixed(d || 0); }
+
+function paint(d, force){
+  if (!d) return;
+  if (MODE === "demo") d = last = demoTick();
+  checkAlarm(d);
+  paintNotice(d);
+  autoTheme();
+  var nw = new Date();
+  txt("clock", ("0" + nw.getHours()).slice(-2) + ":" + ("0" + nw.getMinutes()).slice(-2));
+  var st = MODE === "live" ? "verbonden" : (MODE === "off" ? "geen vesc" : "demo");
+  txt("stxt", st);
+  cls("dot", MODE === "live" ? "" : (MODE === "off" ? "off" : "demo"));
+
+  var bp = d.battery_pct, bc = batCls(bp);
+
+  if (view === 0) {
+    topSpeed = Math.max(topSpeed, d.speed_kmh || 0);
+    txt("vmaxtxt", "max " + n(topSpeed));
+    txt("speed", n(d.speed_kmh));
+    wide("barfill", d.speed_kmh / VMAX * 100);
+    var lvl = bp <= 15 ? " empty" : (bp <= 30 ? " low" : "");
+    cls("batcard", "card" + lvl);
+    cls("rangecard", "card" + lvl);
+    txt("bat", n(bp));
+    wide("batfill", bp);
+    var whkm = d.trip_km > 0.3 ? d.wh_used / d.trip_km : WHKM;
+    txt("range", n(Math.max(0, PACK_WH * bp / 100) / Math.max(5, whkm), 1));
+  } else if (view === 1) {
+    txt("tm", n(d.temp_motor));
+    cls("tm", "v big " + tempCls(d.temp_motor));
+    txt("tf", n(d.temp_fet));
+    cls("tf", "v big " + tempCls(d.temp_fet));
+    txt("duty", n(d.duty * 100));
+    wide("dutyf", d.duty * 100);
+    txt("im", n(d.motor_current, 1));
+    txt("ib", n(d.battery_current, 1));
+    txt("rpm", n(d.rpm));
+  } else {
+    txt("vv", n(d.voltage, 1));
+    txt("vc", n(d.cell_voltage, 2));
+    txt("bat2", n(bp));
+    cls("bat2", "v mid " + bc);
+    wide("bat2f", bp);
+    cls("bat2f", bc === "crit" ? "fill-crit" : (bc === "warn" ? "fill-warn" : ""));
+    txt("wh", n(d.wh_used));
+    txt("trip", n(d.trip_km, 1));
+    txt("whkm", d.trip_km > 0.2 ? n(d.wh_used / d.trip_km, 1) : "—");
+  }
+}
+setInterval(function(){ paint(last); }, 165);
+paint(last);
+poll();
+</script>
+</body>
+</html>
