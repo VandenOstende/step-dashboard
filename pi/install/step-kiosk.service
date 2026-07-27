@@ -1,0 +1,25 @@
+[Unit]
+Description=Step Dashboard — Chromium kiosk
+After=step-dashboard.service systemd-user-sessions.service
+Wants=step-dashboard.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+SupplementaryGroups=video input tty
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty
+StandardOutput=journal
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=STEP_URL=http://127.0.0.1:8080/
+ExecStart=/opt/step-dashboard/install/kiosk.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target

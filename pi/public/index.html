@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=480,height=320,initial-scale=1,user-scalable=no">
+<title>Step Dashboard</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Nocturne tokens — overgenomen uit
+   _ds/nocturne-6cd0eed5-43bd-40e8-9e93-c4bd292c6682/styles.css.
+   Inline omdat de Pi geen internet heeft: geen @import, geen CDN, geen
+   externe fonts. Inter wordt gebruikt als het lokaal geïnstalleerd is
+   (apt install fonts-inter), anders valt hij terug op system-ui.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --color-bg:#161826;
+  --color-surface:#232532;
+  --color-text:#e9e9ed;
+  --color-neutral-500:#9397ab;
+  --color-neutral-800:#3f424d;
+  --color-neutral-900:#292b31;
+  --color-accent:#9184d9;
+  --color-accent-300:#d2cefd;
+  --color-accent-900:#2b2741;
+
+  --color-warn:#e0a94a;
+  --color-crit:#e0645c;
+  --color-warn-fill:#e0a94a;
+  --color-crit-fill:#e0645c;
+
+  --space-1:2.8px;
+  --space-2:5.6px;
+  --space-3:8.4px;
+  --space-4:11.2px;
+  --space-6:16.8px;
+  --space-8:22.4px;
+
+  --radius-sm:4px;
+  --radius-md:8px;
+
+  --font-body:"Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
+}
+/* Licht thema — de ramp-stappen uit dezelfde tokenset, zoals applyTheme() in
+   het component ze zet. accent-300 wijkt bewust af van het component: daar
+   bleef hij #d2cefd staan, gelijk aan de lichte accent-900-achtergrond
+   eronder, waardoor het label op een verbonden netwerkrij onleesbaar werd. */
+body.light{
+  --color-bg:#f3f5fe;
+  --color-surface:#e4e7f5;
+  --color-text:#292b31;
+  --color-neutral-500:#595d6c;
+  --color-neutral-800:#cfd3e5;
+  --color-neutral-900:#cfd3e5;
+  --color-accent:#5d5294;
+  --color-accent-300:#423a6a;
+  --color-accent-900:#d2cefd;
+  --color-warn:#8a5d10;
+  --color-crit:#a83229;
+  --color-warn-fill:#e0a94a;
+  --color-crit-fill:#a83229;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;width:480px;height:320px;overflow:hidden}
+body{
+  background:var(--color-bg);
+  color:var(--color-text);
+  font-family:var(--font-body);
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;
+  cursor:none;
+}
+body,body *{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font-family:inherit;font-variant-numeric:inherit}
+svg{display:block}
+
+#root{position:relative;width:480px;height:320px;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── topbalk / meldingsbalk ────────────────────────────────────────────── */
+#top{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:0 var(--space-4);border-bottom:1px solid var(--color-neutral-800)}
+#topleft{display:flex;align-items:center;gap:var(--space-3);min-width:0}
+#outside{display:flex;align-items:center;gap:5px;flex:none;color:var(--color-neutral-500)}
+#outside svg{flex:none}
+#outtemp{font-size:14px;color:var(--color-text)}
+#outplace{font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+
+#notice{display:none;align-items:center;gap:7px;height:34px;max-width:300px;padding:0;
+  background:transparent;border:0;color:var(--color-warn);font-size:14px;text-align:left}
+#notice.on{display:flex}
+#notice.crit{color:var(--color-crit)}
+#notice svg{flex:none}
+#noticetxt{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+#status{display:flex;align-items:center;gap:var(--space-4);height:34px;padding-left:var(--space-4);
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-500)}
+#wifiico,#btico{display:none;flex:none}
+#sig{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+#sig span{width:3px;border-radius:1px;background:var(--color-neutral-800)}
+#sig span:nth-child(1){height:4px}
+#sig span:nth-child(2){height:6px}
+#sig span:nth-child(3){height:8px}
+#sig span:nth-child(4){height:11px}
+#sig span:nth-child(5){height:14px}
+#sig span.on{background:var(--color-accent)}
+#sig span.weak{background:var(--color-warn)}
+#tech{font-size:11px;letter-spacing:.06em;color:var(--color-text)}
+#clock{font-size:15px;letter-spacing:.02em;color:var(--color-text)}
+#statusbtn{display:flex;align-items:center;gap:var(--space-2);height:34px;padding:0 0 0 var(--space-2);
+  background:transparent;border:0;color:inherit;font:inherit;font-size:12px;letter-spacing:.06em;
+  text-transform:uppercase;white-space:nowrap}
+#status>*{flex:none}
+#dot{width:9px;height:9px;border-radius:50%;background:var(--color-accent)}
+#dot.demo{background:var(--color-warn)}
+#dot.off{background:var(--color-crit)}
+
+/* ── panes ─────────────────────────────────────────────────────────────── */
+#panes{flex:1;position:relative}
+.pane{position:absolute;inset:0;display:none;padding:var(--space-3) var(--space-4)}
+.pane.on{display:flex}
+
+.card{background:var(--color-surface);border:1px solid var(--color-neutral-800);
+  border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);
+  display:flex;flex-direction:column;justify-content:center}
+.k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2}
+.v{font-weight:500;line-height:1}
+.v.big{font-size:34px}
+.v.mid{font-size:26px}
+.u{font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px}
+
+/* pane 1 · Rit */
+#p0{gap:var(--space-3)}
+#speedbox{flex:1;display:flex;flex-direction:column;justify-content:center}
+#speedrow{display:flex;align-items:flex-end;gap:var(--space-3)}
+#speed{font-size:118px;font-weight:600;line-height:.86;letter-spacing:-.04em}
+#speedmeta{padding-bottom:14px;display:flex;flex-direction:column;gap:2px}
+#speedunit{font-size:19px;letter-spacing:.06em;color:var(--color-neutral-500)}
+#vmaxrow{font-size:12px;letter-spacing:.06em;color:var(--color-neutral-500)}
+#speedtrack{height:7px;background:var(--color-neutral-900);border-radius:var(--radius-sm);
+  overflow:hidden;margin-top:var(--space-4)}
+#speedbar{height:100%;width:0%;background:var(--color-accent)}
+#side{width:168px;flex:none;display:flex;flex-direction:column;gap:var(--space-3)}
+#side .card{flex:1}
+#battrack{height:9px;background:var(--color-neutral-900);border-radius:var(--radius-sm);
+  overflow:hidden;margin-top:var(--space-2)}
+#batbar{height:100%;width:0%;background:var(--color-accent)}
+
+/* De accu- en bereikkaart lopen vol vanaf 30 % (oranje) en 15 % (rood). */
+.card.low{background:var(--color-warn-fill);border-color:var(--color-warn-fill);color:#161826}
+.card.low .k,.card.low .u{color:#161826}
+.card.empty{background:var(--color-crit-fill);border-color:var(--color-crit-fill);color:#f3f5fe}
+.card.empty .k,.card.empty .u{color:#f3f5fe}
+.card.low #battrack,.card.empty #battrack{background:rgba(22,24,38,.25)}
+.card.low #batbar{background:#161826}
+.card.empty #batbar{background:#f3f5fe}
+
+/* panes 2 en 3 · rasters */
+.grid{display:grid;width:100%;gap:var(--space-3)}
+#p1 .grid{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
+#p2 .grid{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr}
+#p1 .card,#p2 .card{gap:var(--space-1)}
+.trk{height:6px;background:var(--color-neutral-900);border-radius:var(--radius-sm);
+  overflow:hidden;margin-top:var(--space-1)}
+.trk>i{display:block;height:100%;width:0%;background:var(--color-accent)}
+.warn{color:var(--color-warn)}
+.crit{color:var(--color-crit)}
+.fill-warn{background:var(--color-warn)!important}
+.fill-crit{background:var(--color-crit)!important}
+
+/* ── overlays ──────────────────────────────────────────────────────────── */
+.sheet{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:var(--space-2);
+  background:var(--color-bg);padding:var(--space-3) var(--space-4)}
+.sheet.on{display:flex}
+#net{z-index:2}
+#notices{z-index:3}
+#sys,#settings{z-index:4}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none}
+.sheettitle{font-size:13px;letter-spacing:.10em;text-transform:uppercase;color:var(--color-neutral-500)}
+.xbtn{width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center}
+.scroller{flex:1;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
+.scroller::-webkit-scrollbar{width:0;height:0}
+
+/* systeemvenster */
+.inforows{display:flex;flex-direction:column;gap:var(--space-2);flex:none}
+.inforow{height:46px;display:flex;align-items:center;gap:12px;padding:0 14px;
+  background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)}
+.inforow .lbl{width:74px;flex:none}
+.inforow .val{font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
+.sysbtns{margin-top:auto;display:flex;gap:var(--space-2);flex:none}
+.pbtn{flex:1;height:56px;background:transparent;color:var(--color-text);border:1px solid var(--color-accent);
+  border-radius:var(--radius-md);font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+.sbtn{flex:1;height:56px;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+
+/* instellingen */
+.setrow{min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)}
+.setrow .lbl{flex:1}
+.seg{width:66px;height:44px;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:13px;text-transform:uppercase}
+.seg.on{color:var(--color-text);border-color:var(--color-accent)}
+.step{width:56px;height:44px;background:transparent;color:var(--color-text);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:20px}
+.setval{width:64px;text-align:center;font-size:18px}
+.setval.wide{width:78px}
+.rowbtn{height:44px;padding:0 var(--space-4);background:transparent;color:var(--color-text);
+  border:1px solid var(--color-accent);border-radius:var(--radius-sm);
+  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+
+/* meldingen */
+#noticelist .row{min-height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:8px 14px;
+  background:var(--color-surface);border:1px solid var(--color-neutral-800);
+  border-left:4px solid var(--color-warn);border-radius:var(--radius-md)}
+#noticelist .row.crit{border-left-color:var(--color-crit)}
+#noticelist .row svg{flex:none;color:var(--color-warn)}
+#noticelist .row.crit svg{color:var(--color-crit)}
+#noticelist .msg{font-size:16px;line-height:1.2;color:var(--color-text)}
+#noticelist .lv{margin-left:auto;flex:none;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-warn)}
+#noticelist .row.crit .lv{color:var(--color-crit)}
+
+/* verbindingen */
+#netseg{display:flex;gap:var(--space-2);flex:none}
+#netseg button{flex:1;height:44px;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+#netseg button.on{color:var(--color-text);border-color:var(--color-accent)}
+#netclose{width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center}
+#netlist button{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:0 14px;background:var(--color-surface);border:1px solid var(--color-neutral-800);
+  border-radius:var(--radius-md);color:var(--color-text);font-size:16px;text-align:left}
+#netlist button.sel{background:var(--color-accent-900);border-color:var(--color-accent)}
+#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#netlist .st{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
+#netlist button.sel .st{color:var(--color-accent-300)}
+#netempty{font-size:14px;color:var(--color-neutral-500);padding:var(--space-3) 2px}
+
+/* volledig-scherm alarm */
+#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:var(--space-3);padding:var(--space-6) var(--space-8);
+  background:var(--color-crit-fill);color:#161826;z-index:5}
+#alarm.on{display:flex}
+#alarmhead{display:flex;align-items:center;gap:var(--space-4)}
+#alarmtitle{font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
+#alarmmsg{font-size:22px;line-height:1.25;align-self:center;text-align:center;white-space:pre-line}
+#alarmclose{height:56px;min-width:160px;align-self:center;margin-top:var(--space-2);padding:0 var(--space-6);
+  background:transparent;color:#161826;border:2px solid #161826;border-radius:var(--radius-md);
+  font-size:16px;letter-spacing:.09em;text-transform:uppercase}
+
+/* positie-indicator */
+#dots{height:16px;flex:none;display:flex;align-items:center;justify-content:center;gap:var(--space-2)}
+#dots span{width:6px;height:6px;border-radius:50%;background:var(--color-neutral-800)}
+#dots span.on{background:var(--color-accent)}
+</style>
+</head>
+<body>
+<div id="root">
+
+  <div id="top">
+    <div id="topleft">
+      <div id="outside">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
+        <span id="outtemp">--&deg;</span>
+        <span id="outplace">--</span>
+      </div>
+      <button id="notice">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+        <span id="noticetxt">--</span>
+      </button>
+    </div>
+    <div id="status">
+      <svg id="wifiico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke-width="2" stroke-linecap="round">
+        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--color-neutral-800)"/>
+        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--color-neutral-800)"/>
+        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--color-neutral-800)"/>
+        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--color-neutral-800)" stroke="none"/>
+      </svg>
+      <svg id="btico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
+      <span id="tech">--</span>
+      <span id="clock">--:--</span>
+      <button id="statusbtn"><span id="dot"></span><span id="stxt">demo</span></button>
+    </div>
+  </div>
+
+  <div id="panes">
+
+    <!-- 1 · RIT -->
+    <div class="pane on" id="p0">
+      <div id="speedbox">
+        <div id="speedrow">
+          <div id="speed">0</div>
+          <div id="speedmeta">
+            <div id="speedunit">km/u</div>
+            <div id="vmaxrow">max <span id="vmaxtxt">0</span></div>
+          </div>
+        </div>
+        <div id="speedtrack"><div id="speedbar"></div></div>
+      </div>
+      <div id="side">
+        <div class="card" id="batcard">
+          <div class="k">Batterij</div>
+          <div class="v big"><span id="bat">0</span><span class="u">%</span></div>
+          <div id="battrack"><div id="batbar"></div></div>
+        </div>
+        <div class="card" id="rangecard">
+          <div class="k">Bereik ca.</div>
+          <div class="v big"><span id="range">0</span><span class="u">km</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · MOTOR -->
+    <div class="pane" id="p1">
+      <div class="grid">
+        <div class="card"><div class="k">Motor &deg;C</div><div class="v big" id="tm">0</div></div>
+        <div class="card"><div class="k">FET &deg;C</div><div class="v big" id="tf">0</div></div>
+        <div class="card"><div class="k">Duty</div>
+          <div class="v big"><span id="duty">0</span><span class="u">%</span></div>
+          <div class="trk"><i id="dutybar"></i></div></div>
+        <div class="card"><div class="k">Motorstroom</div><div class="v mid"><span id="im">0</span><span class="u">A</span></div></div>
+        <div class="card"><div class="k">Accustroom</div><div class="v mid"><span id="ib">0</span><span class="u">A</span></div></div>
+        <div class="card"><div class="k">RPM</div><div class="v mid" id="rpm">0</div></div>
+      </div>
+    </div>
+
+    <!-- 3 · ACCU -->
+    <div class="pane" id="p2">
+      <div class="grid">
+        <div class="card"><div class="k">Accuvoltage</div><div class="v mid"><span id="vv">0</span><span class="u">V</span></div></div>
+        <div class="card"><div class="k">Cel</div><div class="v mid"><span id="vc">0</span><span class="u">V</span></div></div>
+        <div class="card"><div class="k">Accupercentage</div>
+          <div class="v mid"><span id="bat2">0</span><span class="u">%</span></div>
+          <div class="trk"><i id="bat2bar"></i></div></div>
+        <div class="card"><div class="k">Verbruikt</div><div class="v mid"><span id="wh">0</span><span class="u">Wh</span></div></div>
+        <div class="card"><div class="k">Afstand</div><div class="v mid"><span id="trip">0</span><span class="u">km</span></div></div>
+        <div class="card"><div class="k">Wh / km</div><div class="v mid" id="whkm">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- verbindingen -->
+  <div class="sheet" id="net">
+    <div id="netseg">
+      <button id="segwifi" class="on">Wi-Fi</button>
+      <button id="segbt">Bluetooth</button>
+      <button id="netclose"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="scroller" id="netlist"></div>
+  </div>
+
+  <!-- meldingen -->
+  <div class="sheet" id="notices">
+    <div class="sheethead">
+      <div class="sheettitle">Meldingen</div>
+      <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="scroller" id="noticelist"></div>
+  </div>
+
+  <!-- systeem -->
+  <div class="sheet" id="sys">
+    <div class="sheethead">
+      <div class="sheettitle">Systeem</div>
+      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="inforows">
+      <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
+      <div class="inforow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
+    </div>
+    <div class="sysbtns">
+      <button id="sysnet" class="pbtn">Verbindingen</button>
+      <button id="sysset" class="pbtn">Instellingen</button>
+      <button id="sysdesk" class="sbtn">Desktop</button>
+    </div>
+  </div>
+
+  <!-- instellingen -->
+  <div class="sheet" id="settings">
+    <div class="sheethead">
+      <div class="sheettitle">Instellingen</div>
+      <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <div class="scroller" id="setlist">
+      <div class="setrow"><span class="lbl">Thema</span>
+        <button class="seg" data-theme="Auto">Auto</button>
+        <button class="seg" data-theme="Licht">Licht</button>
+        <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp waarschuwing</span>
+        <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
+        <span class="setval" id="setwarn">70&deg;</span>
+        <button class="step" data-k="tempWarn" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp kritiek</span>
+        <button class="step" data-k="tempCrit" data-d="-5">&minus;</button>
+        <span class="setval" id="setcrit">90&deg;</span>
+        <button class="step" data-k="tempCrit" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Schermhelderheid</span>
+        <button class="step bright" data-d="-10">&minus;</button>
+        <span class="setval wide" id="setbright">80 %</span>
+        <button class="step bright" data-d="10">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Startscherm</span>
+        <button class="seg start" data-i="0">Rit</button>
+        <button class="seg start" data-i="1">Motor</button>
+        <button class="seg start" data-i="2">Accu</button>
+      </div>
+      <div class="setrow"><span class="lbl">Topsnelheid</span>
+        <button id="toprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow"><span class="lbl">Rit-teller</span>
+        <button id="triprst" class="rowbtn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- volledig-scherm alarm -->
+  <div id="alarm">
+    <div id="alarmhead">
+      <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <div id="alarmtitle">WARNING</div>
+    </div>
+    <div id="alarmmsg">Motortemperatuur te hoog</div>
+    <button id="alarmclose">Bevestigen</button>
+  </div>
+
+  <div id="dots"><span class="on"></span><span></span><span></span></div>
+</div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   Step Dashboard — 480 × 320, Chromium kiosk op een Raspberry Pi 4.
+   Alles vanilla: geen libraries, geen externe requests behalve de eigen
+   endpoints op dezelfde origin. Rendert ~6×/s en raakt alleen gewijzigde
+   nodes aan, want de SPI-display is traag.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var $ = function (id) { return document.getElementById(id); };
+
+/* ── instellingen ───────────────────────────────────────────────────────
+   Defaults uit de tweaks van het component (data-props). tempWarn staat op
+   70 in plaats van de 100 die in het component stond: 100 lag boven
+   tempCrit, waardoor de waarschuwing pas ná kritiek zou komen. */
+var cfg = {
+  theme: "Auto",
+  tempWarn: 70,
+  tempCrit: 90,
+  packWh: 1147,
+  whPerKm: 18,
+  speedMax: 35,
+  bright: 80,
+  start: 0
+};
+var POLL_MS = 150;
+var RENDER_MS = 165;
+var LIMITS = { tempWarn: [40, 120], tempCrit: [50, 130] };
+
+/* ── panes ─────────────────────────────────────────────────────────────── */
+var panes = [$("p0"), $("p1"), $("p2")];
+var dots = [].slice.call($("dots").children);
+var view = 0;
+
+function show(i) {
+  i = i < 0 ? 0 : (i > 2 ? 2 : i);
+  panes[view].classList.remove("on");
+  dots[view].classList.remove("on");
+  view = i;
+  panes[i].classList.add("on");
+  dots[i].classList.add("on");
+  $("net").classList.remove("on");
+  cacheT = {}; cacheS = {};
+  paint();
+}
+
+/* Een tik op de pagina gaat naar het volgende scherm; bewegen is geen tik. */
+var tp = null;
+var pn = $("panes");
+pn.addEventListener("pointerdown", function (e) { tp = { x: e.clientX, y: e.clientY }; });
+pn.addEventListener("pointerup", function (e) {
+  var t = tp; tp = null;
+  if (!t || Math.abs(e.clientX - t.x) > 12 || Math.abs(e.clientY - t.y) > 12) return;
+  show((view + 1) % 3);
+});
+pn.addEventListener("pointercancel", function () { tp = null; });
+document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+/* ── thema — automatisch op de klok: 07:30–18:00 licht ──────────────────── */
+function wantLight() {
+  if (cfg.theme === "Licht") return true;
+  if (cfg.theme === "Donker") return false;
+  var d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  return m >= 450 && m < 1080;
+}
+function applyTheme(force) {
+  var light = wantLight();
+  if (!force && light === document.body.classList.contains("light")) return;
+  document.body.classList.toggle("light", light);
+  cacheT = {}; cacheS = {};
+}
+
+/* ── data ──────────────────────────────────────────────────────────────── */
+var MODE = "demo";           // "live" | "demo" | "off"
+var prevMode = "demo";
+var liveFails = 0;
+var topSpeed = 0;
+var bootTopSpeed = 0;      // laatst bewaarde echte topsnelheid van de Pi
+var dm = { t: 0, spd: 0, tgt: 14, bat: 87, wh: 120, trip: 6.4, tm: 42, tf: 38 };
+var last = demoTick();
+
+function poll() {
+  fetch("/data", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (d) {
+    liveFails = 0;
+    MODE = d && d.connected === false ? "off" : "live";
+    last = d;
+  })["catch"](function () {
+    if (++liveFails > 2) MODE = "demo";
+  });
+}
+
+/* Demo-rit zodat het ontwerp ook standalone te bekijken is. */
+function demoTick() {
+  dm.t += 0.15;
+  if (Math.random() < 0.02) dm.tgt = Math.random() < 0.25 ? 0 : 6 + Math.random() * 32;
+  dm.spd += (dm.tgt - dm.spd) * 0.06;
+  var spd = Math.max(0, dm.spd + Math.sin(dm.t * 1.7) * 0.35);
+  var pw = Math.max(0, spd * 26 + (dm.tgt - dm.spd) * 95 + Math.sin(dm.t) * 30);
+  var v = 50.4 - (100 - dm.bat) * 0.062 - pw / 900;
+  dm.bat -= pw * 0.0000045 + 0.0006;
+  if (dm.bat < 4) dm.bat = 96;
+  dm.wh += pw * 0.0000417;
+  dm.trip += spd * 0.0000417;
+  dm.tm += (30 + pw * 0.055 - dm.tm) * 0.0022;
+  dm.tf += (28 + pw * 0.040 - dm.tf) * 0.0025;
+  return {
+    connected: true, speed_kmh: spd, rpm: spd * 118, erpm: spd * 118 * 15,
+    duty: Math.min(0.97, spd / 42 + pw / 6000), battery_pct: dm.bat, voltage: v,
+    cell_voltage: v / 13, motor_current: pw / Math.max(20, v) * 1.6,
+    battery_current: pw / Math.max(20, v), power_w: pw,
+    temp_motor: dm.tm, temp_fet: dm.tf, wh_used: dm.wh, trip_km: dm.trip
+  };
+}
+
+/* ── meldingen ─────────────────────────────────────────────────────────── */
+var noticeList = [];
+var ni = 0;
+
+function notices(d) {
+  var out = [];
+  if (MODE === "off") out.push({ lv: 2, t: "Geen VESC-verbinding" });
+  if (d.fault) out.push({ lv: 2, t: "VESC-storing — " + d.fault });
+  var tm = d.temp_motor || 0, tf = d.temp_fet || 0, bp = d.battery_pct || 0;
+  if (tm >= cfg.tempCrit) out.push({ lv: 2, t: "Motor " + tm.toFixed(0) + "°C — stop en laat afkoelen" });
+  else if (tm >= cfg.tempWarn) out.push({ lv: 1, t: "Motor " + tm.toFixed(0) + "°C — verminder belasting" });
+  if (tf >= cfg.tempCrit) out.push({ lv: 2, t: "FET " + tf.toFixed(0) + "°C — stop en laat afkoelen" });
+  else if (tf >= cfg.tempWarn) out.push({ lv: 1, t: "FET " + tf.toFixed(0) + "°C — verminder belasting" });
+  if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% — bijna leeg" });
+  else if (bp < 20) out.push({ lv: 1, t: "Accu " + bp.toFixed(0) + "% — laag" });
+  if ((d.duty || 0) > 0.95) out.push({ lv: 1, t: "Duty 95%+ — geen reserve" });
+  out.sort(function (a, b) { return b.lv - a.lv; });
+  return out;
+}
+
+function paintNotice(d) {
+  noticeList = notices(d);
+  var b = $("notice");
+  if (!noticeList.length) {
+    ni = 0;
+    if (cacheS.nz !== "0") { cacheS.nz = "0"; b.className = ""; $("notices").classList.remove("on"); }
+    return;
+  }
+  var sig = noticeList.map(function (x) { return x.lv + x.t; }).join("|");
+  if ($("notices").classList.contains("on") && cacheS.nsig !== sig) { cacheS.nsig = sig; renderNotices(); }
+  var cur = noticeList[ni % noticeList.length];
+  var key = cur.lv + "|" + cur.t;
+  if (cacheS.nz === key) return;
+  cacheS.nz = key;
+  b.className = "on" + (cur.lv === 2 ? " crit" : "");
+  $("noticetxt").textContent = cur.t;
+}
+
+function renderNotices() {
+  $("noticelist").innerHTML = noticeList.map(function (nt) {
+    return '<div class="row' + (nt.lv === 2 ? " crit" : "") + '">'
+      + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>'
+      + '<div class="msg"></div>'
+      + '<div class="lv">' + (nt.lv === 2 ? "fout" : "let op") + '</div></div>';
+  }).join("");
+  /* tekst apart zetten: melding-tekst kan servertekst bevatten */
+  [].slice.call($("noticelist").querySelectorAll(".msg")).forEach(function (el, i) {
+    el.textContent = noticeList[i].t;
+  });
+}
+
+/* Meldingen wisselen elke 3 s door de actieve lijst. */
+setInterval(function () {
+  if (noticeList.length > 1) { ni++; paintNotice(last); }
+}, 3000);
+
+$("notice").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  if (!noticeList.length) return;
+  renderNotices();
+  $("notices").classList.add("on");
+});
+$("noticesclose").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  $("notices").classList.remove("on");
+});
+
+/* ── volledig-scherm temperatuuralarm ───────────────────────────────────
+   Knippert 3× (0,5 s aan / 0,5 s uit) en blijft daarna staan tot de
+   gebruiker bevestigt. Amber en rood alarmeren elk apart. */
+var alarm = { level: null, acked: {} };
+var blink = null;
+
+function checkAlarm(d) {
+  var tm = d.temp_motor || 0, tf = d.temp_fet || 0, hot = Math.max(tm, tf);
+  var level = hot >= cfg.tempCrit ? "crit" : (hot >= cfg.tempWarn ? "warn" : null);
+  var el = $("alarm");
+  if (!level) {
+    if (alarm.level) {
+      alarm.level = null; alarm.acked = {};
+      clearTimeout(blink); blink = null;
+      el.classList.remove("on");
+    }
+    return;
+  }
+  if (level === alarm.level) return;
+  alarm.level = level;
+  var crit = level === "crit";
+  el.style.background = crit ? "var(--color-crit-fill)" : "var(--color-warn-fill)";
+  el.style.color = crit ? "#f3f5fe" : "#161826";
+  $("alarmclose").style.color = crit ? "#f3f5fe" : "#161826";
+  $("alarmclose").style.borderColor = crit ? "#f3f5fe" : "#161826";
+  $("alarmmsg").textContent =
+    (tm >= tf ? "Motortemperatuur " + tm.toFixed(0) : "FET-temperatuur " + tf.toFixed(0))
+    + "°C — " + (crit ? "stop en laat afkoelen" : "verminder belasting");
+  if (alarm.acked[level]) return;
+
+  clearTimeout(blink);
+  var step = 0;
+  el.classList.add("on");
+  var next = function () {
+    step++;
+    if (step >= 6) { blink = null; el.classList.add("on"); return; }
+    el.classList.toggle("on", step % 2 === 0);
+    blink = setTimeout(next, 500);
+  };
+  blink = setTimeout(next, 500);
+}
+
+$("alarmclose").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  clearTimeout(blink); blink = null;
+  alarm.acked[alarm.level] = true;
+  $("alarm").classList.remove("on");
+});
+
+/* ── topbalk rechts: wifi, bluetooth, mobiel bereik ─────────────────────── */
+var wifiLevel = null;
+var cell = { bars: 0, tech: null };
+var net = {
+  tab: "wifi", wifiOn: false, ssid: "", btOn: false, dev: "", devMac: "",
+  items: { wifi: [], bt: [] }, busy: "", error: null
+};
+
+function paintWifi() {
+  $("btico").style.display = net.btOn ? "block" : "none";
+  $("wifiico").style.display = net.wifiOn ? "block" : "none";
+  if (!net.wifiOn) return;
+  var lv = Math.max(1, Math.min(3, wifiLevel == null ? 3 : wifiLevel));
+  var c = lv === 1 ? "var(--color-warn)" : "var(--color-accent)";
+  $("wadot").setAttribute("fill", c);
+  [].slice.call(document.querySelectorAll("#wifiico .wa")).forEach(function (p) {
+    p.setAttribute("stroke", +p.dataset.lv <= lv ? c : "var(--color-neutral-800)");
+  });
+}
+
+function fetchWifi() {
+  fetch("/wifi", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (w) {
+    net.wifiOn = !!w.connected;
+    net.ssid = w.ssid || "";
+    wifiLevel = w.level;
+    paintWifi();
+  })["catch"](function () { paintWifi(); });
+}
+
+function fetchBt() {
+  fetch("/bt", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (b) {
+    net.btOn = !!b.connected;
+    net.dev = b.name || "";
+    net.devMac = b.mac || "";
+    paintWifi();
+  })["catch"](function () { paintWifi(); });
+}
+
+var sigbars = [].slice.call(document.querySelectorAll("#sig span"));
+function paintSignal(bars, tech) {
+  var b = Math.max(0, Math.min(5, bars || 0));
+  cell.bars = b; cell.tech = tech;
+  var weak = b <= 1;
+  sigbars.forEach(function (s, k) { s.className = k < b ? (weak ? "weak" : "on") : ""; });
+  var t = $("tech");
+  t.textContent = b === 0 ? "GEEN" : (tech || "--");
+  t.style.color = b === 0 ? "var(--color-neutral-500)" : "var(--color-text)";
+}
+
+function fetchModem() {
+  fetch("/modem", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (m) { paintSignal(m.bars, m.tech); })
+  ["catch"](function () { paintSignal(0, null); });
+}
+
+function fetchWeather() {
+  fetch("/weather", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (w) {
+    if (typeof w.temp_c === "number") $("outtemp").textContent = w.temp_c.toFixed(0) + "°";
+    $("outplace").textContent = w.place || "";
+  })["catch"](function () {
+    $("outtemp").textContent = "--°";
+    $("outplace").textContent = "";
+  });
+}
+
+/* ── systeemvenster ────────────────────────────────────────────────────── */
+function openSys() {
+  var lv = wifiLevel == null ? 3 : wifiLevel;
+  $("syswifi").textContent = net.wifiOn
+    ? net.ssid + "  ·  " + (lv >= 3 ? "sterk" : lv === 2 ? "matig" : "zwak")
+    : "niet verbonden";
+  $("syscell").textContent = cell.bars
+    ? (cell.tech || "?") + "  ·  " + cell.bars + "/5"
+    : "geen bereik";
+  $("sys").classList.add("on");
+}
+$("status").addEventListener("pointerdown", function (e) { e.preventDefault(); openSys(); });
+$("sysclose").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); });
+$("sysnet").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); openNet("wifi"); });
+$("sysset").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); $("sys").classList.remove("on"); renderSettings(); $("settings").classList.add("on");
+});
+$("setclose").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); $("settings").classList.remove("on"); openSys();
+});
+$("sysdesk").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  var b = $("sysdesk");
+  b.textContent = "Verlaten…";
+  fetch("/desktop", { method: "POST" }).then(function (r) {
+    if (!r.ok) throw 0;
+    b.textContent = "Desktop";
+  })["catch"](function () {
+    b.textContent = "Niet beschikbaar";
+    setTimeout(function () { b.textContent = "Desktop"; }, 2000);
+  });
+});
+
+/* ── instellingen ──────────────────────────────────────────────────────── */
+function renderSettings() {
+  $("setbright").textContent = cfg.bright + " %";
+  $("setwarn").textContent = cfg.tempWarn + "°";
+  $("setcrit").textContent = cfg.tempCrit + "°";
+  [].slice.call(document.querySelectorAll(".seg.start")).forEach(function (b) {
+    b.classList.toggle("on", +b.dataset.i === cfg.start);
+  });
+  [].slice.call(document.querySelectorAll(".seg[data-theme]")).forEach(function (b) {
+    b.classList.toggle("on", b.dataset.theme === cfg.theme);
+  });
+}
+
+function bump(key, step) {
+  var lim = LIMITS[key];
+  cfg[key] = Math.max(lim[0], Math.min(lim[1], cfg[key] + step));
+  if (key === "tempWarn" && cfg.tempWarn > cfg.tempCrit) cfg.tempCrit = cfg.tempWarn;
+  if (key === "tempCrit" && cfg.tempCrit < cfg.tempWarn) cfg.tempWarn = cfg.tempCrit;
+  cacheT = {}; cacheS = {};
+  renderSettings();
+  saveSettings();
+}
+
+/* De UI mag zelf niets opslaan (geen localStorage) — de Pi bewaart het. */
+var saveTimer = null;
+function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function () {
+    fetch("/settings", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg)
+    })["catch"](function () {});
+  }, 400);
+}
+
+$("setlist").addEventListener("pointerdown", function (e) {
+  var br = e.target.closest(".step.bright");
+  if (br) {
+    e.preventDefault();
+    cfg.bright = Math.max(20, Math.min(100, cfg.bright + (+br.dataset.d)));
+    fetch("/backlight", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: cfg.bright })
+    })["catch"](function () {});
+    renderSettings();
+    saveSettings();
+    return;
+  }
+  var s = e.target.closest(".step");
+  if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
+  var t = e.target.closest(".seg[data-theme]");
+  if (t) { e.preventDefault(); cfg.theme = t.dataset.theme; applyTheme(true); renderSettings(); saveSettings(); return; }
+  var st = e.target.closest(".seg.start");
+  if (st) {
+    e.preventDefault();
+    cfg.start = +st.dataset.i;
+    renderSettings();
+    saveSettings();
+    $("settings").classList.remove("on");
+    show(cfg.start);
+  }
+});
+
+$("toprst").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  topSpeed = bootTopSpeed = 0;
+  fetch("/reset-top", { method: "POST" })["catch"](function () {});
+  cacheT = {}; cacheS = {};
+  paint();
+});
+$("triprst").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  dm.trip = 0; dm.wh = 0;
+  fetch("/reset-trip", { method: "POST" })["catch"](function () {});
+  cacheT = {}; cacheS = {};
+  paint();
+});
+
+/* ── verbindingen ──────────────────────────────────────────────────────── */
+function renderNet() {
+  var items = net.items[net.tab] || [];
+  var list = $("netlist");
+  if (!items.length) {
+    list.innerHTML = '<div id="netempty"></div>';
+    $("netempty").textContent = net.tab === "wifi" ? "Geen netwerken gevonden" : "Geen apparaten gekoppeld";
+    return;
+  }
+  list.innerHTML = items.map(function (it) {
+    var sel = !!it.active;
+    return '<button data-id="' + encodeURIComponent(it.id) + '"' + (sel ? ' class="sel"' : '') + '>'
+      + '<span class="nm"></span><span class="st"></span></button>';
+  }).join("");
+  [].slice.call(list.children).forEach(function (b, i) {
+    var it = items[i];
+    b.querySelector(".nm").textContent = it.name;
+    b.querySelector(".st").textContent =
+      net.busy === it.id ? "verbinden…"
+        : (net.error && net.error.id === it.id) ? net.error.msg
+          : (it.active ? "verbonden" : "verbind");
+  });
+}
+
+function fetchNetList() {
+  var kind = net.tab;
+  fetch("/net?kind=" + kind, { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (j) {
+    net.items[kind] = j.items || [];
+    if (net.tab === kind) renderNet();
+  })["catch"](function () {
+    net.items[kind] = [];
+    if (net.tab === kind) renderNet();
+  });
+}
+
+function openNet(tab) {
+  net.tab = tab;
+  $("net").classList.add("on");
+  $("segwifi").classList.toggle("on", tab === "wifi");
+  $("segbt").classList.toggle("on", tab === "bt");
+  renderNet();
+  fetchNetList();
+}
+
+function pickNet(id) {
+  var items = net.items[net.tab] || [];
+  var it = null;
+  for (var i = 0; i < items.length; i++) if (items[i].id === id) it = items[i];
+  if (!it || net.busy) return;
+  net.busy = id;
+  net.error = null;
+  renderNet();
+  fetch("/net", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: net.tab, id: it.id, name: it.name, connect: !it.active })
+  }).then(function (r) { return r.json()["catch"](function () { return {}; }); })
+    .then(function (res) {
+      net.busy = "";
+      /* Mislukt het — meestal omdat er een wachtwoord nodig is — dan blijft
+         dat op de rij zelf staan tot de volgende poging. */
+      if (res && res.error) net.error = { id: id, msg: res.error };
+      fetchNetList();
+      fetchWifi();
+      fetchBt();
+    })["catch"](function () {
+      net.busy = "";
+      net.error = { id: id, msg: "mislukt" };
+      renderNet();
+    });
+}
+
+$("segwifi").addEventListener("pointerdown", function (e) { e.preventDefault(); openNet("wifi"); });
+$("segbt").addEventListener("pointerdown", function (e) { e.preventDefault(); openNet("bt"); });
+$("netclose").addEventListener("pointerdown", function (e) { e.preventDefault(); $("net").classList.remove("on"); });
+
+/* Een tik selecteert alleen als de vinger < 10 px beweegt — scrollen
+   selecteert dus niets. */
+var nd = null;
+$("netlist").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest("[data-id]");
+  nd = b ? { x: e.clientX, y: e.clientY, id: decodeURIComponent(b.dataset.id) } : null;
+});
+$("netlist").addEventListener("pointerup", function (e) {
+  var d = nd; nd = null;
+  if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
+  pickNet(d.id);
+});
+$("netlist").addEventListener("pointercancel", function () { nd = null; });
+
+/* ── render ────────────────────────────────────────────────────────────── */
+var cacheT = {}, cacheS = {};
+function txt(id, s) { if (cacheT[id] !== s) { cacheT[id] = s; $(id).textContent = s; } }
+function wide(id, pct) {
+  pct = Math.max(0, Math.min(100, pct || 0)).toFixed(0) + "%";
+  if (cacheS["w" + id] !== pct) { cacheS["w" + id] = pct; $(id).style.width = pct; }
+}
+function cls(id, c) { if (cacheS["c" + id] !== c) { cacheS["c" + id] = c; $(id).className = c; } }
+function tempCls(v) { return v >= cfg.tempCrit ? "crit" : (v >= cfg.tempWarn ? "warn" : ""); }
+function batCls(v) { return v < 10 ? "crit" : (v < 20 ? "warn" : ""); }
+function n(v, d) { return (typeof v === "number" && isFinite(v) ? v : 0).toFixed(d || 0); }
+
+function paint() {
+  if (MODE === "demo") last = demoTick();
+  var d = last;
+  if (!d) return;
+
+  checkAlarm(d);
+  paintNotice(d);
+  applyTheme(false);
+
+  var nw = new Date();
+  txt("clock", ("0" + nw.getHours()).slice(-2) + ":" + ("0" + nw.getMinutes()).slice(-2));
+  txt("stxt", MODE === "live" ? "verbonden" : (MODE === "off" ? "geen vesc" : "demo"));
+  cls("dot", MODE === "live" ? "" : (MODE === "off" ? "off" : "demo"));
+
+  /* Zodra de echte VESC-data binnenkomt vervalt alles wat de demo-rit heeft
+     opgebouwd — anders staat er een verzonnen topsnelheid op het scherm.
+     De Pi bewaart de echte waarde, dus daar vallen we op terug. */
+  if (prevMode === "demo" && MODE !== "demo") {
+    topSpeed = bootTopSpeed;
+    cacheT = {}; cacheS = {};
+  }
+  prevMode = MODE;
+
+  /* Topsnelheid loopt door op elk scherm, niet alleen op het rit-scherm. */
+  if (typeof d.speed_kmh === "number" && isFinite(d.speed_kmh)) {
+    topSpeed = Math.max(topSpeed, d.speed_kmh);
+  }
+  var bp = d.battery_pct;
+
+  if (view === 0) {
+    txt("vmaxtxt", n(topSpeed));
+    txt("speed", n(d.speed_kmh));
+    wide("speedbar", d.speed_kmh / cfg.speedMax * 100);
+
+    var lvl = bp <= 15 ? " empty" : (bp <= 30 ? " low" : "");
+    cls("batcard", "card" + lvl);
+    cls("rangecard", "card" + lvl);
+    txt("bat", n(bp));
+    wide("batbar", bp);
+
+    var whkm = d.trip_km > 0.3 ? d.wh_used / d.trip_km : cfg.whPerKm;
+    var range = Math.max(0, cfg.packWh * bp / 100) / Math.max(5, whkm);
+    txt("range", n(range, 1));
+  } else if (view === 1) {
+    txt("tm", n(d.temp_motor));
+    cls("tm", "v big " + tempCls(d.temp_motor));
+    txt("tf", n(d.temp_fet));
+    cls("tf", "v big " + tempCls(d.temp_fet));
+    txt("duty", n(d.duty * 100));
+    wide("dutybar", d.duty * 100);
+    txt("im", n(d.motor_current, 1));
+    txt("ib", n(d.battery_current, 1));
+    txt("rpm", n(d.rpm));
+  } else {
+    var bc = batCls(bp);
+    txt("vv", n(d.voltage, 1));
+    txt("vc", n(d.cell_voltage, 2));
+    txt("bat2", n(bp));
+    cls("bat2", "v mid " + bc);
+    wide("bat2bar", bp);
+    cls("bat2bar", bc === "crit" ? "fill-crit" : (bc === "warn" ? "fill-warn" : ""));
+    txt("wh", n(d.wh_used));
+    txt("trip", n(d.trip_km, 1));
+    txt("whkm", d.trip_km > 0.2 ? n(d.wh_used / d.trip_km, 1) : "—");
+  }
+}
+
+/* ── start ─────────────────────────────────────────────────────────────── */
+function boot(saved) {
+  if (saved) {
+    Object.keys(cfg).forEach(function (k) {
+      if (typeof saved[k] === typeof cfg[k]) cfg[k] = saved[k];
+    });
+    if (saved.pollMs) POLL_MS = Math.max(80, saved.pollMs);
+    if (typeof saved.topSpeed === "number") { topSpeed = bootTopSpeed = saved.topSpeed; }
+  }
+  applyTheme(true);
+  renderSettings();
+  show(cfg.start);
+
+  poll();
+  setInterval(poll, POLL_MS);
+  setInterval(paint, RENDER_MS);
+  paint();
+
+  fetchWeather();
+  setInterval(fetchWeather, 300000);
+  fetchModem();
+  setInterval(fetchModem, 10000);
+  fetchWifi();
+  fetchBt();
+  setInterval(function () { fetchWifi(); fetchBt(); }, 10000);
+}
+
+fetch("/settings", { cache: "no-store" })
+  .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+  .then(boot)["catch"](function () { boot(null); });
+</script>
+</body>
+</html>

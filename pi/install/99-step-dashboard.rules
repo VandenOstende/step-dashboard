@@ -1,0 +1,10 @@
+# De schermhelderheid staat in /sys/class/backlight en is standaard alleen
+# door root te schrijven. Deze regel geeft de groep "video" schrijfrechten,
+# zodat de instellingenknop werkt zonder de service als root te draaien.
+SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
+SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+
+# De VESC meldt zich als CDC-ACM. Raspberry Pi OS zet die al op groep
+# "dialout"; deze regel legt daarnaast een vast pad aan, zodat
+# vesc.port in config.json ook kan verwijzen naar /dev/vesc.
+SUBSYSTEM=="tty", SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="vesc", GROUP="dialout", MODE="0660"

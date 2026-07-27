@@ -1,0 +1,31 @@
+{
+  "host": "127.0.0.1",
+  "port": 8080,
+
+  "vesc": {
+    "port": null,
+    "baud": 115200,
+    "pollMs": 150
+  },
+
+  "step": {
+    "batteryCells": null,
+    "packWh": 1147,
+    "polePairs": 15,
+    "wheelDiameterM": 0.254,
+    "gearRatio": 1
+  },
+
+  "weather": {
+    "latitude": null,
+    "longitude": null,
+    "place": ""
+  },
+
+  "system": {
+    "wifiInterface": null,
+    "backlightPath": null,
+    "backlightCommand": null,
+    "desktopCommand": "sudo systemctl stop step-kiosk.service"
+  }
+}

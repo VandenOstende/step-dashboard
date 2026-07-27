@@ -1,0 +1,8 @@
+# De Desktop-knop in het systeemvenster stopt de kiosk-unit. Dat is het enige
+# dat de service met verhoogde rechten mag doen — geen wildcards, geen shell.
+#
+# Installeren met:  sudo install -m 0440 step-dashboard.sudoers /etc/sudoers.d/step-dashboard
+# Controleren met:  sudo visudo -cf /etc/sudoers.d/step-dashboard
+
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl stop step-kiosk.service
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl start step-kiosk.service

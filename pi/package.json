@@ -1,0 +1,15 @@
+{
+  "name": "step-dashboard",
+  "version": "1.0.0",
+  "description": "Fullscreen dashboard voor een elektrische step — Raspberry Pi 4 + VESC via USB",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "probe": "node tools/vesc-probe.js",
+    "test": "node tools/selftest.js"
+  }
+}

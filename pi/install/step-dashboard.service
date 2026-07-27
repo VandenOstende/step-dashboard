@@ -1,0 +1,28 @@
+[Unit]
+Description=Step Dashboard — VESC-uitlezer en webservice
+Documentation=file:/opt/step-dashboard/README.md
+After=network.target
+Wants=ModemManager.service NetworkManager.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+# dialout: toegang tot /dev/ttyACM* (de VESC)
+# video:   toegang tot /sys/class/backlight (schermhelderheid)
+SupplementaryGroups=dialout video
+WorkingDirectory=/opt/step-dashboard
+ExecStart=/usr/bin/node /opt/step-dashboard/src/server.js
+Environment=NODE_ENV=production
+Environment=STEP_STATE=/var/lib/step-dashboard/state.json
+Restart=always
+RestartSec=2
+
+# De service hoeft alleen zijn eigen staat te schrijven.
+StateDirectory=step-dashboard
+NoNewPrivileges=false
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
