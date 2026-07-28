@@ -18,11 +18,20 @@ const fs = require("fs");
 const path = require("path");
 const { execFile } = require("child_process");
 
-function run(cmd, args, timeout) {
+function run(cmd, args, timeout, input) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout: timeout || 4000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
-      resolve({ ok: !err, out: (stdout || "").toString(), err: (stderr || "").toString().trim(), code: err ? err.code : 0 });
-    });
+    const child = execFile(cmd, args, { timeout: timeout || 4000, maxBuffer: 1 << 20 },
+      (err, stdout, stderr) => {
+        resolve({ ok: !err, out: (stdout || "").toString(), err: (stderr || "").toString().trim(), code: err ? err.code : 0 });
+      });
+    // Stdin altijd sluiten, ook als er niets in gaat: blijft de pijp open, dan
+    // wacht een tool die stdin leest — bluetoothctl doet dat — tot de timeout
+    // in plaats van meteen te antwoorden. Geheimen gaan hierlangs naar nmcli
+    // en niet via de argumenten, want die staan in `ps` en /proc te lezen.
+    if (child.stdin) {
+      child.stdin.on("error", () => {});
+      child.stdin.end(input == null ? "" : input);
+    }
   });
 }
 
@@ -99,15 +108,69 @@ async function wifiList() {
     .slice(0, 40);
 }
 
-async function wifiConnect(ssid) {
-  const known = await knownConnections();
-  const r = known.has(ssid)
-    ? await run("nmcli", ["connection", "up", "id", ssid], 30000)
-    : await run("nmcli", ["device", "wifi", "connect", ssid], 30000);
+/**
+ * Stel de nmcli-aanroep samen. Apart gehouden van het uitvoeren zodat de
+ * zelftest kan controleren wát er gebeurt zonder nmcli aan te roepen.
+ *
+ * Levert een lijst stappen; elke stap is {args, input}. `input` gaat naar
+ * stdin, zodat een wachtwoord nooit in de argumenten belandt.
+ */
+function wifiConnectPlan(ssid, password, known) {
+  if (!password) {
+    return known
+      ? [{ args: ["connection", "up", "id", ssid] }]
+      : [{ args: ["device", "wifi", "connect", ssid] }];
+  }
+  if (known) {
+    // Het profiel bestaat al met een ander wachtwoord: bijwerken en opnieuw
+    // verbinden. nmcli leest de nieuwe waarde van stdin dankzij --ask.
+    return [
+      { args: ["--ask", "connection", "modify", "id", ssid,
+        "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk"], input: password + "\n" },
+      { args: ["connection", "up", "id", ssid] }
+    ];
+  }
+  return [{ args: ["--ask", "device", "wifi", "connect", ssid], input: password + "\n" }];
+}
+
+/** Terugval als --ask niet werkt: het wachtwoord tóch als argument. */
+function wifiConnectPlanFallback(ssid, password, known) {
+  if (known) {
+    return [
+      { args: ["connection", "modify", "id", ssid,
+        "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", password] },
+      { args: ["connection", "up", "id", ssid] }
+    ];
+  }
+  return [{ args: ["device", "wifi", "connect", ssid, "password", password] }];
+}
+
+const SECRET_RE = /secret|password|psk|802-11-wireless-security|not provided|invalid/i;
+
+async function runPlan(steps) {
+  let last = { ok: true, err: "" };
+  for (const s of steps) {
+    last = await run("nmcli", s.args, 30000, s.input);
+    if (!last.ok) return last;
+  }
+  return last;
+}
+
+async function wifiConnect(ssid, password) {
+  const known = (await knownConnections()).has(ssid);
+  let r = await runPlan(wifiConnectPlan(ssid, password, known));
+
+  // Oudere nmcli-versies kennen --ask niet op elk subcommando; dan alsnog de
+  // argumentvorm proberen.
+  if (!r.ok && password && /unknown option|--ask|usage:/i.test(r.err || "")) {
+    r = await runPlan(wifiConnectPlanFallback(ssid, password, known));
+  }
   if (r.ok) return { ok: true };
-  const msg = (r.err || "").toLowerCase();
-  if (/secret|password|psk|802-11-wireless-security/.test(msg)) {
-    return { ok: false, error: "wachtwoord nodig" };
+
+  if (SECRET_RE.test(r.err || "")) {
+    return password
+      ? { ok: false, error: "wachtwoord onjuist", needsPassword: true }
+      : { ok: false, error: "wachtwoord nodig", needsPassword: true };
   }
   return { ok: false, error: "verbinden mislukt" };
 }
@@ -263,6 +326,7 @@ async function toDesktop(command) {
 
 module.exports = {
   wifiStatus, wifiList, wifiConnect, wifiDisconnect,
+  wifiConnectPlan, wifiConnectPlanFallback,
   btStatus, btList, btConnect, btDisconnect,
   modem, modemLocation,
   setBacklight, toDesktop

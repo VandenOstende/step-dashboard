@@ -308,4 +308,54 @@ test("faultcodes krijgen een leesbare naam", () => {
   assert.strictEqual(faultName(200), "FAULT_200");
 });
 
+/* ── wifi verbinden ─────────────────────────────────────────────────────── */
+console.log("\nwifi");
+
+const { wifiConnectPlan, wifiConnectPlanFallback } = require("../src/system");
+
+const flat = (steps) => steps.map((s) => s.args.join(" ")).join(" | ");
+
+test("zonder wachtwoord: bekend netwerk wordt gewoon geactiveerd", () => {
+  assert.strictEqual(flat(wifiConnectPlan("Stepnet", null, true)), "connection up id Stepnet");
+});
+
+test("zonder wachtwoord: onbekend netwerk via device wifi connect", () => {
+  assert.strictEqual(flat(wifiConnectPlan("Stepnet", null, false)), "device wifi connect Stepnet");
+});
+
+test("met wachtwoord op een onbekend netwerk gaat het geheim via stdin", () => {
+  const steps = wifiConnectPlan("Stepnet", "geheim123", false);
+  assert.strictEqual(steps.length, 1);
+  assert.strictEqual(flat(steps), "--ask device wifi connect Stepnet");
+  assert.strictEqual(steps[0].input, "geheim123\n");
+});
+
+test("met wachtwoord op een bekend netwerk wordt het profiel bijgewerkt", () => {
+  const steps = wifiConnectPlan("Stepnet", "geheim123", true);
+  assert.strictEqual(steps.length, 2);
+  assert.ok(steps[0].args.includes("modify"), "eerste stap moet het profiel aanpassen");
+  assert.strictEqual(steps[0].input, "geheim123\n");
+  assert.strictEqual(steps[1].args.join(" "), "connection up id Stepnet");
+});
+
+test("het wachtwoord staat nooit in de argumenten", () => {
+  for (const known of [true, false]) {
+    for (const step of wifiConnectPlan("Stepnet", "geheim123", known)) {
+      assert.ok(!step.args.includes("geheim123"),
+        "wachtwoord lekt naar argv (known=" + known + "): " + step.args.join(" "));
+    }
+  }
+});
+
+test("de terugval zonder --ask gebruikt wel argumenten", () => {
+  // Alleen voor oude nmcli-versies; dan is argv het enige dat werkt.
+  assert.ok(wifiConnectPlanFallback("Stepnet", "geheim123", false)[0].args.includes("geheim123"));
+  assert.ok(wifiConnectPlanFallback("Stepnet", "geheim123", true)[0].args.includes("geheim123"));
+});
+
+test("een SSID met spaties blijft één argument", () => {
+  const steps = wifiConnectPlan("Hotspot Ruben", "geheim123", false);
+  assert.ok(steps[0].args.includes("Hotspot Ruben"));
+});
+
 console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));

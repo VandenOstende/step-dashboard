@@ -124,7 +124,7 @@ onthoudt het.
 | `GET /modem` | `{bars: 0..5, tech}` — mmcli |
 | `GET /weather` | `{temp_c, place}` — Open-Meteo |
 | `GET /net?kind=wifi\|bt` | scanlijst voor het verbindingsscherm |
-| `POST /net` | `{kind, id, connect}` |
+| `POST /net` | `{kind, id, connect}`, plus `password` bij een beveiligd netwerk |
 
 `/data` levert exact het contract uit de briefing — `connected`, `speed_kmh`,
 `rpm`, `erpm`, `duty`, `battery_pct`, `voltage`, `cell_voltage`,
@@ -155,6 +155,8 @@ UI na drie mislukte pogingen terug op de demo-rit.
 * **Tik rechtsboven op de statusbalk** — systeemvenster met de actieve wifi en
   het mobiele netwerk, en de knoppen Verbindingen, Instellingen en Desktop.
 * **Tik op een melding in de topbalk** — het volledige meldingenoverzicht.
+* **Tik op een beveiligd wifi-netwerk** — het schermtoetsenbord voor het
+  wachtwoord; zie hieronder.
 * **Thema** volgt de klok: licht van 07:30 tot 18:00, daarbuiten donker. Te
   overrulen in de instellingen. Zonder internet heeft de Pi een RTC-module of
   `fake-hwclock` nodig, anders klopt zowel de klok als het thema niet.
@@ -180,7 +182,24 @@ Drie dingen zijn bewust anders dan in `Step Dashboard.dc.html`:
 
 Verder is de lijst in het verbindingsscherm nu echt: hij komt van `/net` in
 plaats van uit de vaste demo-lijst, en een rij toont kort "verbinden…" terwijl
-`nmcli` of `bluetoothctl` bezig is. Wifi-netwerken die een wachtwoord nodig
-hebben tonen dat als status — een schermtoetsenbord zit er niet in, dus koppel
-zo'n netwerk één keer via `nmcli` of de desktop; daarna kent NetworkManager het
-en werkt de knop wel.
+`nmcli` of `bluetoothctl` bezig is.
+
+## Schermtoetsenbord
+
+Chromium heeft op desktop-Linux geen eigen aanraaktoetsenbord, dus zit er één
+in de pagina. Tik je op een beveiligd netwerk dat de Pi nog niet kent — die
+rijen tonen "beveiligd" in plaats van "verbind" — dan vult een AZERTY-
+toetsenbord het scherm: drie lagen (letters, cijfers met de gewone tekens, en
+een tweede tekenpagina), `⇧` voor één hoofdletter of vast met een tweede tik,
+en een oogknop om te zien wat je typt. Hangt er een USB-toetsenbord aan, dan
+werkt dat tegelijk.
+
+Het wachtwoord gaat over stdin naar `nmcli --ask`, niet als argument, want
+argumenten zijn voor elke lokale gebruiker te lezen in `ps` en `/proc`. Kent
+NetworkManager het netwerk al maar met een verkeerd wachtwoord, dan wordt het
+opgeslagen profiel bijgewerkt en opnieuw geactiveerd. De Pi bewaart het
+wachtwoord verder nergens — dat doet NetworkManager — en de UI wist het zodra
+je op Verbind tikt.
+
+Het temperatuuralarm ligt bewust bóven het toetsenbord: een te warme motor
+onderbreekt waar je mee bezig bent, niet andersom.

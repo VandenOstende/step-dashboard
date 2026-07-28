@@ -190,8 +190,20 @@ const routes = {
     if (kind === "bt" && !/^[0-9A-F:]{17}$/i.test(id)) return send(res, 400, { error: "ongeldig adres" });
 
     const connect = body.connect !== false;
+
+    /* Het wachtwoord van het schermtoetsenbord. 8–63 tekens is het bereik dat
+       WPA toestaat. Het wordt doorgegeven en verder nergens bewaard of
+       gelogd — NetworkManager onthoudt het, wij niet. */
+    let password = null;
+    if (kind === "wifi" && connect && typeof body.password === "string" && body.password) {
+      if (body.password.length < 8 || body.password.length > 63) {
+        return send(res, 400, { error: "wachtwoord 8–63 tekens", needsPassword: true });
+      }
+      password = body.password;
+    }
+
     let r;
-    if (kind === "wifi") r = connect ? await sys.wifiConnect(id) : await sys.wifiDisconnect(id);
+    if (kind === "wifi") r = connect ? await sys.wifiConnect(id, password) : await sys.wifiDisconnect(id);
     else r = connect ? await sys.btConnect(id) : await sys.btDisconnect(id);
     send(res, r.ok ? 200 : 502, r);
   }
