@@ -177,11 +177,20 @@ svg{display:block}
 #notices{z-index:3}
 #sys,#settings{z-index:4}
 .sheethead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none}
-.sheettitle{font-size:13px;letter-spacing:.10em;text-transform:uppercase;color:var(--color-neutral-500)}
+.sheettitle{font-size:13px;letter-spacing:.10em;text-transform:uppercase;color:var(--color-neutral-500);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sheetnav{display:flex;align-items:center;gap:var(--space-2);flex:none}
 .xbtn{width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
   border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
   display:flex;align-items:center;justify-content:center}
-.scroller{flex:1;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;
+/* Aan het begin of het eind van de lijst: gedimd, zoals de gids voor
+   uitgeschakelde knoppen voorschrijft. */
+.xbtn.off{opacity:.45}
+/* #netseg staat erbij omdat `#netseg button` anders de randkleur wint. */
+.xbtn.hit,#netseg .xbtn.hit{border-color:var(--color-accent);color:var(--color-accent)}
+/* position:relative zodat offsetTop van een rij vanaf de lijst zelf telt en
+   niet vanaf het scherm eromheen — anders klopt de sprong per rij niet. */
+.scroller{flex:1;position:relative;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;
   overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
 .scroller::-webkit-scrollbar{width:0;height:0}
 
@@ -231,6 +240,8 @@ svg{display:block}
   border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
   font-size:13px;letter-spacing:.09em;text-transform:uppercase}
 #netseg button.on{color:var(--color-text);border-color:var(--color-accent)}
+/* De scrollknoppen staan in dezelfde rij als de tabs maar rekken niet mee. */
+#netseg .xbtn{flex:none;width:56px;height:44px}
 #netclose{width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
   border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
   display:flex;align-items:center;justify-content:center}
@@ -390,6 +401,8 @@ svg{display:block}
     <div id="netseg">
       <button id="segwifi" class="on">Wi-Fi</button>
       <button id="segbt">Bluetooth</button>
+      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
       <button id="netclose"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="scroller" id="netlist"></div>
@@ -412,7 +425,11 @@ svg{display:block}
   <div class="sheet" id="notices">
     <div class="sheethead">
       <div class="sheettitle">Meldingen</div>
-      <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
     </div>
     <div class="scroller" id="noticelist"></div>
   </div>
@@ -438,7 +455,11 @@ svg{display:block}
   <div class="sheet" id="settings">
     <div class="sheethead">
       <div class="sheettitle">Instellingen</div>
-      <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      </div>
     </div>
     <div class="scroller" id="setlist">
       <div class="setrow"><span class="lbl">Thema</span>
@@ -655,6 +676,7 @@ function renderNotices() {
   [].slice.call($("noticelist").querySelectorAll(".msg")).forEach(function (el, i) {
     el.textContent = noticeList[i].t;
   });
+  syncNav("noticelist");
 }
 
 /* Meldingen wisselen elke 3 s door de actieve lijst. */
@@ -667,6 +689,7 @@ $("notice").addEventListener("pointerdown", function (e) {
   if (!noticeList.length) return;
   renderNotices();
   $("notices").classList.add("on");
+  syncNav("noticelist");
 });
 $("noticesclose").addEventListener("pointerdown", function (e) {
   e.preventDefault();
@@ -814,6 +837,7 @@ $("sysclose").addEventListener("pointerdown", function (e) { e.preventDefault();
 $("sysnet").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); openNet("wifi"); });
 $("sysset").addEventListener("pointerdown", function (e) {
   e.preventDefault(); $("sys").classList.remove("on"); renderSettings(); $("settings").classList.add("on");
+  syncNav("setlist");            // pas meten als het scherm zichtbaar is
 });
 $("setclose").addEventListener("pointerdown", function (e) {
   e.preventDefault(); $("settings").classList.remove("on"); openSys();
@@ -908,6 +932,95 @@ $("triprst").addEventListener("pointerdown", function (e) {
   cacheT = {}; cacheS = {};
   paint();
 });
+
+/* ── scrollknoppen ─────────────────────────────────────────────────────────
+   De lijsten zijn hoger dan het vlak waarin ze staan — instellingen toont ~3,5
+   van de 7 rijen — en de scrollbalk is verborgen. Twee chevrons per lijst
+   schuiven rij voor rij, zodat je niet hoeft te slepen op een rij vol knoppen.
+   Ingedrukt houden herhaalt: het verbindingsscherm kan 40 netwerken tonen. */
+
+var HOLD_START = 400;    // ms voordat het herhalen begint
+var HOLD_STEP = 120;     // ms tussen de herhalingen
+
+function navButtons(id) {
+  return [].slice.call(document.querySelectorAll('[data-scroll="' + id + '"]'));
+}
+
+/** Verberg de knoppen als de lijst past; dim ze aan het begin en het eind. */
+function syncNav(id) {
+  var sc = $(id);
+  if (!sc) return;
+  var max = sc.scrollHeight - sc.clientHeight;
+  var can = max > 1;
+  navButtons(id).forEach(function (b) {
+    b.style.display = can ? "flex" : "none";
+    var atEnd = +b.dataset.dir < 0 ? sc.scrollTop <= 1 : sc.scrollTop >= max - 1;
+    b.classList.toggle("off", can && atEnd);
+  });
+}
+
+/**
+ * Spring naar de volgende of vorige rijgrens. Mikken op rijgrenzen in plaats
+ * van op een vast aantal pixels, want een melding met lange tekst is hoger
+ * dan de 56 px van een gewone rij.
+ */
+function stepScroll(id, dir) {
+  var sc = $(id);
+  if (!sc) return;
+  var kids = sc.children;
+  var y = sc.scrollTop;
+  var target = null;
+  if (dir > 0) {
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].offsetTop > y + 1) { target = kids[i].offsetTop; break; }
+    }
+    if (target === null) target = sc.scrollHeight;
+  } else {
+    for (var j = kids.length - 1; j >= 0; j--) {
+      if (kids[j].offsetTop < y - 1) { target = kids[j].offsetTop; break; }
+    }
+    if (target === null) target = 0;
+  }
+  // Geen behavior:"smooth" — een geanimeerde scroll van 300 ms is te zwaar
+  // voor de trage SPI-display.
+  sc.scrollTop = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, target));
+  syncNav(id);
+}
+
+(function bindNav() {
+  var held = null;
+  var stop = function () {
+    if (!held) return;
+    clearTimeout(held.timer);
+    held.btn.classList.remove("hit");
+    held = null;
+  };
+  [].slice.call(document.querySelectorAll("[data-scroll]")).forEach(function (b) {
+    var id = b.dataset.scroll, dir = +b.dataset.dir;
+    b.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (b.classList.contains("off")) return;
+      stop();
+      b.classList.add("hit");
+      stepScroll(id, dir);
+      var repeat = function () {
+        stepScroll(id, dir);
+        if (b.classList.contains("off")) { stop(); return; }
+        if (held) held.timer = setTimeout(repeat, HOLD_STEP);
+      };
+      held = { btn: b, timer: setTimeout(repeat, HOLD_START) };
+    });
+    b.addEventListener("pointerup", stop);
+    b.addEventListener("pointercancel", stop);
+    b.addEventListener("pointerleave", stop);
+  });
+  ["setlist", "netlist", "noticelist"].forEach(function (id) {
+    var sc = $(id);
+    // Ook na slepen met de vinger moeten de knoppen kloppen.
+    if (sc) sc.addEventListener("scroll", function () { syncNav(id); }, { passive: true });
+  });
+})();
 
 /* ── schermtoetsenbord ─────────────────────────────────────────────────────
    AZERTY. Chromium op desktop-Linux heeft geen eigen aanraaktoetsenbord, dus
@@ -1081,6 +1194,7 @@ function renderNet() {
   if (!items.length) {
     list.innerHTML = '<div id="netempty"></div>';
     $("netempty").textContent = net.tab === "wifi" ? "Geen netwerken gevonden" : "Geen apparaten gekoppeld";
+    syncNav("netlist");
     return;
   }
   list.innerHTML = items.map(function (it) {
@@ -1098,6 +1212,7 @@ function renderNet() {
             : (it.secured && !it.known) ? "beveiligd"
               : "verbind";
   });
+  syncNav("netlist");
 }
 
 function fetchNetList() {
@@ -1120,6 +1235,7 @@ function openNet(tab) {
   $("segwifi").classList.toggle("on", tab === "wifi");
   $("segbt").classList.toggle("on", tab === "bt");
   renderNet();
+  syncNav("netlist");              // pas meten als het scherm zichtbaar is
   fetchNetList();
 }
 

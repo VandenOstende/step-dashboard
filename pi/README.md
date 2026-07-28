@@ -157,6 +157,11 @@ UI na drie mislukte pogingen terug op de demo-rit.
 * **Tik op een melding in de topbalk** — het volledige meldingenoverzicht.
 * **Tik op een beveiligd wifi-netwerk** — het schermtoetsenbord voor het
   wachtwoord; zie hieronder.
+* **De twee chevrons in Instellingen, Verbindingen en Meldingen** schuiven de
+  lijst rij voor rij op en neer — die lijsten zijn langer dan het scherm en de
+  scrollbalk is verborgen. Ingedrukt houden schuift door. Ze verdwijnen als de
+  lijst helemaal past en dimmen aan het begin en het eind, zodat je ziet dat er
+  meer onder staat. Slepen met de vinger blijft ook gewoon werken.
 * **Thema** volgt de klok: licht van 07:30 tot 18:00, daarbuiten donker. Te
   overrulen in de instellingen. Zonder internet heeft de Pi een RTC-module of
   `fake-hwclock` nodig, anders klopt zowel de klok als het thema niet.
