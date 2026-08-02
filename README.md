@@ -34,6 +34,8 @@ Beyond that:
   counter and top speed.
 - On boot it checks whether a newer version is on GitHub. If there is, the
   notification bar says so and one tap in the settings installs it.
+- Plug in the charger and a charging screen appears: percentage, a bar, and an
+  estimate of how much longer it needs. Tap it away if it's in the way.
 
 Everything runs locally. No internet needed, no CDNs, no external fonts — the
 scooter is often out of range and it should just work.
@@ -126,7 +128,7 @@ The page talks to a handful of endpoints on the same origin:
 
 | route | what |
 | --- | --- |
-| `GET /data` | speed, battery, temperatures — every 150 ms |
+| `GET /data` | speed, battery, temperatures, charging state — every 150 ms |
 | `GET/POST /settings` | store settings |
 | `POST /reset-trip`, `/reset-top` | zero the counters |
 | `POST /backlight` | screen brightness |
@@ -138,6 +140,25 @@ The page talks to a handful of endpoints on the same origin:
 
 If a system tool is missing — no modem, no backlight — the endpoint returns
 nothing gracefully and the UI shows "no signal". Nothing crashes over it.
+
+### Charging
+
+A normal charger connects straight to the battery, not through the VESC, so
+there's no charging current to measure — the controller only sees the pack
+voltage creeping up. So that's what `src/charge.js` watches, while the scooter
+is stationary: the jump when you plug in (0.2 V within a minute) and the slow
+climb after that (0.12 V over five minutes). A 13S pack that fills in four
+hours rises about 0.04 V per minute, and the VESC reports voltage in steps of
+0.1 V — measure over a shorter window and you see nothing. If current *is*
+flowing into the pack through the controller, it's obvious immediately.
+
+The remaining time comes from a straight line fitted through the percentage
+over time. For the first three minutes it says "tijd nog onbekend" rather than
+inventing a number, and it gets more accurate as it goes.
+
+The screen sits below all the panels, so you can still reach the settings past
+it, and below the temperature alarm. Tap it away and it returns on the next
+charging session.
 
 ### Updating
 
@@ -166,7 +187,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 37 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 47 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
 ```
 
@@ -229,6 +250,8 @@ Verder:
 - Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
   er, dan zegt de meldingsbalk dat en werk je bij met één tik in de
   instellingen.
+- Hang je de lader eraan, dan verschijnt een laadscherm: percentage, een balk,
+  en een schatting hoelang het nog duurt. Wegtikken kan als het in de weg zit.
 
 Alles draait lokaal. Geen internet nodig, geen CDN's, geen externe fonts — de
 step staat vaak buiten bereik en dan moet het gewoon werken.
@@ -321,7 +344,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 
 | route | wat |
 | --- | --- |
-| `GET /data` | snelheid, accu, temperaturen — elke 150 ms |
+| `GET /data` | snelheid, accu, temperaturen, laadstatus — elke 150 ms |
 | `GET/POST /settings` | instellingen bewaren |
 | `POST /reset-trip`, `/reset-top` | tellers op nul |
 | `POST /backlight` | schermhelderheid |
@@ -333,6 +356,25 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 
 Ontbreekt er een systeemtool — geen modem, geen backlight — dan geeft het
 endpoint netjes niks terug en toont de UI "geen bereik". Niks crasht daarop.
+
+### Laden
+
+Een gewone lader hangt rechtstreeks aan de accu en niet via de VESC, dus er is
+geen laadstroom te meten — de controller ziet alleen de pakspanning omhoog
+kruipen. Daar kijkt `src/charge.js` dus naar, terwijl de step stilstaat: de
+sprong bij het aansluiten (0,2 V binnen een minuut) en daarna de trage stijging
+(0,12 V over vijf minuten). Een 13S-pak dat in vier uur vol is stijgt zo'n
+0,04 V per minuut, en de VESC meldt spanning in stappen van 0,1 V — meet je
+over een korter venster, dan zie je niets. Loopt er wél stroom de accu in via
+de controller, dan is het meteen duidelijk.
+
+De resterende tijd komt uit een rechte lijn door het percentageverloop. De
+eerste drie minuten staat er "tijd nog onbekend" in plaats van een verzonnen
+getal; daarna wordt het steeds preciezer.
+
+Het scherm staat onder alle vensters, zodat je er nog bij de instellingen langs
+kunt, en onder het temperatuuralarm. Wegtikken kan; bij de volgende laadbeurt
+komt het terug.
 
 ### Bijwerken
 
@@ -361,7 +403,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 37 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 47 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 ```
 

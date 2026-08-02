@@ -11,6 +11,7 @@ src/vesc.js         VESC-protocol: framing, CRC16, pakketten
 src/telemetry.js    ruwe waarden → wat de UI verwacht
 src/system.js       nmcli, bluetoothctl, mmcli, backlight
 src/weather.js      buitentemperatuur
+src/charge.js       herkennen dat de accu laadt, en hoelang nog
 src/config.js       config.json en de opgeslagen staat
 src/update.js       versie vergelijken met GitHub
 src/server.js       de HTTP-server
@@ -132,11 +133,12 @@ je een wachtwoord intypt, niet andersom.
 npm test
 ```
 
-37 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+47 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
-opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, en het
-vergelijken van versies.
+opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het
+vergelijken van versies, en het herkennen van laden — inclusief de traagste
+lader die we nog willen zien.
 
 Voor de UI heb ik met Playwright op 480 × 320 doorgeklikt. Dat zit niet in de
 repo, maar de aanpak is simpel: server starten, `page.tap()` op de knoppen, en
