@@ -27,12 +27,14 @@ const { loadConfig, loadState, ROOT } = require("./config");
 const { Vesc } = require("./vesc");
 const { Telemetry } = require("./telemetry");
 const { Weather } = require("./weather");
+const { Updater } = require("./update");
 const sys = require("./system");
 
 const cfg = loadConfig();
 const state = loadState();
 const telemetry = new Telemetry(cfg, state);
 const weather = new Weather(cfg);
+const updater = new Updater(cfg);
 
 const log = (...a) => console.log("[step]", ...a);
 
@@ -98,6 +100,8 @@ function readJson(req, limit) {
     req.on("error", reject);
   });
 }
+
+const url_force = (req) => /[?&]check=1/.test(req.url || "");
 
 const num = (v, lo, hi, fallback) => {
   const n = Number(v);
@@ -167,6 +171,16 @@ const routes = {
   "GET /bt": async (req, res) => send(res, 200, await sys.btStatus()),
 
   "GET /modem": async (req, res) => send(res, 200, await sys.modem()),
+
+  "GET /update": async (req, res) => {
+    // ?check=1 gaat langs de cache heen; de knop in de instellingen doet dat.
+    send(res, 200, await updater.status(url_force(req)));
+  },
+
+  "POST /update": async (req, res) => {
+    const r = await updater.start();
+    send(res, r.ok ? 200 : 409, r);
+  },
 
   "GET /weather": async (req, res) => {
     try {
@@ -244,6 +258,24 @@ server.listen(cfg.port, cfg.host, () => {
   log("luistert op http://" + cfg.host + ":" + cfg.port);
   log("VESC-poort: " + (cfg.vesc.port || "automatisch zoeken"));
 });
+
+/* Bij het opstarten kijken of er een nieuwe versie klaarstaat. Alleen kijken;
+   installeren is een bewuste tik in de instellingen — tenzij je in config.json
+   update.autoInstall aanzet. Een kapotte commit die zichzelf ongevraagd op je
+   stuur installeert is geen prettig vooruitzicht. */
+if (cfg.update && cfg.update.checkOnStart) {
+  setTimeout(() => {
+    updater.status(true).then((st) => {
+      if (st.error) return log("update-controle mislukt: " + st.error);
+      if (!st.available) return log("versie is actueel (" + (st.currentShort || "onbekend") + ")");
+      log("nieuwe versie beschikbaar: " + st.latestShort + " — " + (st.message || ""));
+      if (cfg.update.autoInstall) {
+        log("autoInstall staat aan, bijwerken");
+        updater.start().then((r) => { if (!r.ok) log("bijwerken mislukt: " + r.error); });
+      }
+    }).catch((e) => log("update-controle mislukt: " + e.message));
+  }, 5000);   // even wachten tot het netwerk er is
+}
 
 function shutdown() {
   log("afsluiten");

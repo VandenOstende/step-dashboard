@@ -11,6 +11,19 @@ const { crc16, frame, Vesc, faultName } = require("../src/vesc");
 const { Telemetry, pctFromCellVoltage, guessCells } = require("../src/telemetry");
 
 let passed = 0;
+
+/** Async variant — de synchrone `test` hieronder slikt een afgewezen promise. */
+async function atest(name, fn) {
+  try {
+    await fn();
+    passed++;
+    console.log("  ✓ " + name);
+  } catch (err) {
+    console.error("  ✗ " + name + "\n    " + err.message);
+    process.exitCode = 1;
+  }
+}
+
 function test(name, fn) {
   try {
     fn();
@@ -358,4 +371,83 @@ test("een SSID met spaties blijft één argument", () => {
   assert.ok(steps[0].args.includes("Hotspot Ruben"));
 });
 
-console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
+(async () => {
+/* ── bijwerken ──────────────────────────────────────────────────────────── */
+console.log("\nupdate");
+
+const { Updater, apiUrlFor } = require("../src/update");
+
+test("de GitHub-API-url wordt uit de repo-url afgeleid", () => {
+  assert.strictEqual(apiUrlFor("https://github.com/VandenOstende/step-dashboard.git", "main"),
+    "https://api.github.com/repos/VandenOstende/step-dashboard/commits/main");
+  assert.strictEqual(apiUrlFor("https://github.com/VandenOstende/step-dashboard", "main"),
+    "https://api.github.com/repos/VandenOstende/step-dashboard/commits/main");
+});
+
+test("een ssh- of onzin-url levert geen api-url op", () => {
+  assert.strictEqual(apiUrlFor("git@github.com:x/y.git", "main"), null);
+  assert.strictEqual(apiUrlFor("", "main"), null);
+  assert.strictEqual(apiUrlFor(null, "main"), null);
+});
+
+test("de tak wordt veilig in de url gezet", () => {
+  assert.ok(apiUrlFor("https://github.com/a/b", "feature/x").endsWith("/commits/feature%2Fx"));
+});
+
+await atest("zonder netwerk meldt status een fout in plaats van te crashen", async () => {
+  const u = new Updater({ update: { repo: "https://github.com/a/b", branch: "main" } });
+  u.remote = () => Promise.reject(new Error("geen netwerk"));
+  const st = await u.status(true);
+  assert.strictEqual(st.error, "geen netwerk");
+  assert.strictEqual(st.available, false);
+});
+
+await atest("een nieuwere commit op GitHub geeft available", async () => {
+  const u = new Updater({ update: { repo: "https://github.com/a/b", branch: "main" } });
+  u.installed = () => ({ commit: "a".repeat(40), at: 1 });
+  u.remote = () => Promise.resolve({ commit: "b".repeat(40), message: "iets nieuws" });
+  const st = await u.status(true);
+  assert.strictEqual(st.available, true);
+  assert.strictEqual(st.currentShort, "aaaaaaa");
+  assert.strictEqual(st.latestShort, "bbbbbbb");
+  assert.strictEqual(st.message, "iets nieuws");
+});
+
+await atest("dezelfde commit geeft geen update", async () => {
+  const u = new Updater({ update: { repo: "https://github.com/a/b", branch: "main" } });
+  u.installed = () => ({ commit: "c".repeat(40), at: 1 });
+  u.remote = () => Promise.resolve({ commit: "c".repeat(40), message: "" });
+  const st = await u.status(true);
+  assert.strictEqual(st.available, false);
+});
+
+await atest("zonder bekende versie beweren we niet dat er een update is", async () => {
+  // Bijvoorbeeld bij een handmatige kopie zonder version.json.
+  const u = new Updater({ update: { repo: "https://github.com/a/b", branch: "main" } });
+  u.installed = () => null;
+  u.remote = () => Promise.resolve({ commit: "d".repeat(40), message: "" });
+  const st = await u.status(true);
+  assert.strictEqual(st.available, false);
+  assert.strictEqual(st.current, null);
+});
+
+await atest("start weigert als er al een installatie loopt", async () => {
+  const u = new Updater({ update: { repo: "https://github.com/a/b" } });
+  u.progress = () => ({ state: "bezig", message: "ophalen" });
+  const r = await u.start();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.error, "al bezig");
+});
+
+await atest("status meldt dat er een installatie loopt", async () => {
+  const u = new Updater({ update: { repo: "https://github.com/a/b" } });
+  u.installed = () => ({ commit: "e".repeat(40), at: 1 });
+  u.remote = () => Promise.resolve({ commit: "e".repeat(40), message: "" });
+  u.progress = () => ({ state: "bezig", message: "installeren" });
+  const st = await u.status(true);
+  assert.strictEqual(st.running, true);
+  assert.strictEqual(st.runMessage, "installeren");
+});
+
+  console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
+})();

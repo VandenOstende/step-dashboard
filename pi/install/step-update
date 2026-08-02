@@ -1,0 +1,89 @@
+#!/bin/bash
+# Werkt het Step Dashboard bij vanaf GitHub.
+#
+# Draait als root via een sudoers-regel, en wordt losgekoppeld gestart met
+# systemd-run — anders sterft dit script halverwege, want het herstart de
+# service waar het zelf uit is aangeroepen.
+#
+# Haalt een verse kloon op in een tijdelijke map in plaats van te vertrouwen
+# op de map waar je ooit `git clone` deed; die kan verplaatst of weggegooid
+# zijn. De voortgang komt in een statusbestand te staan zodat de UI hem kan
+# volgen ook als de service tussendoor herstart.
+set -uo pipefail
+
+STATE_DIR=/var/lib/step-dashboard
+STATUS="$STATE_DIR/update-status.json"
+UNIT=/etc/systemd/system/step-dashboard.service
+DEST=/opt/step-dashboard
+
+REPO="${1:-}"
+BRANCH="${2:-}"
+
+mkdir -p "$STATE_DIR"
+
+say() {
+  # $1 = staat, $2 = tekst voor op het scherm
+  printf '{"state":"%s","message":"%s","at":%s}' "$1" "$2" "$(date +%s)" > "$STATUS.tmp"
+  mv "$STATUS.tmp" "$STATUS"
+}
+
+fail() {
+  say "fout" "$1"
+  echo "step-update: $1" >&2
+  exit 1
+}
+
+[[ $EUID -eq 0 ]] || fail "moet als root draaien"
+
+cfg() { sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$DEST/config.json" 2>/dev/null | head -1; }
+[[ -n "$REPO"   ]] || REPO=$(cfg repo)
+[[ -n "$BRANCH" ]] || BRANCH=$(cfg branch)
+[[ -n "$BRANCH" ]] || BRANCH=main
+[[ -n "$REPO" ]] || fail "geen repository ingesteld"
+
+# Alleen https naar een git-host; geen ssh, geen lokale paden, geen shell-tekens.
+[[ "$REPO" =~ ^https://[A-Za-z0-9._/-]+$ ]] || fail "ongeldige repository-url"
+[[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "ongeldige tak"
+
+command -v git >/dev/null || fail "git ontbreekt"
+
+# De service draait onder een gewone gebruiker; install.sh moet weten welke.
+STEP_USER=$(sed -n 's/^User=//p' "$UNIT" 2>/dev/null | head -1)
+[[ -n "$STEP_USER" ]] || STEP_USER=pi
+export STEP_USER
+
+say "bezig" "ophalen"
+
+TMP=$(mktemp -d) || fail "geen tijdelijke map"
+trap 'rm -rf "$TMP"' EXIT
+
+if ! git clone --depth 1 --branch "$BRANCH" "$REPO" "$TMP/repo" >"$TMP/log" 2>&1; then
+  fail "ophalen mislukt — geen netwerk?"
+fi
+
+[[ -x "$TMP/repo/pi/install/install.sh" ]] || fail "installatiescript ontbreekt in de repo"
+
+NEW=$(git -C "$TMP/repo" rev-parse HEAD)
+OLD=$(sed -n 's/.*"commit"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$DEST/version.json" 2>/dev/null | head -1)
+
+if [[ -n "$OLD" && "$OLD" == "$NEW" ]]; then
+  say "actueel" "al bijgewerkt"
+  exit 0
+fi
+
+say "bezig" "installeren"
+
+if ! "$TMP/repo/pi/install/install.sh" >>"$TMP/log" 2>&1; then
+  # Het oude /opt staat er nog; de service blijft dus draaien op de oude code.
+  fail "installeren mislukt — zie journalctl -u step-selfupdate"
+fi
+
+say "herstarten" "herstarten"
+
+# --no-block, want systemctl wacht anders op een service die dit script
+# zelf net heeft vervangen.
+systemctl restart --no-block step-dashboard.service
+systemctl is-enabled step-kiosk.service >/dev/null 2>&1 && \
+  systemctl restart --no-block step-kiosk.service
+
+say "klaar" "bijgewerkt naar ${NEW:0:7}"

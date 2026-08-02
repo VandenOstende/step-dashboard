@@ -32,6 +32,12 @@ for d in src public install tools; do
   cp -r "$SRC/$d" "$DEST/$d"
 done
 cp "$SRC/package.json" "$DEST/"
+
+# Welke commit staat er nu? De updater vergelijkt dit met GitHub.
+COMMIT=$(git -C "$SRC/.." rev-parse HEAD 2>/dev/null || echo "")
+BRANCH_NOW=$(git -C "$SRC/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+printf '{"commit":"%s","branch":"%s","at":%s}\n' \
+  "$COMMIT" "$BRANCH_NOW" "$(date +%s)" > "$DEST/version.json"
 [[ -f "$DEST/config.json" ]] || cp "$SRC/config.json" "$DEST/config.json"
 chmod +x "$DEST/install/kiosk.sh"
 chown -R "$USER_NAME":"$USER_NAME" "$DEST"
@@ -39,7 +45,16 @@ chown -R "$USER_NAME":"$USER_NAME" "$DEST"
 echo "→ rechten"
 usermod -aG dialout,video "$USER_NAME"
 install -d -o "$USER_NAME" -g "$USER_NAME" /var/lib/step-dashboard
-install -m 0440 "$SRC/install/step-dashboard.sudoers" /etc/sudoers.d/step-dashboard
+# De updater draait als root en staat buiten $DEST, want $DEST is van de
+# service-gebruiker — een script dat die zelf kan aanpassen en met sudo mag
+# draaien is een achterdeur naar root.
+install -m 0755 -o root -g root "$SRC/install/step-update" /usr/local/sbin/step-update
+
+# De regels staan op naam van "pi"; zet de echte gebruiker erin, anders werken
+# de Desktop-knop en het bijwerken niet op een Pi met een andere gebruikersnaam.
+sed "s/^pi ALL=/$USER_NAME ALL=/" "$SRC/install/step-dashboard.sudoers" \
+  > /etc/sudoers.d/step-dashboard
+chmod 0440 /etc/sudoers.d/step-dashboard
 visudo -cf /etc/sudoers.d/step-dashboard >/dev/null
 install -m 0644 "$SRC/install/99-step-dashboard.rules" /etc/udev/rules.d/99-step-dashboard.rules
 udevadm control --reload-rules || true
@@ -63,3 +78,5 @@ echo "  sudo systemctl enable --now step-kiosk"
 echo
 echo "VESC uitlezen om te controleren of de setup-wizard gedraaid heeft:"
 echo "  node $DEST/tools/vesc-probe.js"
+echo
+echo "Geïnstalleerde versie: ${COMMIT:0:7}${COMMIT:+ (}${BRANCH_NOW}${COMMIT:+)}"

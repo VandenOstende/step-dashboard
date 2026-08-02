@@ -6,3 +6,8 @@
 
 pi ALL=(root) NOPASSWD: /usr/bin/systemctl stop step-kiosk.service
 pi ALL=(root) NOPASSWD: /usr/bin/systemctl start step-kiosk.service
+
+# Bijwerken vanaf GitHub. Exact dit commando, zonder jokertekens: step-update
+# leest de repository en de tak zelf uit config.json, dus er hoeven geen
+# argumenten door de sudo-regel heen.
+pi ALL=(root) NOPASSWD: /usr/bin/systemd-run --unit=step-selfupdate --collect --quiet /usr/local/sbin/step-update

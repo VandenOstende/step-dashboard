@@ -24,6 +24,9 @@ Verder:
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
+- Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
+  er, dan zegt de meldingsbalk dat en werk je bij met één tik in de
+  instellingen.
 
 Alles draait lokaal. Geen internet nodig, geen CDN's, geen externe fonts — de
 step staat vaak buiten bereik en dan moet het gewoon werken.
@@ -123,15 +126,39 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
 | `GET/POST /net` | netwerken scannen en verbinden |
+| `GET/POST /update` | versie vergelijken met GitHub, en bijwerken |
 
 Ontbreekt er een systeemtool — geen modem, geen backlight — dan geeft het
 endpoint netjes niks terug en toont de UI "geen bereik". Niks crasht daarop.
+
+## Bijwerken
+
+Instellingen → bovenste rij. Daar staat welke versie draait; **Zoeken** kijkt bij
+GitHub en **Installeren** haalt de nieuwe binnen en herstart de service. Dat
+laatste duurt een halve minuut, waarin het scherm even herlaadt.
+
+Onder water haalt hij een verse kloon in een tijdelijke map en draait daar
+`install/install.sh` uit. Je `config.json` en je opgeslagen instellingen blijven
+staan. Gaat het ophalen of installeren mis, dan blijft de oude versie gewoon
+draaien — er wordt pas iets vervangen als de kloon binnen is.
+
+Vanaf de terminal kan het ook:
+
+```bash
+cd ~/step-dashboard && git pull
+cd pi && sudo ./install/install.sh && sudo systemctl restart step-dashboard
+```
+
+Automatisch installeren bij het opstarten kan met `update.autoInstall` in
+`config.json`. Staat standaard uit: een kapotte versie die zichzelf tijdens het
+opstarten op je stuur zet is geen prettig vooruitzicht. Alleen *controleren*
+gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ## Zelf ermee spelen
 
 ```bash
 cd pi
-npm test     # 28 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 37 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 ```
 

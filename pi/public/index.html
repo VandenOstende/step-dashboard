@@ -91,6 +91,7 @@ svg{display:block}
   background:transparent;border:0;color:var(--color-warn);font-size:14px;text-align:left}
 #notice.on{display:flex}
 #notice.crit{color:var(--color-crit)}
+#notice.info{color:var(--color-accent)}
 #notice svg{flex:none}
 #noticetxt{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 
@@ -219,6 +220,10 @@ svg{display:block}
   border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:20px}
 .setval{width:64px;text-align:center;font-size:18px}
 .setval.wide{width:78px}
+.setstat{font-size:13px;color:var(--color-neutral-500);text-align:right;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;flex:1}
+.setstat.new{color:var(--color-accent)}
+.setstat.bad{color:var(--color-crit)}
 .rowbtn{height:44px;padding:0 var(--space-4);background:transparent;color:var(--color-text);
   border:1px solid var(--color-accent);border-radius:var(--radius-sm);
   font-size:13px;letter-spacing:.09em;text-transform:uppercase}
@@ -228,11 +233,14 @@ svg{display:block}
   background:var(--color-surface);border:1px solid var(--color-neutral-800);
   border-left:4px solid var(--color-warn);border-radius:var(--radius-md)}
 #noticelist .row.crit{border-left-color:var(--color-crit)}
+#noticelist .row.info{border-left-color:var(--color-accent)}
 #noticelist .row svg{flex:none;color:var(--color-warn)}
 #noticelist .row.crit svg{color:var(--color-crit)}
+#noticelist .row.info svg{color:var(--color-accent)}
 #noticelist .msg{font-size:16px;line-height:1.2;color:var(--color-text)}
 #noticelist .lv{margin-left:auto;flex:none;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-warn)}
 #noticelist .row.crit .lv{color:var(--color-crit)}
+#noticelist .row.info .lv{color:var(--color-accent)}
 
 /* verbindingen */
 #netseg{display:flex;gap:var(--space-2);flex:none}
@@ -462,6 +470,10 @@ svg{display:block}
       </div>
     </div>
     <div class="scroller" id="setlist">
+      <div class="setrow"><span class="lbl" style="flex:none">Update</span>
+        <span class="setstat" id="setupd">controleren…</span>
+        <button id="updbtn" class="rowbtn">Zoeken</button>
+      </div>
       <div class="setrow"><span class="lbl">Thema</span>
         <button class="seg" data-theme="Auto">Auto</button>
         <button class="seg" data-theme="Licht">Licht</button>
@@ -643,6 +655,7 @@ function notices(d) {
   if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% — bijna leeg" });
   else if (bp < 20) out.push({ lv: 1, t: "Accu " + bp.toFixed(0) + "% — laag" });
   if ((d.duty || 0) > 0.95) out.push({ lv: 1, t: "Duty 95%+ — geen reserve" });
+  if (upd.available) out.push({ lv: 0, t: "Nieuwe versie beschikbaar — zie Instellingen" });
   out.sort(function (a, b) { return b.lv - a.lv; });
   return out;
 }
@@ -661,16 +674,18 @@ function paintNotice(d) {
   var key = cur.lv + "|" + cur.t;
   if (cacheS.nz === key) return;
   cacheS.nz = key;
-  b.className = "on" + (cur.lv === 2 ? " crit" : "");
+  b.className = "on" + (cur.lv === 2 ? " crit" : cur.lv === 0 ? " info" : "");
   $("noticetxt").textContent = cur.t;
 }
 
 function renderNotices() {
   $("noticelist").innerHTML = noticeList.map(function (nt) {
-    return '<div class="row' + (nt.lv === 2 ? " crit" : "") + '">'
+    var cls = nt.lv === 2 ? " crit" : nt.lv === 0 ? " info" : "";
+    var label = nt.lv === 2 ? "fout" : nt.lv === 0 ? "info" : "let op";
+    return '<div class="row' + cls + '">'
       + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>'
       + '<div class="msg"></div>'
-      + '<div class="lv">' + (nt.lv === 2 ? "fout" : "let op") + '</div></div>';
+      + '<div class="lv">' + label + '</div></div>';
   }).join("");
   /* tekst apart zetten: melding-tekst kan servertekst bevatten */
   [].slice.call($("noticelist").querySelectorAll(".msg")).forEach(function (el, i) {
@@ -931,6 +946,115 @@ $("triprst").addEventListener("pointerdown", function (e) {
   fetch("/reset-trip", { method: "POST" })["catch"](function () {});
   cacheT = {}; cacheS = {};
   paint();
+});
+
+/* ── bijwerken ─────────────────────────────────────────────────────────────
+   De service kijkt bij het opstarten of er een nieuwe versie op GitHub staat.
+   Installeren blijft een bewuste tik: een kapotte versie die zichzelf tijdens
+   het opstarten op je stuur zet, wil je niet. */
+
+var upd = { available: false, running: false, checked: false, text: "", cls: "" };
+var updTimer = null;
+
+function paintUpdate() {
+  var st = $("setupd"), b = $("updbtn");
+  if (!st) return;
+  st.textContent = upd.text;
+  st.className = "setstat" + (upd.cls ? " " + upd.cls : "");
+  b.textContent = upd.running ? "Bezig…" : (upd.available ? "Installeren" : "Zoeken");
+  b.style.opacity = upd.running ? "0.45" : "1";
+}
+
+function readUpdate(u) {
+  if (u.running) {
+    upd.running = true;
+    upd.text = u.runMessage ? u.runMessage + "…" : "bezig…";
+    upd.cls = "";
+  } else if (u.runState === "fout") {
+    upd.running = false;
+    upd.available = !!u.available;
+    upd.text = u.runMessage || "mislukt";
+    upd.cls = "bad";
+  } else if (u.error) {
+    upd.running = false;
+    upd.available = false;
+    upd.text = u.error;
+    upd.cls = "bad";
+  } else if (u.available) {
+    upd.running = false;
+    upd.available = true;
+    upd.text = "nieuw: " + u.latestShort;
+    upd.cls = "new";
+  } else {
+    upd.running = false;
+    upd.available = false;
+    upd.text = u.currentShort ? "actueel · " + u.currentShort : "actueel";
+    upd.cls = "";
+  }
+  upd.checked = true;
+  paintUpdate();
+}
+
+function fetchUpdate(force) {
+  return fetch("/update" + (force ? "?check=1" : ""), { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+    .then(readUpdate)
+    ["catch"](function () {
+      /* Tijdens de herstart aan het eind van een update is de server even weg;
+         dat is geen fout, dus laat de tekst dan staan. */
+      if (upd.running) return;
+      upd.text = "niet bereikbaar";
+      upd.cls = "bad";
+      upd.checked = true;
+      paintUpdate();
+    });
+}
+
+/* Zolang er iets loopt elke 2 s kijken; anders stoppen. */
+function followUpdate() {
+  clearInterval(updTimer);
+  updTimer = setInterval(function () {
+    fetchUpdate(false).then(function () {
+      if (!upd.running) { clearInterval(updTimer); updTimer = null; }
+    });
+  }, 2000);
+}
+
+$("updbtn").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  if (upd.running) return;
+  var b = $("updbtn");
+  b.classList.add("hit");
+  setTimeout(function () { b.classList.remove("hit"); }, 90);
+
+  if (!upd.available) {                     // zoeken
+    upd.text = "controleren…";
+    upd.cls = "";
+    paintUpdate();
+    fetchUpdate(true);
+    return;
+  }
+  upd.running = true;                       // installeren
+  upd.text = "starten…";
+  upd.cls = "";
+  paintUpdate();
+  fetch("/update", { method: "POST" })
+    .then(function (r) { return r.json()["catch"](function () { return {}; }); })
+    .then(function (res) {
+      if (res && res.error) {
+        upd.running = false;
+        upd.text = res.error;
+        upd.cls = "bad";
+        paintUpdate();
+        return;
+      }
+      followUpdate();
+    })["catch"](function () {
+      upd.running = false;
+      upd.text = "starten mislukt";
+      upd.cls = "bad";
+      paintUpdate();
+    });
 });
 
 /* ── scrollknoppen ─────────────────────────────────────────────────────────
@@ -1403,6 +1527,10 @@ function boot(saved) {
   setInterval(poll, POLL_MS);
   setInterval(paint, RENDER_MS);
   paint();
+
+  paintUpdate();
+  fetchUpdate(false);
+  setInterval(function () { fetchUpdate(false); }, 3600000);
 
   fetchWeather();
   setInterval(fetchWeather, 300000);

@@ -16,6 +16,13 @@
     "gearRatio": 1
   },
 
+  "update": {
+    "repo": "https://github.com/VandenOstende/step-dashboard.git",
+    "branch": "main",
+    "checkOnStart": true,
+    "autoInstall": false
+  },
+
   "weather": {
     "latitude": null,
     "longitude": null,

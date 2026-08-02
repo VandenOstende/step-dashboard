@@ -12,7 +12,9 @@ src/telemetry.js    ruwe waarden → wat de UI verwacht
 src/system.js       nmcli, bluetoothctl, mmcli, backlight
 src/weather.js      buitentemperatuur
 src/config.js       config.json en de opgeslagen staat
+src/update.js       versie vergelijken met GitHub
 src/server.js       de HTTP-server
+install/step-update het script dat als root bijwerkt
 tools/vesc-probe.js kijken wat je VESC vertelt
 tools/selftest.js   tests, zonder hardware
 ```
@@ -87,6 +89,28 @@ in de argumenten belandt.
 Alle systeemaanroepen gaan via `execFile` met een argumentenlijst, nooit via een
 shell. Een SSID met een puntkomma erin mag geen commando worden.
 
+## Zichzelf bijwerken
+
+Twee stukken. `src/update.js` vraagt de laatste commit op via de publieke
+GitHub-API en vergelijkt die met `version.json`, dat `install.sh` bij elke
+installatie wegschrijft. Installeren doet `step-update`, een los script dat als
+root draait.
+
+Dat script moet **losgekoppeld** starten, want het herstart aan het eind de
+service waar de aanroep vandaan kwam — zonder `systemd-run` snijdt het zichzelf
+halverwege af. Daarom komt de voortgang ook uit een statusbestand in
+`/var/lib/step-dashboard/` en niet uit het proces: de UI blijft dat lezen terwijl
+de server onder haar handen herstart.
+
+Het script staat in `/usr/local/sbin/` en niet in `/opt/step-dashboard`, want die
+map is van de service-gebruiker. Een script dat je zelf kunt aanpassen én met
+sudo mag draaien is een achterdeur naar root. Om dezelfde reden staan er geen
+jokertekens in de sudoers-regel: `step-update` leest de repository en de tak zelf
+uit `config.json`, zodat er niks door sudo heen hoeft.
+
+Het haalt altijd een verse kloon op in plaats van te pullen in de map waar je
+ooit `git clone` deed — die kan verplaatst of weggegooid zijn.
+
 ## Lagen op het scherm
 
 De overlays zitten op vaste z-index-niveaus:
@@ -108,10 +132,11 @@ je een wachtwoord intypt, niet andersom.
 npm test
 ```
 
-28 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+37 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
-opstart en zijn tellers terugzet), en de opbouw van de nmcli-commando's.
+opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, en het
+vergelijken van versies.
 
 Voor de UI heb ik met Playwright op 480 × 320 doorgeklikt. Dat zit niet in de
 repo, maar de aanpak is simpel: server starten, `page.tap()` op de knoppen, en

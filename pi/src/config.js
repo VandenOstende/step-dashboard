@@ -31,6 +31,13 @@ const DEFAULT_CONFIG = {
     wheelDiameterM: 0.254,   // 10 inch
     gearRatio: 1             // motoromwentelingen per wielomwenteling
   },
+  update: {
+    // Waar de Pi zijn eigen updates vandaan haalt.
+    repo: "https://github.com/VandenOstende/step-dashboard.git",
+    branch: "main",
+    checkOnStart: true,     // bij het opstarten kijken of er iets nieuws is
+    autoInstall: false      // en dat dan ook meteen installeren
+  },
   weather: {
     latitude: null,          // null = proberen via de modem (mmcli --location-get)
     longitude: null,
