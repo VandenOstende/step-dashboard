@@ -262,6 +262,23 @@ svg{display:block}
 #netlist button.sel .st{color:var(--color-accent-300)}
 #netempty{font-size:14px;color:var(--color-neutral-500);padding:var(--space-3) 2px}
 
+/* ── laadscherm ────────────────────────────────────────────────────────────
+   Verschijnt zodra de lader eraan hangt. Staat boven de drie panes maar onder
+   alle vensters, zodat je nog gewoon bij de instellingen kunt. */
+#charge{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:var(--space-2);
+  padding:var(--space-3) var(--space-6);background:var(--color-bg);z-index:1}
+#charge.on{display:flex}
+#chargehead{display:flex;align-items:center;gap:var(--space-2);color:var(--color-accent);
+  font-size:13px;letter-spacing:.10em;text-transform:uppercase}
+#chargepct{font-size:86px;font-weight:600;line-height:.9;letter-spacing:-.03em}
+#chargepct span{font-size:24px;font-weight:400;color:var(--color-neutral-500);margin-left:4px}
+#chargetrack{width:100%;height:10px;background:var(--color-neutral-900);
+  border-radius:var(--radius-sm);overflow:hidden}
+#chargebar{height:100%;width:0%;background:var(--color-accent)}
+#chargeeta{font-size:20px;color:var(--color-text)}
+#chargesub{font-size:12px;letter-spacing:.06em;color:var(--color-neutral-500)}
+
 /* ── schermtoetsenbord ─────────────────────────────────────────────────────
    Vult het hele scherm in plaats van alleen het verbindingsvlak: dat levert
    de 50 px van de topbalk en de puntjes op, en daarmee toetsen van ~43 × 50
@@ -402,6 +419,18 @@ svg{display:block}
         <div class="card"><div class="k">Wh / km</div><div class="v mid" id="whkm">0</div></div>
       </div>
     </div>
+  </div>
+
+  <!-- laden -->
+  <div id="charge">
+    <div id="chargehead">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
+      <span id="chargelabel">Laden</span>
+    </div>
+    <div id="chargepct"><span id="chargeval">0</span><span>%</span></div>
+    <div id="chargetrack"><div id="chargebar"></div></div>
+    <div id="chargeeta">tijd nog onbekend</div>
+    <div id="chargesub">--</div>
   </div>
 
   <!-- verbindingen -->
@@ -950,6 +979,58 @@ $("triprst").addEventListener("pointerdown", function (e) {
   paint();
 });
 
+/* ── laden ─────────────────────────────────────────────────────────────────
+   De server herkent dat de lader eraan hangt en schat hoe lang het nog duurt.
+   Het scherm verschijnt vanzelf en verdwijnt met een tik; bij de volgende
+   laadbeurt komt het terug. */
+
+var chg = { shown: false, dismissed: 0, session: 0 };
+
+function etaText(min) {
+  if (min === 0) return "vol";
+  if (min == null) return "tijd nog onbekend";
+  if (min < 60) return "nog \u00b1 " + min + " min";
+  var u = Math.floor(min / 60), m = min % 60;
+  return "nog \u00b1 " + u + " u" + (m ? " " + ("0" + m).slice(-2) : "");
+}
+
+function paintCharge(d) {
+  var el = $("charge");
+  if (!d || !d.charging) {
+    if (chg.shown) { chg.shown = false; el.classList.remove("on"); cacheT = {}; cacheS = {}; }
+    return;
+  }
+  /* Nieuwe laadbeurt: het scherm mag weer opkomen, ook als je het vorige
+     hebt weggetikt. */
+  if (d.charge_session !== chg.session) {
+    chg.session = d.charge_session;
+    chg.dismissed = 0;
+  }
+  if (chg.dismissed === chg.session) {
+    if (chg.shown) { chg.shown = false; el.classList.remove("on"); }
+    return;
+  }
+  if (!chg.shown) { chg.shown = true; el.classList.add("on"); }
+
+  var pct = d.battery_pct || 0;
+  el.classList.toggle("full", !!d.charge_full);
+  txt("chargelabel", d.charge_full ? "Volledig geladen" : "Laden");
+  txt("chargeval", n(pct));
+  wide("chargebar", pct);
+  txt("chargeeta", d.charge_full ? "vol" : etaText(d.charge_eta_min));
+  txt("chargesub", n(d.voltage, 1) + " V \u00b7 " + n(d.cell_voltage, 2) + " V/cel");
+}
+
+$("charge").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  chg.dismissed = chg.session;            // deze beurt niet meer tonen
+  chg.shown = false;
+  $("charge").classList.remove("on");
+  cacheT = {}; cacheS = {};
+  paint();
+});
+
 /* ── bijwerken ─────────────────────────────────────────────────────────────
    De service kijkt bij het opstarten of er een nieuwe versie op GitHub staat.
    Installeren blijft een bewuste tik: een kapotte versie die zichzelf tijdens
@@ -1018,13 +1099,18 @@ function readUpdate(u) {
 
 function fetchUpdate(force) {
   return fetch("/update" + (force ? "?check=1" : ""), { cache: "no-store" })
-    .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+    .then(function (r) {
+      if (!r.ok) throw { code: r.status };
+      return r.json();
+    })
     .then(readUpdate)
-    ["catch"](function () {
+    ["catch"](function (e) {
       /* Tijdens de herstart aan het eind van een update is de server even weg;
          dat is geen fout, dus laat de tekst dan staan. */
       if (upd.running) return;
-      upd.text = "niet bereikbaar";
+      /* 404 betekent iets anders dan "geen netwerk": dan draait er een versie
+         van vóór deze knop, en moet je die ene keer met de hand bijwerken. */
+      upd.text = (e && e.code === 404) ? "server te oud — werk handmatig bij" : "niet bereikbaar";
       upd.cls = "bad";
       upd.checked = true;
       paintUpdate();
@@ -1471,6 +1557,7 @@ function paint() {
 
   checkAlarm(d);
   paintNotice(d);
+  paintCharge(d);
   applyTheme(false);
 
   var nw = new Date();

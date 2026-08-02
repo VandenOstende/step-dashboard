@@ -28,6 +28,7 @@ const { Vesc } = require("./vesc");
 const { Telemetry } = require("./telemetry");
 const { Weather } = require("./weather");
 const { Updater } = require("./update");
+const { Charge } = require("./charge");
 const sys = require("./system");
 
 const cfg = loadConfig();
@@ -35,6 +36,7 @@ const state = loadState();
 const telemetry = new Telemetry(cfg, state);
 const weather = new Weather(cfg);
 const updater = new Updater(cfg);
+const charge = new Charge();
 
 const log = (...a) => console.log("[step]", ...a);
 
@@ -116,6 +118,14 @@ const routes = {
     if (data.connected && data.speed_kmh > state.data.topSpeed) {
       state.patch({ topSpeed: data.speed_kmh });
     }
+    /* Laden herkennen we aan de spanning die stijgt terwijl de step stilstaat;
+       een gewone lader hangt rechtstreeks aan de accu en loopt niet via de
+       VESC, dus stroom meten alleen is niet genoeg. */
+    const ch = charge.update(data, Date.now());
+    data.charging = ch.charging;
+    data.charge_eta_min = ch.etaMin;
+    data.charge_full = ch.full;
+    data.charge_session = ch.session;
     send(res, 200, data);
   },
 

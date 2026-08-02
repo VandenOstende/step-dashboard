@@ -39,7 +39,9 @@ cfg() { sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$D
 [[ -n "$REPO"   ]] || REPO=$(cfg repo)
 [[ -n "$BRANCH" ]] || BRANCH=$(cfg branch)
 [[ -n "$BRANCH" ]] || BRANCH=main
-[[ -n "$REPO" ]] || fail "geen repository ingesteld"
+# Terugval voor een config die van vóór het update-blok komt. install.sh vult
+# ontbrekende sleutels tegenwoordig aan, maar dan moet je die versie al hebben.
+[[ -n "$REPO" ]] || REPO=https://github.com/VandenOstende/step-dashboard.git
 
 # Alleen https naar een git-host; geen ssh, geen lokale paden, geen shell-tekens.
 [[ "$REPO" =~ ^https://[A-Za-z0-9._/-]+$ ]] || fail "ongeldige repository-url"

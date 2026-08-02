@@ -38,7 +38,12 @@ COMMIT=$(git -C "$SRC/.." rev-parse HEAD 2>/dev/null || echo "")
 BRANCH_NOW=$(git -C "$SRC/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 printf '{"commit":"%s","branch":"%s","at":%s}\n' \
   "$COMMIT" "$BRANCH_NOW" "$(date +%s)" > "$DEST/version.json"
-[[ -f "$DEST/config.json" ]] || cp "$SRC/config.json" "$DEST/config.json"
+# Bestaande waarden blijven; alleen wat er later is bijgekomen wordt aangevuld.
+if [[ -f "$DEST/config.json" ]]; then
+  node "$SRC/install/merge-config.js" "$SRC/config.json" "$DEST/config.json"
+else
+  cp "$SRC/config.json" "$DEST/config.json"
+fi
 chmod +x "$DEST/install/kiosk.sh"
 chown -R "$USER_NAME":"$USER_NAME" "$DEST"
 
@@ -66,7 +71,11 @@ sed "s/^User=pi$/User=$USER_NAME/;s/^Group=pi$/Group=$USER_NAME/" \
 sed "s/^User=pi$/User=$USER_NAME/;s/^Group=pi$/Group=$USER_NAME/" \
   "$SRC/install/step-kiosk.service" > /etc/systemd/system/step-kiosk.service
 systemctl daemon-reload
-systemctl enable --now step-dashboard.service
+systemctl enable step-dashboard.service
+# Expliciet herstarten: `enable --now` start een service die al draait niet
+# opnieuw, en dan draait het oude proces verder met de nieuwe bestanden op
+# schijf. Dat geeft een UI die vooruitloopt op zijn eigen server.
+systemctl restart step-dashboard.service
 
 echo
 echo "De service draait. Controleer met:"

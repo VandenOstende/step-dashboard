@@ -449,5 +449,129 @@ await atest("status meldt dat er een installatie loopt", async () => {
   assert.strictEqual(st.runMessage, "installeren");
 });
 
+  /* ── laden ────────────────────────────────────────────────────────────── */
+  console.log("\nladen");
+
+  const { Charge } = require("../src/charge");
+
+  /** Bouwt een /data-object; alleen de velden die Charge gebruikt doen ertoe. */
+  const sample = (o) => Object.assign({
+    connected: true, speed_kmh: 0, battery_pct: 50, voltage: 48, battery_current: 0
+  }, o);
+
+  /** Draait de klok vooruit en voedt Charge elke 5 s een monster. */
+  function run(c, opts) {
+    let t = opts.from;
+    let out = null;
+    while (t <= opts.from + opts.durationMs) {
+      out = c.update(sample(opts.at(t)), t);
+      t += 5000;
+    }
+    return out;
+  }
+
+  test("stilstaan met vlakke spanning is niet laden", () => {
+    const c = new Charge();
+    const r = run(c, { from: 0, durationMs: 10 * 60000, at: () => ({ voltage: 48, battery_pct: 50 }) });
+    assert.strictEqual(r.charging, false);
+  });
+
+  test("langzaam stijgende spanning telt als laden", () => {
+    const c = new Charge();
+    // 0,04 V/min: een 13S-pak dat in een uur of vier vol is
+    const r = run(c, {
+      from: 0, durationMs: 12 * 60000,
+      at: (t) => ({ voltage: 48 + t / 60000 * 0.04, battery_pct: 50 + t / 60000 * 0.2 })
+    });
+    assert.strictEqual(r.charging, true);
+    assert.ok(r.since != null, "starttijd niet vastgelegd");
+  });
+
+  test("de spanningssprong bij het aansluiten wordt snel gezien", () => {
+    const c = new Charge();
+    // eerst een minuut rust, dan de lader erin: +0,3 V
+    const r = run(c, {
+      from: 0, durationMs: 3 * 60000,
+      at: (t) => ({ voltage: t < 60000 ? 48 : 48.3, battery_pct: 50 })
+    });
+    assert.strictEqual(r.charging, true);
+  });
+
+  test("negatieve accustroom telt ook als laden", () => {
+    const c = new Charge();
+    const r = run(c, {
+      from: 0, durationMs: 60000,
+      at: () => ({ voltage: 48, battery_pct: 50, battery_current: -2.5 })
+    });
+    assert.strictEqual(r.charging, true);
+  });
+
+  test("rijden sluit laden uit", () => {
+    const c = new Charge();
+    run(c, {
+      from: 0, durationMs: 12 * 60000,
+      at: (t) => ({ voltage: 48 + t / 60000 * 0.04, battery_pct: 50 + t / 60000 * 0.2 })
+    });
+    assert.strictEqual(c.charging, true, "moet eerst laden");
+    const r = c.update(sample({ speed_kmh: 25 }), 13 * 60000);
+    assert.strictEqual(r.charging, false);
+  });
+
+  test("de resterende tijd klopt met het tempo", () => {
+    const c = new Charge();
+    // 1 % per minuut vanaf 50 %
+    const r = run(c, {
+      from: 0, durationMs: 12 * 60000,
+      at: (t) => ({ voltage: 48 + t / 60000 * 0.04, battery_pct: 50 + t / 60000 })
+    });
+    assert.ok(r.etaMin != null, "geen schatting");
+    // op t=12min staat hij op 62 %, dus nog 38 minuten
+    assert.ok(Math.abs(r.etaMin - 38) <= 3, "geschat: " + r.etaMin + " min");
+  });
+
+  test("de eerste minuten geven nog geen schatting", () => {
+    const c = new Charge();
+    const r = run(c, {
+      from: 0, durationMs: 90000,
+      at: () => ({ voltage: 48, battery_pct: 50, battery_current: -3 })
+    });
+    assert.strictEqual(r.charging, true);
+    assert.strictEqual(r.etaMin, null);
+  });
+
+  test("een volle accu geeft nul minuten", () => {
+    const c = new Charge();
+    const r = run(c, {
+      from: 0, durationMs: 5 * 60000,
+      at: () => ({ voltage: 54.6, battery_pct: 100, battery_current: -1 })
+    });
+    assert.strictEqual(r.full, true);
+    assert.strictEqual(r.etaMin, 0);
+  });
+
+  test("zonder VESC-verbinding wordt alles vergeten", () => {
+    const c = new Charge();
+    run(c, {
+      from: 0, durationMs: 5 * 60000,
+      at: () => ({ voltage: 48, battery_pct: 50, battery_current: -3 })
+    });
+    assert.strictEqual(c.charging, true);
+    const r = c.update({ connected: false }, 6 * 60000);
+    assert.strictEqual(r.charging, false);
+    assert.strictEqual(c.hist.length, 0);
+  });
+
+  test("elke nieuwe laadbeurt krijgt een eigen nummer", () => {
+    const c = new Charge();
+    const opts = {
+      from: 0, durationMs: 5 * 60000,
+      at: () => ({ voltage: 48, battery_pct: 50, battery_current: -3 })
+    };
+    const first = run(c, opts).session;
+    c.update(sample({ speed_kmh: 25 }), 6 * 60000);          // ertussenuit rijden
+    const second = run(c, Object.assign({}, opts, { from: 7 * 60000 })).session;
+    assert.strictEqual(second, first + 1);
+  });
+
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();
