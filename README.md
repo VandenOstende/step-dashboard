@@ -1,5 +1,207 @@
 # Step Dashboard
 
+A custom dashboard for my electric scooter, running on a Raspberry Pi 4 wired to
+a VESC controller over USB.
+
+**[English](#english)** · **[Nederlands](#nederlands)**
+
+---
+
+## English
+
+A Raspberry Pi 4 hangs off the VESC controller over USB and shows speed, battery,
+temperatures and the rest fullscreen on a 3.5" display mounted on the handlebars.
+
+The VESC phone app is fine, but I don't want to ride with a phone in a cradle —
+and I want to decide myself what goes on that screen.
+
+### What it does
+
+Three screens: **Ride** (big speed, battery percentage, estimated range),
+**Motor** (temperatures, duty, currents, rpm) and **Battery** (pack voltage, cell
+voltage, Wh, distance, Wh/km). Tapping the screen moves to the next one; the
+three dots at the bottom show where you are.
+
+Beyond that:
+
+- If the motor or the FETs get too hot, a warning fills the whole screen. It
+  blinks three times and then stays until you tap it away.
+- Faults, low battery and excessive duty show up in the top bar, which cycles
+  through them when there's more than one. Tapping opens the full list.
+- The theme follows the clock: light between 07:30 and 18:00, dark outside that.
+- Joining a Wi-Fi network needs no keyboard — there's one on screen (AZERTY).
+- Settings for thresholds, brightness, start screen, and resetting the trip
+  counter and top speed.
+- On boot it checks whether a newer version is on GitHub. If there is, the
+  notification bar says so and one tap in the settings installs it.
+
+Everything runs locally. No internet needed, no CDNs, no external fonts — the
+scooter is often out of range and it should just work.
+
+### Hardware
+
+- Raspberry Pi 4 (4 GB, though 2 GB is plenty)
+- VESC controller over USB — mine is a Flipsky Mini MK5
+- 3.5" SPI touchscreen, 480 × 320, landscape
+- Optional: a 5G dongle for the weather and the signal bars
+
+The display is slow, so the UI repaints about 6 times a second and only touches
+the pixels that actually changed. No animations, no transitions.
+
+### Installing
+
+On Raspberry Pi OS:
+
+```bash
+sudo apt install -y nodejs chromium-browser network-manager bluez modemmanager
+git clone https://github.com/VandenOstende/step-dashboard.git
+cd step-dashboard/pi
+sudo ./install/install.sh
+```
+
+Check that it's running:
+
+```bash
+systemctl status step-dashboard
+curl -s http://127.0.0.1:8080/data
+```
+
+If that works, turn on the kiosk:
+
+```bash
+sudo systemctl enable --now step-kiosk
+```
+
+**No `npm install` needed.** There are zero dependencies. The serial port is put
+into raw mode with `stty` and then read as a plain file — which works because the
+VESC enumerates as a CDC-ACM device, where the baud rate is meaningless anyway.
+That makes the whole install doable offline.
+
+The SPI driver for the display is out of scope here; it differs per brand. Make
+sure your screen works at 480 × 320 landscape *before* you enable the kiosk — the
+UI is built for exactly that size and doesn't scroll.
+
+### Reading the VESC
+
+This took me the most digging, so for anyone building the same thing:
+
+You do **not** need to put wheel size, pole pairs and gearing into this app. The
+VESC firmware computes speed, distance and battery percentage itself, from what
+the setup wizard in VESC Tool wrote into the controller. Just ask for
+`COMM_GET_VALUES_SETUP` (command 47) and you get metres per second and a battery
+level back.
+
+VESC Tool itself doesn't need to be running afterwards — in fact it can't be:
+it's a GUI without an API and it holds the USB port open.
+
+To check whether the wizard has been run:
+
+```bash
+node tools/vesc-probe.js
+```
+
+If it says no, it tells you which values to put in `config.json`; the app then
+works it out from the erpm and the tachometer.
+
+### Configuration
+
+`config.json` is yours; it is only ever read. The important bits:
+
+| key | what for |
+| --- | --- |
+| `vesc.port` | `/dev/ttyACM0` or `/dev/vesc`; `null` = find it automatically |
+| `step.packWh` | pack capacity, for the range estimate |
+| `step.*` | wheel size and pole pairs — only needed if the VESC doesn't supply them |
+| `update.*` | repository, branch, and whether to check or install on boot |
+| `weather.*` | coordinates and place name for the outside temperature |
+| `system.*` | backlight path and the command behind the Desktop button |
+
+`state.json` in `/var/lib/step-dashboard/` belongs to the service: your settings,
+the top speed and the zero point of the trip counter. The UI stores nothing
+itself — the Pi does that.
+
+### Endpoints
+
+The page talks to a handful of endpoints on the same origin:
+
+| route | what |
+| --- | --- |
+| `GET /data` | speed, battery, temperatures — every 150 ms |
+| `GET/POST /settings` | store settings |
+| `POST /reset-trip`, `/reset-top` | zero the counters |
+| `POST /backlight` | screen brightness |
+| `POST /desktop` | leave the kiosk |
+| `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
+| `GET /weather` | outside temperature |
+| `GET/POST /net` | scan networks and connect |
+| `GET/POST /update` | compare the version with GitHub, and update |
+
+If a system tool is missing — no modem, no backlight — the endpoint returns
+nothing gracefully and the UI shows "no signal". Nothing crashes over it.
+
+### Updating
+
+Settings → top row. It shows which version is running; **Search** checks GitHub
+and **Install** fetches the new one and restarts the service. That last part
+takes about half a minute, during which the screen reloads.
+
+Under the hood it pulls a fresh clone into a temporary directory and runs
+`install/install.sh` from there. Your `config.json` and stored settings survive.
+If fetching or installing fails, the old version keeps running — nothing is
+replaced until the clone has landed.
+
+From the terminal it works too:
+
+```bash
+cd ~/step-dashboard && git pull
+cd pi && sudo ./install/install.sh && sudo systemctl restart step-dashboard
+```
+
+Installing automatically on boot is possible via `update.autoInstall` in
+`config.json`. It's off by default: a broken version installing itself onto your
+handlebars while you're trying to leave is not a pleasant prospect. *Checking*
+does happen automatically — that's `update.checkOnStart`.
+
+### Playing with it yourself
+
+```bash
+cd pi
+npm test     # 37 tests: VESC protocol, CRC, framing, the conversions
+npm start    # http://127.0.0.1:8080
+```
+
+Without a VESC attached, `/data` reports `connected: false` and the screen says
+"geen vesc" in the top right. Open `pi/public/index.html` directly in a browser
+and there's no server at all — after three failed attempts the UI falls back to a
+simulated ride, which is handy for working on the looks without dragging the
+scooter along.
+
+### Still to do
+
+- Learn the consumption across several rides instead of the fixed Wh/km
+  assumption. The Pi would have to track that, since the UI isn't allowed to
+  store anything.
+- Hidden networks (typing an SSID yourself) in the connection screen.
+- The place name for the weather comes from `config.json` right now; reverse
+  geocoding would be nicer.
+- The clock drifts without internet. An RTC module or `fake-hwclock` is needed,
+  otherwise the automatic theme is wrong too.
+
+### Where it came from
+
+The design was first made as a clickable prototype in Claude Design; those files
+are still in `project/`. The working version lives in `pi/`.
+
+### A note on language
+
+The interface is in Dutch, and so are the code comments — it's a personal
+project. The structure should be readable regardless: `pi/README.md` explains how
+the code fits together, also in Dutch. Ask if you'd like that translated.
+
+---
+
+## Nederlands
+
 Een eigen dashboard voor mijn elektrische step. Een Raspberry Pi 4 hangt met USB
 aan de VESC-controller en toont snelheid, accu, temperaturen en de rest
 fullscreen op een 3,5"-schermpje op het stuur.
@@ -7,7 +209,7 @@ fullscreen op een 3,5"-schermpje op het stuur.
 De VESC-app op je telefoon is prima, maar ik wil niet rijden met een telefoon in
 een houder — en ik wil zelf bepalen wat er op dat scherm staat.
 
-## Wat het doet
+### Wat het doet
 
 Drie schermen: **Rit** (snelheid groot, accupercentage, geschat bereik),
 **Motor** (temperaturen, duty, stromen, rpm) en **Accu** (spanning, celspanning,
@@ -31,7 +233,7 @@ Verder:
 Alles draait lokaal. Geen internet nodig, geen CDN's, geen externe fonts — de
 step staat vaak buiten bereik en dan moet het gewoon werken.
 
-## Hardware
+### Hardware
 
 - Raspberry Pi 4 (4 GB, maar 2 GB is ruim genoeg)
 - VESC-controller via USB — bij mij een Flipsky Mini MK5
@@ -41,7 +243,7 @@ step staat vaak buiten bereik en dan moet het gewoon werken.
 Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
 de pixels aan die echt veranderen. Geen animaties, geen transities.
 
-## Installeren
+### Installeren
 
 Op Raspberry Pi OS:
 
@@ -74,7 +276,7 @@ De SPI-driver van het schermpje valt hierbuiten, die verschilt per merk. Zorg
 dat je scherm op 480 × 320 liggend werkt vóór je de kiosk aanzet; de UI is
 precies op dat formaat gemaakt en scrollt niet.
 
-## De VESC uitlezen
+### De VESC uitlezen
 
 Dit kostte me het meeste uitzoekwerk, dus voor wie hetzelfde wil bouwen:
 
@@ -96,7 +298,7 @@ node tools/vesc-probe.js
 Zegt die van niet, dan vertelt hij welke waarden je in `config.json` moet zetten;
 de app rekent het dan zelf uit uit de erpm en de tachometer.
 
-## Instellen
+### Instellen
 
 `config.json` is van jou, die wordt alleen gelezen. Het belangrijkste:
 
@@ -105,6 +307,7 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | `vesc.port` | `/dev/ttyACM0` of `/dev/vesc`; `null` = zelf zoeken |
 | `step.packWh` | accucapaciteit, voor de bereikschatting |
 | `step.*` | wielmaat en poolparen — alleen nodig als de VESC ze niet levert |
+| `update.*` | repository, tak, en of hij bij het opstarten controleert of installeert |
 | `weather.*` | coördinaten en plaatsnaam voor de buitentemperatuur |
 | `system.*` | backlight-pad en het commando achter de Desktop-knop |
 
@@ -112,7 +315,7 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 de topsnelheid en het nulpunt van de ritteller. De UI slaat zelf niks op, dat
 doet de Pi.
 
-## Endpoints
+### Endpoints
 
 De pagina praat met een handvol endpoints op dezelfde origin:
 
@@ -131,7 +334,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 Ontbreekt er een systeemtool — geen modem, geen backlight — dan geeft het
 endpoint netjes niks terug en toont de UI "geen bereik". Niks crasht daarop.
 
-## Bijwerken
+### Bijwerken
 
 Instellingen → bovenste rij. Daar staat welke versie draait; **Zoeken** kijkt bij
 GitHub en **Installeren** haalt de nieuwe binnen en herstart de service. Dat
@@ -154,7 +357,7 @@ Automatisch installeren bij het opstarten kan met `update.autoInstall` in
 opstarten op je stuur zet is geen prettig vooruitzicht. Alleen *controleren*
 gebeurt wel automatisch, dat is `update.checkOnStart`.
 
-## Zelf ermee spelen
+### Zelf ermee spelen
 
 ```bash
 cd pi
@@ -168,7 +371,7 @@ is er helemaal geen server en valt de UI na drie mislukte pogingen terug op een
 gesimuleerde rit — handig om aan het uiterlijk te werken zonder de step erbij te
 halen.
 
-## Nog te doen
+### Nog te doen
 
 - Het verbruik over meerdere ritten leren in plaats van de vaste Wh/km als
   aanname. De Pi zou dat moeten bijhouden, want de UI mag niks opslaan.
@@ -178,7 +381,7 @@ halen.
 - De klok loopt fout zonder internet. Een RTC-module of `fake-hwclock` is nodig,
   anders klopt ook het automatische thema niet.
 
-## Herkomst
+### Herkomst
 
 Het ontwerp is eerst als klikbaar prototype gemaakt in Claude Design; die
 bestanden staan nog in `project/`. De werkende versie staat in `pi/`.
