@@ -505,6 +505,9 @@ svg{display:block}
       <div class="setrow"><span class="lbl">Rit-teller</span>
         <button id="triprst" class="rowbtn">Reset</button>
       </div>
+      <div class="setrow"><span class="lbl" style="flex:none">Versie</span>
+        <span class="setstat" id="setver">—</span>
+      </div>
     </div>
   </div>
 
@@ -654,7 +657,6 @@ function notices(d) {
   else if (tf >= cfg.tempWarn) out.push({ lv: 1, t: "FET " + tf.toFixed(0) + "°C — verminder belasting" });
   if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% — bijna leeg" });
   else if (bp < 20) out.push({ lv: 1, t: "Accu " + bp.toFixed(0) + "% — laag" });
-  if ((d.duty || 0) > 0.95) out.push({ lv: 1, t: "Duty 95%+ — geen reserve" });
   if (upd.available) out.push({ lv: 0, t: "Nieuwe versie beschikbaar — zie Instellingen" });
   out.sort(function (a, b) { return b.lv - a.lv; });
   return out;
@@ -953,12 +955,21 @@ $("triprst").addEventListener("pointerdown", function (e) {
    Installeren blijft een bewuste tik: een kapotte versie die zichzelf tijdens
    het opstarten op je stuur zet, wil je niet. */
 
-var upd = { available: false, running: false, checked: false, text: "", cls: "" };
+var upd = { available: false, running: false, checked: false, text: "", cls: "", version: "—" };
+
+/* Unix-tijd (seconden) → 28-07-2026 */
+function updDate(t) {
+  if (!t) return "";
+  var d = new Date(t * 1000);
+  return ("0" + d.getDate()).slice(-2) + "-" + ("0" + (d.getMonth() + 1)).slice(-2)
+    + "-" + d.getFullYear();
+}
 var updTimer = null;
 
 function paintUpdate() {
   var st = $("setupd"), b = $("updbtn");
   if (!st) return;
+  $("setver").textContent = upd.version;
   st.textContent = upd.text;
   st.className = "setstat" + (upd.cls ? " " + upd.cls : "");
   b.textContent = upd.running ? "Bezig…" : (upd.available ? "Installeren" : "Zoeken");
@@ -966,6 +977,16 @@ function paintUpdate() {
 }
 
 function readUpdate(u) {
+  /* De volledige versie staat onderaan de instellingen; de rij bovenaan toont
+     alleen of er iets nieuws is. */
+  if (u.currentShort) {
+    upd.version = u.currentShort
+      + (u.branch && u.branch !== "main" ? " (" + u.branch + ")" : "")
+      + (u.installedAt ? " · " + updDate(u.installedAt) : "");
+  } else {
+    upd.version = "onbekend";
+  }
+
   if (u.running) {
     upd.running = true;
     upd.text = u.runMessage ? u.runMessage + "…" : "bezig…";

@@ -104,6 +104,7 @@ class Updater {
       current: cur ? cur.commit : null,
       currentShort: cur ? cur.commit.slice(0, 7) : null,
       installedAt: cur ? cur.at : null,
+      branch: cur ? cur.branch : null,
       latest: null,
       latestShort: null,
       message: null,
