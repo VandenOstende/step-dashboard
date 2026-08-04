@@ -45,7 +45,7 @@ scooter is often out of range and it should just work.
 - Raspberry Pi 4 (4 GB, though 2 GB is plenty)
 - VESC controller over USB — mine is a Flipsky Mini MK5
 - 3.5" SPI touchscreen, 480 × 320, landscape
-- Optional: a 5G dongle for the weather and the signal bars
+- Optional: a 5G dongle, for the signal bars in the top bar
 
 The display is slow, so the UI repaints about 6 times a second and only touches
 the pixels that actually changed. No animations, no transitions.
@@ -115,7 +115,7 @@ works it out from the erpm and the tachometer.
 | `step.packWh` | pack capacity, for the range estimate |
 | `step.*` | wheel size and pole pairs — only needed if the VESC doesn't supply them |
 | `update.*` | repository, branch, and whether to check or install on boot |
-| `weather.*` | coordinates and place name for the outside temperature |
+| `weather.*` | coordinates for the outside temperature; empty = look them up by IP |
 | `system.*` | the backlight path, if the automatic search doesn't find it |
 
 `state.json` in `/var/lib/step-dashboard/` belongs to the service: your settings,
@@ -137,8 +137,10 @@ The page talks to a handful of endpoints on the same origin:
 | `GET/POST /net` | scan networks and connect |
 | `GET/POST /update` | compare the version with GitHub, and update |
 
-If a system tool is missing — no modem, no backlight — the endpoint returns
-nothing gracefully and the UI shows "no signal". Nothing crashes over it.
+If a system tool is missing — no backlight, no ModemManager — the endpoint
+returns nothing gracefully and the UI leaves that part out. Nothing crashes
+over it. Without a modem the signal bars disappear from the top bar entirely,
+rather than sitting there reading "none" about hardware you don't have.
 
 ### Charging
 
@@ -186,7 +188,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 47 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 51 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
 ```
 
@@ -202,8 +204,6 @@ scooter along.
   assumption. The Pi would have to track that, since the UI isn't allowed to
   store anything.
 - Hidden networks (typing an SSID yourself) in the connection screen.
-- The place name for the weather comes from `config.json` right now; reverse
-  geocoding would be nicer.
 - The clock drifts without internet. An RTC module or `fake-hwclock` is needed,
   otherwise the automatic theme is wrong too.
 
@@ -260,7 +260,7 @@ step staat vaak buiten bereik en dan moet het gewoon werken.
 - Raspberry Pi 4 (4 GB, maar 2 GB is ruim genoeg)
 - VESC-controller via USB — bij mij een Flipsky Mini MK5
 - 3,5" SPI-touchscreen, 480 × 320, liggend
-- Optioneel: 5G-dongle voor het weerbericht en de bereikbalkjes
+- Optioneel: 5G-dongle, voor de bereikbalkjes in de topbalk
 
 Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
 de pixels aan die echt veranderen. Geen animaties, geen transities.
@@ -330,7 +330,7 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | `step.packWh` | accucapaciteit, voor de bereikschatting |
 | `step.*` | wielmaat en poolparen — alleen nodig als de VESC ze niet levert |
 | `update.*` | repository, tak, en of hij bij het opstarten controleert of installeert |
-| `weather.*` | coördinaten en plaatsnaam voor de buitentemperatuur |
+| `weather.*` | coördinaten voor de buitentemperatuur; leeg = zelf opzoeken via het IP-adres |
 | `system.*` | het backlight-pad, als hij het zelf niet vindt |
 
 `state.json` in `/var/lib/step-dashboard/` is van de service: je instellingen,
@@ -352,8 +352,10 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `GET/POST /net` | netwerken scannen en verbinden |
 | `GET/POST /update` | versie vergelijken met GitHub, en bijwerken |
 
-Ontbreekt er een systeemtool — geen modem, geen backlight — dan geeft het
-endpoint netjes niks terug en toont de UI "geen bereik". Niks crasht daarop.
+Ontbreekt er een systeemtool — geen backlight, geen ModemManager — dan geeft
+het endpoint netjes niks terug en laat de UI dat stuk weg. Niks crasht daarop.
+Zonder modem verdwijnen de bereikbalkjes helemaal uit de topbalk, in plaats van
+"geen" te melden over iets wat er niet in zit.
 
 ### Laden
 
@@ -401,7 +403,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 47 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 51 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 ```
 
@@ -416,8 +418,6 @@ halen.
 - Het verbruik over meerdere ritten leren in plaats van de vaste Wh/km als
   aanname. De Pi zou dat moeten bijhouden, want de UI mag niks opslaan.
 - Verborgen netwerken (zelf een SSID intypen) in het verbindingsscherm.
-- Plaatsnaam bij het weer komt nu uit `config.json`; reverse geocoding zou
-  netter zijn.
 - De klok loopt fout zonder internet. Een RTC-module of `fake-hwclock` is nodig,
   anders klopt ook het automatische thema niet.
 

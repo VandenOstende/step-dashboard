@@ -90,6 +90,25 @@ in de argumenten belandt.
 Alle systeemaanroepen gaan via `execFile` met een argumentenlijst, nooit via een
 shell. Een SSID met een puntkomma erin mag geen commando worden.
 
+## Waar de step staat
+
+De buitentemperatuur links boven heeft coördinaten nodig. Die komen uit
+`config.json`, anders uit de gps van een 5G-modem, en anders uit een opzoeking
+op het IP-adres. Die laatste is er omdat de meeste steps geen modem hebben en
+niemand zin heeft om zelf coördinaten op te zoeken; hij levert meteen een
+plaatsnaam mee, dus dan staat er "18° Gent" en niet alleen een getal. Uit te
+zetten met `weather.ipFallback: false`.
+
+Rij je de wifi uit, dan houdt hij de laatst bekende temperatuur nog drie uur
+vast. Buiten wordt het niet ineens tien graden kouder, en een oud getal is
+bruikbaarder dan een leeg vakje.
+
+Het mobiele bereik werkt andersom: `modem()` geeft `present` terug, en zit er
+geen dongle in dan verdwijnen de balkjes helemaal uit de topbalk. "Geen bereik"
+melden over hardware die er niet is, is geen informatie. Verschijnen mag meteen,
+verdwijnen pas na drie keer op rij niks — ModemManager is even stil als hij
+herstart en dan hoort de topbalk niet te knipperen.
+
 ## Zichzelf bijwerken
 
 Twee stukken. `src/update.js` vraagt de laatste commit op via de publieke
@@ -133,12 +152,12 @@ je een wachtwoord intypt, niet andersom.
 npm test
 ```
 
-47 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+51 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
 opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het
-vergelijken van versies, en het herkennen van laden — inclusief de traagste
-lader die we nog willen zien.
+vergelijken van versies, het herkennen van laden — inclusief de traagste lader
+die we nog willen zien — en welke locatiebron voorgaat bij het weer.
 
 Voor de UI heb ik met Playwright op 480 × 320 doorgeklikt. Dat zit niet in de
 repo, maar de aanpak is simpel: server starten, `page.tap()` op de knoppen, en

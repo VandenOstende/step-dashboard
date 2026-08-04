@@ -39,9 +39,10 @@ const DEFAULT_CONFIG = {
     autoInstall: false      // en dat dan ook meteen installeren
   },
   weather: {
-    latitude: null,          // null = proberen via de modem (mmcli --location-get)
+    latitude: null,          // null = modem-gps, en anders het IP-adres
     longitude: null,
-    place: ""                // vaste plaatsnaam; leeg = via reverse geocoding
+    place: "",               // vaste plaatsnaam; leeg = die van de IP-opzoeking
+    ipFallback: true         // false = alleen de coördinaten hierboven gebruiken
   },
   system: {
     wifiInterface: null,     // null = eerste wifi-interface die nmcli meldt

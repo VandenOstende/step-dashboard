@@ -251,22 +251,27 @@ function techName(list) {
   return null;
 }
 
+/* `present` zegt of er überhaupt een modem in zit. Zonder dongle — of zonder
+   ModemManager — laat de UI het hele mobiele stukje weg in plaats van "geen
+   bereik" te melden over iets wat er niet is. Een modem die er wél is maar
+   niks ontvangt geeft present:true met bars:0. */
 async function modem() {
   const r = await run("mmcli", ["-J", "-m", "any"], 6000);
-  if (!r.ok) return { bars: 0, tech: null };
+  if (!r.ok) return { present: false, bars: 0, tech: null };
   let j;
   try {
     j = JSON.parse(r.out);
   } catch {
-    return { bars: 0, tech: null };
+    return { present: false, bars: 0, tech: null };
   }
-  const g = (j.modem && j.modem.generic) || {};
+  if (!j.modem) return { present: false, bars: 0, tech: null };
+  const g = j.modem.generic || {};
   const quality = parseInt((g["signal-quality"] || {}).value, 10);
   const state = String(g.state || "");
   const tech = techName(g["access-technologies"]);
-  if (!/registered|connected/i.test(state) && !tech) return { bars: 0, tech: null };
+  if (!/registered|connected/i.test(state) && !tech) return { present: true, bars: 0, tech: null };
   const bars = isFinite(quality) ? Math.max(quality > 0 ? 1 : 0, Math.round(quality / 20)) : 0;
-  return { bars: Math.max(0, Math.min(5, bars)), tech };
+  return { present: true, bars: Math.max(0, Math.min(5, bars)), tech };
 }
 
 /** Locatie van de modem, als die uitgelezen mag worden. */
