@@ -10,6 +10,7 @@
  *   POST /reset-trip    rit-teller op nul
  *   POST /reset-top     topsnelheid op nul
  *   POST /backlight     {level: 20..100}
+ *   POST /power        {action: "reboot"|"shutdown"}
  *   GET  /wifi          {connected, ssid, level}
  *   GET  /bt            {connected, name, mac}
  *   GET  /modem         {bars, tech}
@@ -168,6 +169,16 @@ const routes = {
     const r = await sys.setBacklight(level, cfg.system);
     if (r.ok) state.patch({ settings: { bright: level } });
     send(res, r.ok ? 200 : 503, r);
+  },
+
+  "POST /power": async (req, res) => {
+    const body = await readJson(req);
+    const action = body.action === "reboot" || body.action === "shutdown" ? body.action : null;
+    if (!action) return send(res, 400, { ok: false, error: "onbekende actie" });
+    // Wat nog in de wachtrij staat gaat mee voordat de stroom eraf gaat.
+    state.flush();
+    const r = await sys.power(action);
+    send(res, r.ok ? 200 : 502, r);
   },
 
   "GET /wifi": async (req, res) => send(res, 200, await sys.wifiStatus()),

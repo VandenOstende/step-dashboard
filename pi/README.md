@@ -131,12 +131,28 @@ uit `config.json`, zodat er niks door sudo heen hoeft.
 Het haalt altijd een verse kloon op in plaats van te pullen in de map waar je
 ooit `git clone` deed — die kan verplaatst of weggegooid zijn.
 
+## Aan/uit
+
+`systemctl reboot` en `poweroff` mogen normaal ook zonder root, maar dan wel
+via logind — en dat vraagt een sessie. De service draait als systeemdaemon
+zonder sessie, dus polkit weigert het. Vandaar sudo, met twee uitgeschreven
+regels erbij.
+
+Wat de UI stuurt komt nooit in het commando terecht: `powerCommand()` slaat
+`"reboot"` of `"shutdown"` op in een tabel en geeft `null` terug voor al het
+andere. Er is dus geen tekenreeks die van de browser tot aan sudo doorloopt.
+
+Het scherm is zelf de bevestiging. Nog een "weet je het zeker" erbij maakt het
+op een aanraakscherm alleen maar irritanter, niet veiliger — en je bent er pas
+na twee tikken vanaf het rijscherm.
+
 ## Lagen op het scherm
 
 De overlays zitten op vaste z-index-niveaus:
 
 ```
-6  temperatuuralarm
+7  temperatuuralarm
+6  aan/uit
 5  schermtoetsenbord
 4  systeem en instellingen
 3  meldingen
@@ -144,7 +160,7 @@ De overlays zitten op vaste z-index-niveaus:
 ```
 
 Het alarm staat bewust bovenaan. Een te warme motor moet je onderbreken terwijl
-je een wachtwoord intypt, niet andersom.
+je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
 
 ## Testen
 
@@ -152,12 +168,14 @@ je een wachtwoord intypt, niet andersom.
 npm test
 ```
 
-51 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+53 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
 opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het
 vergelijken van versies, het herkennen van laden — inclusief de traagste lader
-die we nog willen zien — en welke locatiebron voorgaat bij het weer.
+die we nog willen zien — welke locatiebron voorgaat bij het weer, en dat er uit
+het aan/uit-scherm nooit iets anders komt dan `systemctl reboot` of
+`systemctl poweroff`.
 
 Voor de UI heb ik met Playwright op 480 × 320 doorgeklikt. Dat zit niet in de
 repo, maar de aanpak is simpel: server starten, `page.tap()` op de knoppen, en
