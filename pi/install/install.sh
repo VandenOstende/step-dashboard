@@ -77,6 +77,14 @@ systemctl enable step-dashboard.service
 # schijf. Dat geeft een UI die vooruitloopt op zijn eigen server.
 systemctl restart step-dashboard.service
 
+# Stond de kiosk al aan, dan wijst zijn symlink nog naar het oude target uit
+# de vorige versie van deze unit. reenable legt hem opnieuw aan volgens de
+# [Install]-sectie zoals die er nu staat.
+if systemctl is-enabled step-kiosk.service >/dev/null 2>&1; then
+  systemctl reenable step-kiosk.service >/dev/null 2>&1 || true
+  systemctl restart step-kiosk.service || true
+fi
+
 echo
 echo "De service draait. Controleer met:"
 echo "  systemctl status step-dashboard"

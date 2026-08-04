@@ -22,4 +22,9 @@ Restart=always
 RestartSec=3
 
 [Install]
-WantedBy=graphical.target
+# multi-user.target en niet graphical.target: kiosk.sh start zijn eigen
+# sessie op tty1 en heeft geen bureaublad nodig. Boot de Pi naar de console —
+# wat voor een kiosk logisch is — dan wordt graphical.target nooit bereikt en
+# start hij niet mee, ook al staat hij op enabled. multi-user.target werkt in
+# beide gevallen, want graphical.target trekt het zelf ook binnen.
+WantedBy=multi-user.target
