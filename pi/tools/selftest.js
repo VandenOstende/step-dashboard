@@ -573,5 +573,34 @@ await atest("status meldt dat er een installatie loopt", async () => {
     assert.strictEqual(second, first + 1);
   });
 
+  /* ── locatie voor het weer ────────────────────────────────────────────── */
+  console.log("\nweer");
+
+  const { Weather, parseIpLocation } = require("../src/weather");
+
+  test("de IP-opzoeking levert coördinaten en een plaatsnaam", () => {
+    const loc = parseIpLocation({ success: true, city: "Gent", latitude: 51.05, longitude: 3.72 });
+    assert.deepStrictEqual(loc, { latitude: 51.05, longitude: 3.72, place: "Gent" });
+  });
+
+  test("een mislukte of lege opzoeking geeft niks terug", () => {
+    assert.strictEqual(parseIpLocation({ success: false }), null);
+    assert.strictEqual(parseIpLocation({ latitude: "?", longitude: "?" }), null);
+    assert.strictEqual(parseIpLocation({ latitude: 0, longitude: 0 }), null);   // nulpunt = onbekend
+    assert.strictEqual(parseIpLocation(null), null);
+  });
+
+  await atest("coördinaten uit config.json gaan voor op alles", async () => {
+    const w = new Weather({ weather: { latitude: 51, longitude: 3.7 } });
+    const loc = await w._location();
+    assert.strictEqual(loc.latitude, 51);
+    assert.strictEqual(loc.longitude, 3.7);
+  });
+
+  await atest("met ipFallback uit blijft het bij de modem", async () => {
+    const w = new Weather({ weather: { ipFallback: false } });
+    assert.strictEqual(await w._location(), null);   // geen modem in de testomgeving
+  });
+
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();

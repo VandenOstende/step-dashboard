@@ -98,6 +98,11 @@ svg{display:block}
 #status{display:flex;align-items:center;gap:var(--space-4);height:34px;padding-left:var(--space-4);
   font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-500)}
 #wifiico,#btico{display:none;flex:none}
+/* Het mobiele stukje staat er alleen als er een modem in zit. Zit er geen
+   dongle in, dan is een lege balkjesmeter met "GEEN" ernaast geen informatie
+   maar ruis — dan valt de hele groep weg. */
+#cellgrp{display:none;align-items:center;gap:var(--space-4);flex:none}
+#cellgrp.on{display:flex}
 #sig{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
 #sig span{width:3px;border-radius:1px;background:var(--color-neutral-800)}
 #sig span:nth-child(1){height:4px}
@@ -355,8 +360,10 @@ svg{display:block}
         <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--color-neutral-800)" stroke="none"/>
       </svg>
       <svg id="btico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
-      <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
-      <span id="tech">--</span>
+      <div id="cellgrp">
+        <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
+        <span id="tech">--</span>
+      </div>
       <span id="clock">--:--</span>
       <button id="statusbtn"><span id="dot"></span><span id="stxt">demo</span></button>
     </div>
@@ -476,7 +483,7 @@ svg{display:block}
     </div>
     <div class="inforows">
       <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
-      <div class="inforow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
+      <div class="inforow" id="syscellrow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
     </div>
     <div class="sysbtns">
       <button id="sysnet" class="pbtn">Verbindingen</button>
@@ -789,7 +796,7 @@ $("alarmclose").addEventListener("pointerdown", function (e) {
 
 /* ── topbalk rechts: wifi, bluetooth, mobiel bereik ─────────────────────── */
 var wifiLevel = null;
-var cell = { bars: 0, tech: null };
+var cell = { bars: 0, tech: null, present: false };
 var net = {
   tab: "wifi", wifiOn: false, ssid: "", btOn: false, dev: "", devMac: "",
   items: { wifi: [], bt: [] }, busy: "", error: null
@@ -832,9 +839,23 @@ function fetchBt() {
 }
 
 var sigbars = [].slice.call(document.querySelectorAll("#sig span"));
-function paintSignal(bars, tech) {
+/* Verschijnen mag meteen, verdwijnen pas na drie keer op rij niks. ModemManager
+   is even stil als hij herstart, en een balkjesmeter die daarbij in en uit
+   springt is onrustiger dan een halve minuut wachten. */
+var cellSeen = false, cellMiss = 0;
+
+function paintSignal(bars, tech, present) {
   var b = Math.max(0, Math.min(5, bars || 0));
   cell.bars = b; cell.tech = tech;
+
+  if (present) { cellSeen = true; cellMiss = 0; }
+  else { cellMiss++; }
+  cell.present = present || (cellSeen && cellMiss < 3);
+  $("cellgrp").classList[cell.present ? "add" : "remove"]("on");
+  var row = $("syscellrow");
+  if (row) row.style.display = cell.present ? "" : "none";
+  if (!cell.present) return;
+
   var weak = b <= 1;
   sigbars.forEach(function (s, k) { s.className = k < b ? (weak ? "weak" : "on") : ""; });
   var t = $("tech");
@@ -846,8 +867,8 @@ function fetchModem() {
   fetch("/modem", { cache: "no-store" }).then(function (r) {
     if (!r.ok) throw 0;
     return r.json();
-  }).then(function (m) { paintSignal(m.bars, m.tech); })
-  ["catch"](function () { paintSignal(0, null); });
+  }).then(function (m) { paintSignal(m.bars, m.tech, !!m.present); })
+  ["catch"](function () { paintSignal(0, null, false); });
 }
 
 function fetchWeather() {
