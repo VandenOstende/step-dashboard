@@ -4,8 +4,8 @@
 #   sudo ./install/install.sh
 #
 # Zet de code in /opt/step-dashboard, installeert twee systemd-units (de
-# service en de kiosk), de udev-regels en de sudoers-regel voor de
-# Desktop-knop. Bestaande config.json wordt niet overschreven.
+# service en de kiosk), de udev-regels en de sudoers-regel voor het
+# bijwerken. Bestaande config.json wordt niet overschreven.
 set -euo pipefail
 
 DEST=/opt/step-dashboard
@@ -55,8 +55,8 @@ install -d -o "$USER_NAME" -g "$USER_NAME" /var/lib/step-dashboard
 # draaien is een achterdeur naar root.
 install -m 0755 -o root -g root "$SRC/install/step-update" /usr/local/sbin/step-update
 
-# De regels staan op naam van "pi"; zet de echte gebruiker erin, anders werken
-# de Desktop-knop en het bijwerken niet op een Pi met een andere gebruikersnaam.
+# De regels staan op naam van "pi"; zet de echte gebruiker erin, anders werkt
+# het bijwerken niet op een Pi met een andere gebruikersnaam.
 sed "s/^pi ALL=/$USER_NAME ALL=/" "$SRC/install/step-dashboard.sudoers" \
   > /etc/sudoers.d/step-dashboard
 chmod 0440 /etc/sudoers.d/step-dashboard
