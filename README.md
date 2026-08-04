@@ -116,7 +116,7 @@ works it out from the erpm and the tachometer.
 | `step.*` | wheel size and pole pairs — only needed if the VESC doesn't supply them |
 | `update.*` | repository, branch, and whether to check or install on boot |
 | `weather.*` | coordinates and place name for the outside temperature |
-| `system.*` | backlight path and the command behind the Desktop button |
+| `system.*` | the backlight path, if the automatic search doesn't find it |
 
 `state.json` in `/var/lib/step-dashboard/` belongs to the service: your settings,
 the top speed and the zero point of the trip counter. The UI stores nothing
@@ -132,7 +132,6 @@ The page talks to a handful of endpoints on the same origin:
 | `GET/POST /settings` | store settings |
 | `POST /reset-trip`, `/reset-top` | zero the counters |
 | `POST /backlight` | screen brightness |
-| `POST /desktop` | leave the kiosk |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | outside temperature |
 | `GET/POST /net` | scan networks and connect |
@@ -332,7 +331,7 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | `step.*` | wielmaat en poolparen — alleen nodig als de VESC ze niet levert |
 | `update.*` | repository, tak, en of hij bij het opstarten controleert of installeert |
 | `weather.*` | coördinaten en plaatsnaam voor de buitentemperatuur |
-| `system.*` | backlight-pad en het commando achter de Desktop-knop |
+| `system.*` | het backlight-pad, als hij het zelf niet vindt |
 
 `state.json` in `/var/lib/step-dashboard/` is van de service: je instellingen,
 de topsnelheid en het nulpunt van de ritteller. De UI slaat zelf niks op, dat
@@ -348,7 +347,6 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `GET/POST /settings` | instellingen bewaren |
 | `POST /reset-trip`, `/reset-top` | tellers op nul |
 | `POST /backlight` | schermhelderheid |
-| `POST /desktop` | kiosk verlaten |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
 | `GET/POST /net` | netwerken scannen en verbinden |

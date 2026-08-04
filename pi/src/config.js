@@ -46,8 +46,7 @@ const DEFAULT_CONFIG = {
   system: {
     wifiInterface: null,     // null = eerste wifi-interface die nmcli meldt
     backlightPath: null,     // null = eerste map in /sys/class/backlight
-    backlightCommand: null,  // alternatief commando, {level} wordt vervangen
-    desktopCommand: "sudo systemctl stop step-kiosk.service"
+    backlightCommand: null   // alternatief commando, {level} wordt vervangen
   }
 };
 

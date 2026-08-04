@@ -6,7 +6,6 @@
  *   bluetooth  → bluetoothctl
  *   mobiel     → mmcli (ModemManager)
  *   helderheid → /sys/class/backlight
- *   desktop    → het commando uit config.json
  *
  * Alles draait via execFile met een argumentenlijst — nooit via een shell —
  * zodat een SSID of apparaatnaam nooit als commando kan eindigen. Ontbreekt
@@ -315,19 +314,10 @@ async function setBacklight(level, sysCfg) {
   }
 }
 
-/* ── kiosk verlaten ─────────────────────────────────────────────────────── */
-
-async function toDesktop(command) {
-  if (!command) return { ok: false, error: "niet ingesteld" };
-  const parts = command.split(/\s+/);
-  const r = await run(parts[0], parts.slice(1), 10000);
-  return r.ok ? { ok: true } : { ok: false, error: r.err || "commando mislukt" };
-}
-
 module.exports = {
   wifiStatus, wifiList, wifiConnect, wifiDisconnect,
   wifiConnectPlan, wifiConnectPlanFallback,
   btStatus, btList, btConnect, btDisconnect,
   modem, modemLocation,
-  setBacklight, toDesktop
+  setBacklight
 };

@@ -10,7 +10,6 @@
  *   POST /reset-trip    rit-teller op nul
  *   POST /reset-top     topsnelheid op nul
  *   POST /backlight     {level: 20..100}
- *   POST /desktop       kiosk verlaten
  *   GET  /wifi          {connected, ssid, level}
  *   GET  /bt            {connected, name, mac}
  *   GET  /modem         {bars, tech}
@@ -168,11 +167,6 @@ const routes = {
     const level = num(body.level, 20, 100, 80);
     const r = await sys.setBacklight(level, cfg.system);
     if (r.ok) state.patch({ settings: { bright: level } });
-    send(res, r.ok ? 200 : 503, r);
-  },
-
-  "POST /desktop": async (req, res) => {
-    const r = await sys.toDesktop(cfg.system.desktopCommand);
     send(res, r.ok ? 200 : 503, r);
   },
 

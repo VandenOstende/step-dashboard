@@ -32,7 +32,6 @@
   "system": {
     "wifiInterface": null,
     "backlightPath": null,
-    "backlightCommand": null,
-    "desktopCommand": "sudo systemctl stop step-kiosk.service"
+    "backlightCommand": null
   }
 }
