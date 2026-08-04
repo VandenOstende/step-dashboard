@@ -288,6 +288,27 @@ async function modemLocation() {
   return null;
 }
 
+/* ── afsluiten en herstarten ────────────────────────────────────────────── */
+
+/* Twee vaste commando's, uitgeschreven zoals ze in de sudoers-regel staan.
+   Wat de UI stuurt komt nooit in het commando terecht — het is een sleutel in
+   deze tabel of het is niks. Via sudo en niet via logind, want de service
+   heeft geen sessie en polkit weigert het dan. */
+const POWER = { reboot: "reboot", shutdown: "poweroff" };
+
+function powerCommand(action) {
+  const verb = POWER[String(action)];
+  return verb ? { cmd: "sudo", args: ["/usr/bin/systemctl", verb] } : null;
+}
+
+async function power(action) {
+  const plan = powerCommand(action);
+  if (!plan) return { ok: false, error: "onbekende actie" };
+  const r = await run(plan.cmd, plan.args, 8000);
+  if (r.ok) return { ok: true };
+  return { ok: false, error: /sudo|password|not allowed/i.test(r.err) ? "geen rechten" : "commando mislukt" };
+}
+
 /* ── schermhelderheid ───────────────────────────────────────────────────── */
 
 function backlightDir(configured) {
@@ -324,5 +345,6 @@ module.exports = {
   wifiConnectPlan, wifiConnectPlanFallback,
   btStatus, btList, btConnect, btDisconnect,
   modem, modemLocation,
+  power, powerCommand,
   setBacklight
 };

@@ -573,6 +573,24 @@ await atest("status meldt dat er een installatie loopt", async () => {
     assert.strictEqual(second, first + 1);
   });
 
+  /* ── afsluiten en herstarten ──────────────────────────────────────────── */
+  console.log("\naan/uit");
+
+  const { powerCommand } = require("../src/system");
+
+  test("reboot en shutdown worden vaste commando's", () => {
+    assert.deepStrictEqual(powerCommand("reboot"),
+      { cmd: "sudo", args: ["/usr/bin/systemctl", "reboot"] });
+    assert.deepStrictEqual(powerCommand("shutdown"),
+      { cmd: "sudo", args: ["/usr/bin/systemctl", "poweroff"] });
+  });
+
+  test("alles wat er niet in de tabel staat levert geen commando op", () => {
+    ["", "halt", "reboot; rm -rf /", "REBOOT", null, undefined, 0, {}].forEach((a) => {
+      assert.strictEqual(powerCommand(a), null, "mag niks opleveren: " + JSON.stringify(a));
+    });
+  });
+
   /* ── locatie voor het weer ────────────────────────────────────────────── */
   console.log("\nweer");
 

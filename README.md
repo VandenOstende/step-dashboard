@@ -36,6 +36,8 @@ Beyond that:
   notification bar says so and one tap in the settings installs it.
 - Plug in the charger and a charging screen appears: percentage, a bar, and an
   estimate of how much longer it needs. Tap it away if it's in the way.
+- System → Power gives a fullscreen REBOOT / SHUTDOWN screen, so you can put
+  the Pi down properly instead of pulling the plug.
 
 Everything runs locally. No internet needed, no CDNs, no external fonts — the
 scooter is often out of range and it should just work.
@@ -132,6 +134,7 @@ The page talks to a handful of endpoints on the same origin:
 | `GET/POST /settings` | store settings |
 | `POST /reset-trip`, `/reset-top` | zero the counters |
 | `POST /backlight` | screen brightness |
+| `POST /power` | reboot or shut down |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | outside temperature |
 | `GET/POST /net` | scan networks and connect |
@@ -188,7 +191,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 51 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 53 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
 ```
 
@@ -251,6 +254,8 @@ Verder:
   instellingen.
 - Hang je de lader eraan, dan verschijnt een laadscherm: percentage, een balk,
   en een schatting hoelang het nog duurt. Wegtikken kan als het in de weg zit.
+- Systeem → Power geeft een volledig scherm met REBOOT en SHUTDOWN, zodat je de
+  Pi netjes kunt neerleggen in plaats van de stekker eruit te trekken.
 
 Alles draait lokaal. Geen internet nodig, geen CDN's, geen externe fonts — de
 step staat vaak buiten bereik en dan moet het gewoon werken.
@@ -347,6 +352,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `GET/POST /settings` | instellingen bewaren |
 | `POST /reset-trip`, `/reset-top` | tellers op nul |
 | `POST /backlight` | schermhelderheid |
+| `POST /power` | herstarten of afsluiten |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
 | `GET/POST /net` | netwerken scannen en verbinden |
@@ -403,7 +409,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 51 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 53 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 ```
 

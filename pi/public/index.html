@@ -318,11 +318,33 @@ svg{display:block}
 /* Tikfeedback: kort oplichten, geen transitie — de SPI-display is traag. */
 .key.hit{background:var(--color-accent-900);border-color:var(--color-accent)}
 
-/* volledig-scherm alarm — moet boven het toetsenbord komen: een te warme
-   motor is belangrijker dan wat je aan het typen bent. */
+/* volledig-scherm aan/uit — boven het toetsenbord, want tik je hier op
+   afsluiten dan is een half ingetypt wachtwoord niet meer interessant. */
+#power{position:absolute;inset:0;display:none;flex-direction:column;gap:var(--space-3);
+  padding:var(--space-4) var(--space-6) var(--space-6);background:var(--color-bg);z-index:6}
+#power.on{display:flex}
+#powerhead{display:flex;align-items:center;gap:var(--space-2);flex:none;
+  font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
+#powerbtns{flex:1;display:flex;gap:var(--space-3);min-height:0}
+.powbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:var(--space-2);background:transparent;color:var(--color-text);
+  border:1px solid var(--color-accent);border-radius:var(--radius-md)}
+.powbtn.crit{border-color:var(--color-crit);color:var(--color-crit)}
+.powbtn.hit{background:var(--color-accent-900)}
+.powbtn[disabled]{opacity:.45}
+.powname{font-size:22px;letter-spacing:.06em}
+.powsub{font-size:12px;color:var(--color-neutral-500)}
+#powermsg{flex:none;min-height:16px;font-size:13px;text-align:center;color:var(--color-neutral-500)}
+#powermsg.bad{color:var(--color-crit)}
+#powerclose{height:48px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
+
+/* volledig-scherm alarm — moet boven alles komen: een te warme motor is
+   belangrijker dan wat je aan het typen of aan het afsluiten bent. */
 #alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;gap:var(--space-3);padding:var(--space-6) var(--space-8);
-  background:var(--color-crit-fill);color:#161826;z-index:6}
+  background:var(--color-crit-fill);color:#161826;z-index:7}
 #alarm.on{display:flex}
 #alarmhead{display:flex;align-items:center;gap:var(--space-4)}
 #alarmtitle{font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
@@ -488,6 +510,7 @@ svg{display:block}
     <div class="sysbtns">
       <button id="sysnet" class="pbtn">Verbindingen</button>
       <button id="sysset" class="pbtn">Instellingen</button>
+      <button id="syspower" class="pbtn">Power</button>
     </div>
   </div>
 
@@ -541,6 +564,28 @@ svg{display:block}
         <span class="setstat" id="setver">—</span>
       </div>
     </div>
+  </div>
+
+  <!-- volledig-scherm aan/uit -->
+  <div id="power">
+    <div id="powerhead">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+      <span>Aan / uit</span>
+    </div>
+    <div id="powerbtns">
+      <button id="powreboot" class="powbtn">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
+        <span class="powname">REBOOT</span>
+        <span class="powsub">opnieuw opstarten</span>
+      </button>
+      <button id="powshutdown" class="powbtn crit">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+        <span class="powname">SHUTDOWN</span>
+        <span class="powsub">uitschakelen</span>
+      </button>
+    </div>
+    <div id="powermsg"></div>
+    <button id="powerclose">Annuleren</button>
   </div>
 
   <!-- volledig-scherm alarm -->
@@ -904,6 +949,64 @@ $("sysset").addEventListener("pointerdown", function (e) {
 });
 $("setclose").addEventListener("pointerdown", function (e) {
   e.preventDefault(); $("settings").classList.remove("on"); openSys();
+});
+
+/* ── aan/uit ───────────────────────────────────────────────────────────── */
+/* Twee tikken van het rijscherm naar uitschakelen: eerst de topbalk, dan
+   Power. Ver genoeg weg om er onderweg niet per ongeluk op te komen, en dit
+   scherm is zelf de bevestiging — nog een "weet je het zeker" erbij maakt het
+   op een aanraakscherm alleen maar irritanter, niet veiliger. */
+function openPower() {
+  $("powermsg").textContent = "";
+  $("powermsg").className = "";
+  powbtns.forEach(function (b) { b.disabled = false; b.classList.remove("hit"); });
+  $("powerclose").disabled = false;
+  $("power").classList.add("on");
+}
+
+function doPower(action, label) {
+  powbtns.forEach(function (b) { b.disabled = true; });
+  $("powerclose").disabled = true;
+  $("powermsg").className = "";
+  $("powermsg").textContent = label + "…";
+  fetch("/power", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: action })
+  }).then(function (r) {
+    return r.json()["catch"](function () { return {}; }).then(function (j) {
+      if (!r.ok || !j.ok) throw new Error(j.error || (r.status === 404 ? "server te oud — werk bij" : "mislukt"));
+      /* Vanaf hier gaat de Pi eruit. Niets meer te doen: de melding blijft
+         staan tot het scherm zwart wordt. */
+    });
+  })["catch"](function (err) {
+    $("powermsg").className = "bad";
+    $("powermsg").textContent = err.message;
+    powbtns.forEach(function (b) { b.disabled = false; });
+    $("powerclose").disabled = false;
+  });
+}
+
+var powbtns = [$("powreboot"), $("powshutdown")];
+powbtns.forEach(function (b) {
+  b.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (b.disabled) return;
+    b.classList.add("hit");
+    setTimeout(function () { b.classList.remove("hit"); }, 120);
+    if (b.id === "powreboot") doPower("reboot", "Opnieuw opstarten");
+    else doPower("shutdown", "Uitschakelen");
+  });
+});
+
+$("syspower").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); $("sys").classList.remove("on"); openPower();
+});
+$("powerclose").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  if ($("powerclose").disabled) return;
+  $("power").classList.remove("on");
+  openSys();
 });
 
 /* ── instellingen ──────────────────────────────────────────────────────── */
