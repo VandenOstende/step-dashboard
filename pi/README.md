@@ -16,9 +16,42 @@ src/config.js       config.json en de opgeslagen staat
 src/update.js       versie vergelijken met GitHub
 src/server.js       de HTTP-server
 install/step-update het script dat als root bijwerkt
+tools/design.js     designomgeving: de UI met nagemaakte hardware
 tools/vesc-probe.js kijken wat je VESC vertelt
 tools/selftest.js   tests, zonder hardware
 ```
+
+## Aan de layout werken
+
+```bash
+npm run design      # → http://localhost:8081/design
+```
+
+Dit start een tweede server die `public/` serveert zoals de echte, maar alle
+endpoints uit een scenario haalt. Geen VESC, geen nmcli, geen bluetoothctl —
+je kunt er dus aan werken op je laptop, zonder step in de gang.
+
+Het paneel zet de UI in een frame van precies 480 × 320, met een knop voor 2×
+als je details wilt zien. Ernaast:
+
+- **Scherm** — springt naar elk scherm. Deze knoppen roepen de functies in de
+  pagina rechtstreeks aan (het frame is same-origin), dus je krijgt exact wat
+  een tik op het schermpje ook doet. Handig voor het toetsenbord en het
+  aan/uit-scherm, waar je anders drie keer moet klikken.
+- **Situatie** — rijden, motor heet, lage accu, storing, laden, geen VESC.
+  Elke situatie zet ook de waarden die er niet over gaan terug naar normaal,
+  anders blijft het temperatuuralarm over je laadscherm heen staan.
+- **Waarden** — schuiven voor snelheid, accu, duty, temperaturen, stromen.
+  Zet "snelheid laten golven" uit als je een schermafdruk wilt maken.
+- **Wat de UI heeft gestuurd** — elke POST die de pagina doet, inclusief de
+  lengte van een ingetypt wachtwoord. Zo zie je of een knop echt iets doet.
+
+Sla `public/index.html` op en het frame herlaadt zichzelf; het paneel kijkt elke
+0,7 s naar de mtime. Dat scheelt de hele dag heen-en-weer klikken.
+
+Dit gereedschap hoort niet op de Pi thuis. Het wordt wel meegekopieerd (de hele
+`tools/` gaat mee), maar niets start het en het luistert nergens op tot je het
+zelf aanroept.
 
 ## De UI is één bestand
 
