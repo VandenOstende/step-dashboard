@@ -41,7 +41,6 @@ const DEFAULT_CONFIG = {
   weather: {
     latitude: null,          // null = modem-gps, en anders het IP-adres
     longitude: null,
-    place: "",               // vaste plaatsnaam; leeg = die van de IP-opzoeking
     ipFallback: true         // false = alleen de coördinaten hierboven gebruiken
   },
   system: {

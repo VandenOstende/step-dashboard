@@ -90,14 +90,37 @@ in de argumenten belandt.
 Alle systeemaanroepen gaan via `execFile` met een argumentenlijst, nooit via een
 shell. Een SSID met een puntkomma erin mag geen commando worden.
 
+## Bluetooth zoeken
+
+`bluetoothctl scan on` doet niet wat je denkt. De zoektocht hangt aan het
+proces: sluit dat af, dan stopt hij. En omdat `run()` stdin altijd dichtdoet —
+anders blijft bluetoothctl op invoer wachten — is dat proces meteen weer weg.
+Je start dus een zoektocht van nul seconden.
+
+`--timeout N` lost het op: het proces blijft precies N seconden staan en stopt
+daarna zelf, dus er is geen achtergrondproces om te bewaken. We wachten er niet
+op. De server onthoudt alleen tot wanneer er gezocht wordt en geeft de lijst
+meteen terug; de UI haalt hem elke twee seconden opnieuw op, want apparaten
+komen er één voor één bij. Kent je bluez `--timeout` niet (ouder dan 5.55), dan
+komt dat als "zoeken niet ondersteund" op de zoekrij te staan in plaats van dat
+er niets gebeurt.
+
+`bluetoothctl devices` zonder filter geeft ook wat de zoektocht net gevonden
+heeft, dus daar hoeft niets extra's voor. De lijst zet verbonden bovenaan, dan
+gekoppeld, dan wat een naam heeft. Naamloze apparaten — enkel een mac-adres —
+staan onderaan en gaan er niet uit: soms is dat rare adres net je koptelefoon.
+
 ## Waar de step staat
 
 De buitentemperatuur links boven heeft coördinaten nodig. Die komen uit
 `config.json`, anders uit de gps van een 5G-modem, en anders uit een opzoeking
 op het IP-adres. Die laatste is er omdat de meeste steps geen modem hebben en
-niemand zin heeft om zelf coördinaten op te zoeken; hij levert meteen een
-plaatsnaam mee, dus dan staat er "18° Gent" en niet alleen een getal. Uit te
-zetten met `weather.ipFallback: false`.
+niemand zin heeft om zelf coördinaten op te zoeken. Uit te zetten met
+`weather.ipFallback: false`.
+
+In de topbalk staat alleen het getal. De plaatsnaam komt nog wel uit `/weather`
+— handig om te controleren waar hij denkt te staan — maar op 480 px is elk
+woord dat je niet nodig hebt er één te veel.
 
 Rij je de wifi uit, dan houdt hij de laatst bekende temperatuur nog drie uur
 vast. Buiten wordt het niet ineens tien graden kouder, en een oud getal is

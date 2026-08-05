@@ -26,7 +26,6 @@
   "weather": {
     "latitude": null,
     "longitude": null,
-    "place": "",
     "ipFallback": true
   },
 

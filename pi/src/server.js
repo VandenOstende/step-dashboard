@@ -15,7 +15,7 @@
  *   GET  /bt            {connected, name, mac}
  *   GET  /modem         {bars, tech}
  *   GET  /weather       {temp_c, place}
- *   GET  /net?kind=…    scanlijst wifi of bluetooth
+ *   GET  /net?kind=…    scanlijst wifi of bluetooth (&scan=1 zoekt actief)
  *   POST /net           {kind, id, connect}
  */
 
@@ -207,8 +207,13 @@ const routes = {
 
   "GET /net": async (req, res, url) => {
     const kind = url.searchParams.get("kind") === "bt" ? "bt" : "wifi";
-    const items = kind === "wifi" ? await sys.wifiList() : await sys.btList();
-    send(res, 200, { kind, items });
+    if (kind === "wifi") return send(res, 200, { kind, items: await sys.wifiList() });
+    /* Wifi laat nmcli zelf opnieuw scannen; bij bluetooth moeten we het vragen.
+       De UI doet dat bij het openen van het tabblad en bij "opnieuw zoeken",
+       en blijft ondertussen de lijst ophalen — zoeken duurt seconden en de
+       gekoppelde apparaten mogen daar niet op wachten. */
+    if (url.searchParams.get("scan") === "1") await sys.btStartScan();
+    send(res, 200, Object.assign({ kind, items: await sys.btList() }, sys.btScanState()));
   },
 
   "POST /net": async (req, res) => {

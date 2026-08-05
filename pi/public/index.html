@@ -85,7 +85,6 @@ svg{display:block}
 #outside{display:flex;align-items:center;gap:5px;flex:none;color:var(--color-neutral-500)}
 #outside svg{flex:none}
 #outtemp{font-size:14px;color:var(--color-text)}
-#outplace{font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 
 #notice{display:none;align-items:center;gap:7px;height:34px;max-width:300px;padding:0;
   background:transparent;border:0;color:var(--color-warn);font-size:14px;text-align:left}
@@ -259,6 +258,12 @@ svg{display:block}
   gap:12px;padding:0 14px;background:var(--color-surface);border:1px solid var(--color-neutral-800);
   border-radius:var(--radius-md);color:var(--color-text);font-size:16px;text-align:left}
 #netlist button.sel{background:var(--color-accent-900);border-color:var(--color-accent)}
+/* De zoekrij is geen apparaat: geen vlak eromheen, wel dezelfde hoogte zodat
+   de scrollknoppen op rijgrenzen blijven mikken. */
+#netlist button.scanrow{height:48px;background:transparent;border-style:dashed;
+  border-color:var(--color-accent);color:var(--color-accent);font-size:14px}
+#netlist button.scanrow.busy{border-color:var(--color-neutral-800);color:var(--color-neutral-500)}
+#netlist button.scanrow .st{color:inherit;opacity:.7}
 #netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #netlist .st{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
 #netlist button.sel .st{color:var(--color-accent-300)}
@@ -367,7 +372,6 @@ svg{display:block}
       <div id="outside">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
         <span id="outtemp">--&deg;</span>
-        <span id="outplace">--</span>
       </div>
       <button id="notice">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
@@ -844,7 +848,8 @@ var wifiLevel = null;
 var cell = { bars: 0, tech: null, present: false };
 var net = {
   tab: "wifi", wifiOn: false, ssid: "", btOn: false, dev: "", devMac: "",
-  items: { wifi: [], bt: [] }, busy: "", error: null
+  items: { wifi: [], bt: [] }, busy: "", error: null,
+  scanning: false, scanErr: "", scanTimer: null
 };
 
 function paintWifi() {
@@ -922,10 +927,8 @@ function fetchWeather() {
     return r.json();
   }).then(function (w) {
     if (typeof w.temp_c === "number") $("outtemp").textContent = w.temp_c.toFixed(0) + "°";
-    $("outplace").textContent = w.place || "";
   })["catch"](function () {
     $("outtemp").textContent = "--°";
-    $("outplace").textContent = "";
   });
 }
 
@@ -1527,55 +1530,102 @@ document.addEventListener("keydown", function (e) {
 });
 
 /* ── verbindingen ──────────────────────────────────────────────────────── */
+function netStatus(it) {
+  if (net.busy === it.id) return "verbinden…";
+  if (net.error && net.error.id === it.id) return net.error.msg;
+  if (it.active) return "verbonden";
+  if (net.tab === "bt") return it.known ? "gekoppeld" : "koppelen";
+  return (it.secured && !it.known) ? "beveiligd" : "verbind";
+}
+
 function renderNet() {
   var items = net.items[net.tab] || [];
   var list = $("netlist");
-  if (!items.length) {
-    list.innerHTML = '<div id="netempty"></div>';
-    $("netempty").textContent = net.tab === "wifi" ? "Geen netwerken gevonden" : "Geen apparaten gekoppeld";
-    syncNav("netlist");
-    return;
-  }
-  list.innerHTML = items.map(function (it) {
-    var sel = !!it.active;
-    return '<button data-id="' + encodeURIComponent(it.id) + '"' + (sel ? ' class="sel"' : '') + '>'
+  var html = "";
+
+  /* Bovenaan de bluetooth-lijst een rij die zegt of we aan het zoeken zijn en
+     waarmee je opnieuw kunt zoeken. Als knop in de kop erbij paste het niet —
+     die rij heeft al twee tabs, twee scrollpijlen en een sluitknop — en hier
+     staat hij bovendien waar je kijkt als je een apparaat mist. */
+  if (net.tab === "bt") {
+    html += '<button id="btscan" class="scanrow"' + (net.scanning ? " disabled" : "") + '>'
       + '<span class="nm"></span><span class="st"></span></button>';
-  }).join("");
-  [].slice.call(list.children).forEach(function (b, i) {
+  }
+
+  if (!items.length && !net.scanning) {
+    html += '<div id="netempty"></div>';
+  } else {
+    html += items.map(function (it) {
+      return '<button data-id="' + encodeURIComponent(it.id) + '"' + (it.active ? ' class="sel"' : '') + '>'
+        + '<span class="nm"></span><span class="st"></span></button>';
+    }).join("");
+  }
+  list.innerHTML = html;
+
+  if (net.tab === "bt") {
+    var sc = $("btscan");
+    sc.classList.toggle("busy", net.scanning);
+    sc.querySelector(".nm").textContent = net.scanning ? "Zoeken naar apparaten…" : "Opnieuw zoeken";
+    sc.querySelector(".st").textContent = net.scanErr || (net.scanning ? "even geduld" : "zoek");
+  }
+  if ($("netempty")) {
+    $("netempty").textContent = net.tab === "wifi" ? "Geen netwerken gevonden" : "Niets gevonden";
+  }
+  [].slice.call(list.querySelectorAll("button[data-id]")).forEach(function (b, i) {
     var it = items[i];
     b.querySelector(".nm").textContent = it.name;
-    b.querySelector(".st").textContent =
-      net.busy === it.id ? "verbinden…"
-        : (net.error && net.error.id === it.id) ? net.error.msg
-          : it.active ? "verbonden"
-            : (it.secured && !it.known) ? "beveiligd"
-              : "verbind";
+    b.querySelector(".st").textContent = netStatus(it);
   });
   syncNav("netlist");
 }
 
-function fetchNetList() {
+function fetchNetList(scan) {
   var kind = net.tab;
-  fetch("/net?kind=" + kind, { cache: "no-store" }).then(function (r) {
+  var url = "/net?kind=" + kind + (scan && kind === "bt" ? "&scan=1" : "");
+  fetch(url, { cache: "no-store" }).then(function (r) {
     if (!r.ok) throw 0;
     return r.json();
   }).then(function (j) {
     net.items[kind] = j.items || [];
-    if (net.tab === kind) renderNet();
+    if (kind === "bt") {
+      net.scanning = !!j.scanning;
+      net.scanErr = j.error || "";
+    }
+    if (net.tab === kind) { renderNet(); pollScan(); }
   })["catch"](function () {
     net.items[kind] = [];
+    if (kind === "bt") { net.scanning = false; net.scanErr = ""; }
     if (net.tab === kind) renderNet();
   });
 }
 
+/* Zoeken duurt een seconde of twaalf en apparaten komen er één voor één bij,
+   dus tijdens het zoeken halen we de lijst gewoon opnieuw op. Zodra de server
+   zegt dat hij klaar is stopt dat vanzelf. */
+function pollScan() {
+  clearTimeout(net.scanTimer);
+  net.scanTimer = null;
+  if (!net.scanning || net.tab !== "bt" || !$("net").classList.contains("on")) return;
+  net.scanTimer = setTimeout(function () { fetchNetList(false); }, 2000);
+}
+
+function stopScanPoll() {
+  clearTimeout(net.scanTimer);
+  net.scanTimer = null;
+}
+
 function openNet(tab) {
   net.tab = tab;
+  net.scanErr = "";
   $("net").classList.add("on");
   $("segwifi").classList.toggle("on", tab === "wifi");
   $("segbt").classList.toggle("on", tab === "bt");
+  stopScanPoll();
   renderNet();
   syncNav("netlist");              // pas meten als het scherm zichtbaar is
-  fetchNetList();
+  /* Bluetooth begint meteen te zoeken, net als wifi. Ook als er al iets
+     verbonden is — dat is juist het moment waarop je iets anders zoekt. */
+  fetchNetList(tab === "bt");
 }
 
 function pickNet(id) {
@@ -1630,18 +1680,28 @@ function sendNet(it, connect, password) {
 
 $("segwifi").addEventListener("pointerdown", function (e) { e.preventDefault(); openNet("wifi"); });
 $("segbt").addEventListener("pointerdown", function (e) { e.preventDefault(); openNet("bt"); });
-$("netclose").addEventListener("pointerdown", function (e) { e.preventDefault(); $("net").classList.remove("on"); });
+$("netclose").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); stopScanPoll(); $("net").classList.remove("on");
+});
 
 /* Een tik selecteert alleen als de vinger < 10 px beweegt — scrollen
    selecteert dus niets. */
 var nd = null;
 $("netlist").addEventListener("pointerdown", function (e) {
   var b = e.target.closest("[data-id]");
-  nd = b ? { x: e.clientX, y: e.clientY, id: decodeURIComponent(b.dataset.id) } : null;
+  if (b) { nd = { x: e.clientX, y: e.clientY, id: decodeURIComponent(b.dataset.id) }; return; }
+  var s = e.target.closest("#btscan");
+  nd = s && !s.disabled ? { x: e.clientX, y: e.clientY, scan: true } : null;
 });
 $("netlist").addEventListener("pointerup", function (e) {
   var d = nd; nd = null;
   if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
+  if (d.scan) {
+    net.scanning = true;             // meteen zichtbaar, de server bevestigt zo
+    net.scanErr = "";
+    renderNet();
+    return fetchNetList(true);
+  }
   pickNet(d.id);
 });
 $("netlist").addEventListener("pointercancel", function () { nd = null; });
