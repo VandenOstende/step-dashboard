@@ -153,7 +153,10 @@ function notices(d) {
   else if (tf >= cfg.tempWarn) out.push({ lv: 1, t: "FET " + tf.toFixed(0) + "°C — verminder belasting" });
   if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% — bijna leeg" });
   else if (bp < 20) out.push({ lv: 1, t: "Accu " + bp.toFixed(0) + "% — laag" });
-  if (upd.available) out.push({ lv: 0, t: "Nieuwe versie beschikbaar — zie Instellingen" });
+  /* Deze melding gaat érgens over: de knop om bij te werken. Tik erop en je
+     komt daar meteen, in plaats van in een lijst die je vertelt waar je moet
+     zijn. `act` markeert dat. */
+  if (upd.available) out.push({ lv: 0, act: "settings", t: "Nieuwe versie beschikbaar" });
   out.sort(function (a, b) { return b.lv - a.lv; });
   return out;
 }
@@ -174,13 +177,17 @@ function paintNotice(d) {
   cacheS.nz = key;
   b.className = "on" + (cur.lv === 2 ? " crit" : cur.lv === 0 ? " info" : "");
   $("noticetxt").textContent = cur.t;
+  /* Alleen de staande balk heeft dit hoekje; het zegt wat een tik doet. */
+  var more = $("noticemore");
+  if (more) more.textContent = cur.act ? "openen" : "alle";
 }
 
 function renderNotices() {
   $("noticelist").innerHTML = noticeList.map(function (nt) {
     var cls = nt.lv === 2 ? " crit" : nt.lv === 0 ? " info" : "";
-    var label = nt.lv === 2 ? "fout" : nt.lv === 0 ? "info" : "let op";
-    return '<div class="row' + cls + '">'
+    var label = nt.act ? "openen" : (nt.lv === 2 ? "fout" : nt.lv === 0 ? "info" : "let op");
+    return '<div class="row' + cls + (nt.act ? " act" : "") + '"'
+      + (nt.act ? ' data-act="' + nt.act + '"' : "") + '>'
       + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>'
       + '<div class="msg"></div>'
       + '<div class="lv">' + label + '</div></div>';
@@ -200,10 +207,26 @@ setInterval(function () {
 $("notice").addEventListener("pointerdown", function (e) {
   e.preventDefault();
   if (!noticeList.length) return;
+  var cur = noticeList[ni % noticeList.length];
+  if (cur.act === "settings") return openSettings();
   renderNotices();
   $("notices").classList.add("on");
   syncNav("noticelist");
 });
+
+/* En vanuit de lijst ook, met dezelfde regel als bij de netwerken: bewegen is
+   geen tik, zodat scrollen niets opent. */
+var nod = null;
+$("noticelist").addEventListener("pointerdown", function (e) {
+  var r = e.target.closest("[data-act]");
+  nod = r ? { x: e.clientX, y: e.clientY, act: r.dataset.act } : null;
+});
+$("noticelist").addEventListener("pointerup", function (e) {
+  var d = nod; nod = null;
+  if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
+  if (d.act === "settings") openSettings();
+});
+$("noticelist").addEventListener("pointercancel", function () { nod = null; });
 $("noticesclose").addEventListener("pointerdown", function (e) {
   e.preventDefault();
   $("notices").classList.remove("on");
@@ -361,10 +384,13 @@ function openSys() {
 $("status").addEventListener("pointerdown", function (e) { e.preventDefault(); openSys(); });
 $("sysclose").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); });
 $("sysnet").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); openNet("wifi"); });
-$("sysset").addEventListener("pointerdown", function (e) {
-  e.preventDefault(); $("sys").classList.remove("on"); renderSettings(); $("settings").classList.add("on");
+function openSettings() {
+  ["sys", "notices", "net"].forEach(function (id) { $(id).classList.remove("on"); });
+  renderSettings();
+  $("settings").classList.add("on");
   syncNav("setlist");            // pas meten als het scherm zichtbaar is
-});
+}
+$("sysset").addEventListener("pointerdown", function (e) { e.preventDefault(); openSettings(); });
 $("setclose").addEventListener("pointerdown", function (e) {
   e.preventDefault(); $("settings").classList.remove("on"); openSys();
 });
