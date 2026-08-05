@@ -247,6 +247,10 @@ svg{display:block}
 #noticelist .lv{margin-left:auto;flex:none;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-warn)}
 #noticelist .row.crit .lv{color:var(--color-crit)}
 #noticelist .row.info .lv{color:var(--color-accent)}
+/* Een melding die ergens heen brengt in plaats van alleen iets meldt: de rand
+   licht op, en het label rechts zegt "openen" in plaats van "info". */
+#noticelist .row.act{box-shadow:inset 0 0 0 1px var(--color-accent);cursor:pointer}
+#noticelist .row.act .lv{color:var(--color-accent)}
 
 /* verbindingen */
 #netseg{display:flex;gap:var(--space-2);flex:none}

@@ -238,6 +238,22 @@ In de designomgeving zit er een knop **Staand op 480 × 320** voor: die laadt de
 staande pagina in een liggend frame, precies zoals op de step. Zonder die knop
 zie je een verkeerde draaiing pas op het stuur staan.
 
+## Meldingen die ergens heen gaan
+
+De meeste meldingen vertellen je iets: te warm, accu laag, VESC weg. Daar is de
+lijst het eindstation. De update-melding is anders — die gaat over een knop die
+ergens anders staat. Een melding die zegt "zie Instellingen" is een melding die
+je werk geeft.
+
+Zo'n melding krijgt daarom een `act` in `notices()`. Tik je op de balk terwijl
+die melding aan de beurt is, dan gaat hij rechtstreeks naar dat scherm in plaats
+van naar de lijst; en in de lijst is die rij zelf aantikbaar, met een accentrand
+en "openen" in plaats van "info" ernaast. De rest van de meldingen gedraagt zich
+onveranderd.
+
+Bewegen is geen tik, net als bij de netwerklijst: scrollen door de meldingen
+opent niets.
+
 ## Lagen op het scherm
 
 De overlays zitten op vaste z-index-niveaus:

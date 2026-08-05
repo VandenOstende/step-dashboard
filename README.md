@@ -37,7 +37,8 @@ Beyond that:
 - Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
 - On boot it checks whether a newer version is on GitHub. If there is, the
-  notification bar says so and one tap in the settings installs it.
+  notification bar says so — tap it and you land straight in the settings, on
+  the row that installs it.
 - Plug in the charger and a charging screen appears: percentage, a bar, and an
   estimate of how much longer it needs. Tap it away if it's in the way.
 - System → Power gives a fullscreen REBOOT / SHUTDOWN screen, so you can put
@@ -277,8 +278,8 @@ Verder:
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
 - Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
-  er, dan zegt de meldingsbalk dat en werk je bij met één tik in de
-  instellingen.
+  er, dan zegt de meldingsbalk dat — tik erop en je staat meteen in de
+  instellingen, op de rij die hem installeert.
 - Hang je de lader eraan, dan verschijnt een laadscherm: percentage, een balk,
   en een schatting hoelang het nog duurt. Wegtikken kan als het in de weg zit.
 - Systeem → Power geeft een volledig scherm met REBOOT en SHUTDOWN, zodat je de
