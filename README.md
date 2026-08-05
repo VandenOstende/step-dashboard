@@ -32,6 +32,8 @@ Beyond that:
 - Joining a Wi-Fi network needs no keyboard — there's one on screen (AZERTY).
 - The Bluetooth tab searches for devices nearby, the same way the Wi-Fi tab
   scans — including while something is already connected.
+- Two layouts: landscape 480 × 320 and portrait 320 × 480. Settings → Layout
+  switches between them and the choice survives a reboot.
 - Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
 - On boot it checks whether a newer version is on GitHub. If there is, the
@@ -48,7 +50,7 @@ scooter is often out of range and it should just work.
 
 - Raspberry Pi 4 (4 GB, though 2 GB is plenty)
 - VESC controller over USB — mine is a Flipsky Mini MK5
-- 3.5" SPI touchscreen, 480 × 320, landscape
+- 3.5" SPI touchscreen, 480 × 320 — portrait works too, see Layout below
 - Optional: a 5G dongle, for the signal bars in the top bar
 
 The display is slow, so the UI repaints about 6 times a second and only touches
@@ -84,8 +86,20 @@ VESC enumerates as a CDC-ACM device, where the baud rate is meaningless anyway.
 That makes the whole install doable offline.
 
 The SPI driver for the display is out of scope here; it differs per brand. Make
-sure your screen works at 480 × 320 landscape *before* you enable the kiosk — the
-UI is built for exactly that size and doesn't scroll.
+sure your screen works *before* you enable the kiosk — the UI is built for
+exactly 480 × 320 (or 320 × 480) and doesn't scroll.
+
+### Layout
+
+Settings → **Layout** switches between landscape (480 × 320) and portrait
+(320 × 480). Both show the same data; the portrait one stacks it in a single
+column, gives warnings a full-width band, and moves the keyboard to the bottom
+of the screen. The choice is stored on the Pi, so the kiosk comes back up in the
+layout you left it in.
+
+This only turns the *interface*. Physically rotating the display is a separate
+job — mount the screen the other way round, or add `display_rotate=1` to
+`/boot/firmware/config.txt`.
 
 ### Reading the VESC
 
@@ -248,6 +262,8 @@ Verder:
 - Storingen, lage accu en te hoge duty verschijnen in de bovenbalk, die
   doorloopt als er meerdere zijn. Tikken opent de volledige lijst.
 - Het thema volgt de klok: licht tussen 07:30 en 18:00, daarbuiten donker.
+- Twee indelingen: liggend 480 × 320 en staand 320 × 480. Instellingen →
+  Indeling wisselt ertussen, en die keuze overleeft een herstart.
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
 - Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
   wifi-tabblad scant — ook als er al iets verbonden is.
@@ -268,7 +284,7 @@ step staat vaak buiten bereik en dan moet het gewoon werken.
 
 - Raspberry Pi 4 (4 GB, maar 2 GB is ruim genoeg)
 - VESC-controller via USB — bij mij een Flipsky Mini MK5
-- 3,5" SPI-touchscreen, 480 × 320, liggend
+- 3,5" SPI-touchscreen, 480 × 320 — staand kan ook, zie Indeling hieronder
 - Optioneel: 5G-dongle, voor de bereikbalkjes in de topbalk
 
 Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
@@ -304,8 +320,20 @@ mag, want de VESC meldt zich als CDC-ACM-apparaat en de baudrate doet er dan
 toch niet toe. Zo is de hele installatie offline te doen.
 
 De SPI-driver van het schermpje valt hierbuiten, die verschilt per merk. Zorg
-dat je scherm op 480 × 320 liggend werkt vóór je de kiosk aanzet; de UI is
-precies op dat formaat gemaakt en scrollt niet.
+dat je scherm werkt vóór je de kiosk aanzet; de UI is precies op 480 × 320 (of
+320 × 480) gemaakt en scrollt niet.
+
+### Indeling
+
+Instellingen → **Indeling** wisselt tussen liggend (480 × 320) en staand
+(320 × 480). Allebei tonen ze dezelfde gegevens; de staande zet alles in één
+kolom, geeft waarschuwingen een band over de volle breedte en schuift het
+toetsenbord naar de onderkant van het scherm. De keuze staat op de Pi, dus de
+kiosk komt terug in de indeling waarin je hem verliet.
+
+Dit draait alleen de *interface*. Het schermpje zelf draaien is apart werk —
+hang het andersom op, of zet `display_rotate=1` in
+`/boot/firmware/config.txt`.
 
 ### De VESC uitlezen
 

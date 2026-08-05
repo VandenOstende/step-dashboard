@@ -52,6 +52,7 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_STATE = {
   settings: {
+    layout: "Liggend",     // "Liggend" = index.html, "Staand" = portrait.html
     theme: "Auto",
     tempWarn: 70,
     tempCrit: 90,
