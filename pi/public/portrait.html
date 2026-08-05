@@ -69,7 +69,10 @@ body.light{
 }
 
 *,*::before,*::after{box-sizing:border-box}
-html,body{margin:0;padding:0;width:320px;height:480px;overflow:hidden}
+/* Het paneel bepaalt de body-maat, niet het ontwerp: staat de staande UI op
+   een liggend schermpje, dan draait fitRotation() #root een kwartslag en moet
+   de body de échte afmetingen houden. */
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
 body{
   background:var(--color-bg);
   color:var(--color-text);
@@ -653,6 +656,10 @@ svg{display:block}
       <div class="setrow"><span class="lbl">Indeling</span>
         <button class="seg lay" data-lay="Liggend">Liggend</button>
         <button class="seg lay" data-lay="Staand">Staand</button>
+      </div>
+      <div class="setrow"><span class="lbl">Kwartslag</span>
+        <button class="seg rot" data-rot="90">90&deg;</button>
+        <button class="seg rot" data-rot="270">270&deg;</button>
       </div>
       <div class="setrow"><span class="lbl">Startscherm</span>
         <button class="seg start" data-i="0">Rit</button>
