@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
+    "design": "node tools/design.js",
     "probe": "node tools/vesc-probe.js",
     "test": "node tools/selftest.js"
   }

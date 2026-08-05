@@ -195,13 +195,19 @@ does happen automatically — that's `update.checkOnStart`.
 cd pi
 npm test     # 53 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
+npm run design   # http://localhost:8081/design
 ```
 
 Without a VESC attached, `/data` reports `connected: false` and the screen says
 "geen vesc" in the top right. Open `pi/public/index.html` directly in a browser
 and there's no server at all — after three failed attempts the UI falls back to a
-simulated ride, which is handy for working on the looks without dragging the
-scooter along.
+simulated ride.
+
+`npm run design` is the better way to work on the layout: it serves the real UI
+in a 480 × 320 frame with faked hardware behind it, plus sliders for speed,
+battery, temperatures and the rest, buttons that jump straight to any screen,
+and a log of everything the page posts. Save `public/index.html` and the frame
+reloads itself. Details are in [pi/README.md](pi/README.md).
 
 ### Still to do
 
@@ -413,15 +419,22 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 53 tests: VESC-protocol, CRC, framing, de omrekeningen
-npm start    # http://127.0.0.1:8080
+npm test         # 53 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm start        # http://127.0.0.1:8080
+npm run design   # http://localhost:8081/design
 ```
 
 Zonder VESC eraan meldt `/data` `connected: false` en zegt het scherm
 rechtsboven "geen vesc". Open je `pi/public/index.html` los in een browser, dan
 is er helemaal geen server en valt de UI na drie mislukte pogingen terug op een
-gesimuleerde rit — handig om aan het uiterlijk te werken zonder de step erbij te
-halen.
+gesimuleerde rit.
+
+Aan de layout werken gaat het prettigst met `npm run design`. Dat zet de echte
+UI in een frame van 480 × 320 met nagemaakte hardware erachter: schuiven voor
+snelheid, accu, temperaturen en stromen, knoppen die meteen naar elk scherm
+springen, kant-en-klare situaties (rijden, motor heet, laden, storing) en een
+logboek van alles wat de pagina verstuurt. Sla `public/index.html` op en het
+frame herlaadt zichzelf. Uitleg staat in [pi/README.md](pi/README.md).
 
 ### Nog te doen
 
