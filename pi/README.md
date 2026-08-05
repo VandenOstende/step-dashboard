@@ -5,7 +5,9 @@ Dit is meer een notitieblok voor mezelf over hoe de code werkt en waarom
 sommige dingen zo raar zijn.
 
 ```
-public/index.html   de hele UI — één bestand, alles inline
+public/index.html   opmaak liggend, 480 × 320
+public/portrait.html opmaak staand, 320 × 480
+public/app.js       het gedrag, gedeeld door allebei
 src/serial.js       seriële poort zonder npm-modules
 src/vesc.js         VESC-protocol: framing, CRC16, pakketten
 src/telemetry.js    ruwe waarden → wat de UI verwacht
@@ -20,12 +22,38 @@ tools/vesc-probe.js kijken wat je VESC vertelt
 tools/selftest.js   tests, zonder hardware
 ```
 
-## De UI is één bestand
+## Twee indelingen, één script
 
 Geen build, geen framework, geen bundler. De Pi heeft geen internet, dus alles
-zit inline: de kleuren en maten uit het ontwerp staan als CSS-variabelen
-bovenaan, de iconen zijn inline SVG. Inter wordt gebruikt als je hem lokaal
-hebt (`apt install fonts-inter`), anders valt hij terug op system-ui.
+zit lokaal: de kleuren en maten uit het ontwerp staan als CSS-variabelen
+bovenaan elke pagina, de iconen zijn inline SVG. Inter wordt gebruikt als je hem
+lokaal hebt (`apt install fonts-inter`), anders valt hij terug op system-ui.
+
+`index.html` is liggend, `portrait.html` staand. Ze verschillen **alleen** in
+opmaak: dezelfde element-id's, hetzelfde `app.js`. Dat script apart houden is
+geen nettigheid maar noodzaak — twee kopieën van negenhonderd regels lopen bij
+de eerste wijziging al uit elkaar, en dan werkt een knop in de ene indeling wel
+en in de andere niet.
+
+Welke pagina je voor je hebt staat op de body:
+
+```html
+<body data-layout="Liggend">     <!-- of "Staand" -->
+```
+
+`app.js` leest dat als `PAGE_LAYOUT`. Staat er in de instellingen een andere
+indeling opgeslagen, dan stuurt de pagina bij het opstarten meteen door naar de
+andere — vóór de timers gaan lopen. De kiosk hoeft dus niets te weten: die opent
+altijd `/` en komt vanzelf op de goede uit.
+
+Wisselen slaat eerst op en springt daarna pas (`saveSettingsNow`). Met de gewone
+opslag, die 400 ms wacht, gaat de POST mee het graf in bij het herladen en
+stuurt de andere pagina je meteen terug.
+
+Wat je bij een nieuwe indeling moet naleven: elk id dat `app.js` aanraakt moet
+in de opmaak staan, en elementen waar `cls()` op werkt houden precies de klassen
+die dat script erop zet (`#tm` is `v big`, `#batcard` is `card`). Die twee dingen
+zijn met een regex uit `app.js` te halen en na te lopen — dat scheelt zoeken.
 
 Renderen gebeurt ~6× per seconde en alleen de nodes die echt veranderen worden
 aangeraakt — vandaar die `cacheT` en `cacheS` in `paint()`. Het schermpje is
@@ -168,6 +196,23 @@ andere. Er is dus geen tekenreeks die van de browser tot aan sudo doorloopt.
 Het scherm is zelf de bevestiging. Nog een "weet je het zeker" erbij maakt het
 op een aanraakscherm alleen maar irritanter, niet veiliger — en je bent er pas
 na twee tikken vanaf het rijscherm.
+
+## Wat er staand anders is
+
+Staand is 320 px breed, en dat dwingt een paar dingen af:
+
+- **Meldingen** krijgen een eigen band over de volle breedte. Liggend deelt de
+  meldingsbalk zijn plek met de buitentemperatuur; op 320 px blijft daar zo
+  weinig van over dat je de helft van de tekst moet raden.
+- **Drie knoppen naast elkaar** (systeem, aan/uit) passen niet meer met leesbare
+  labels, dus die staan onder elkaar. Met een duim mik je daar toch beter op.
+- **Het toetsenbord** heeft tien toetsen per rij, dus 27 px breed. Dat is smal,
+  maar er is hoogte zat: de toetsen zijn 64 px hoog en staan onderaan geplakt.
+  Uitrekken over de hele hoogte gaf toetsen van 91 px, en daar mik je niet beter
+  door.
+- **"max 41"** staat op dezelfde basislijn als de grote cijfers via
+  `align-items: last baseline`. Een vast aantal pixels klopt niet meer zodra
+  Inter wel of juist niet geïnstalleerd is.
 
 ## Lagen op het scherm
 
