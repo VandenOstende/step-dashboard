@@ -33,6 +33,11 @@ for d in src public install tools; do
 done
 cp "$SRC/package.json" "$DEST/"
 
+# De designomgeving is gereedschap voor op je eigen computer: hij zet een
+# tweede webserver op met nagemaakte hardware erachter. Op de step heeft dat
+# niets te zoeken, dus die gaat er na het kopiëren weer uit.
+rm -f "$DEST/tools/design.js" "$DEST/tools/design.html"
+
 # Welke commit staat er nu? De updater vergelijkt dit met GitHub.
 COMMIT=$(git -C "$SRC/.." rev-parse HEAD 2>/dev/null || echo "")
 BRANCH_NOW=$(git -C "$SRC/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")

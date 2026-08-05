@@ -97,9 +97,16 @@ column, gives warnings a full-width band, and moves the keyboard to the bottom
 of the screen. The choice is stored on the Pi, so the kiosk comes back up in the
 layout you left it in.
 
-This only turns the *interface*. Physically rotating the display is a separate
-job — mount the screen the other way round, or add `display_rotate=1` to
-`/boot/firmware/config.txt`.
+The page rotates itself. Your screen is bolted to the handlebars in one
+position, so the panel stays 480 × 320 whichever layout you pick — the portrait
+page notices that and turns a quarter turn so it fills the panel. Mount the
+screen upright and it reads correctly. **Rotation** in the settings picks which
+way round (90° or 270°), for whichever way you hung it.
+
+Nothing is changed at the OS level. `display_rotate` and friends differ per
+driver and per Pi OS release, and one wrong line in `config.txt` gets you a
+black screen with no way back in. Touch keeps working — the browser maps taps
+back through the rotation itself.
 
 ### Reading the VESC
 
@@ -331,9 +338,16 @@ kolom, geeft waarschuwingen een band over de volle breedte en schuift het
 toetsenbord naar de onderkant van het scherm. De keuze staat op de Pi, dus de
 kiosk komt terug in de indeling waarin je hem verliet.
 
-Dit draait alleen de *interface*. Het schermpje zelf draaien is apart werk —
-hang het andersom op, of zet `display_rotate=1` in
-`/boot/firmware/config.txt`.
+De pagina draait zichzelf. Je schermpje zit in één stand op het stuur
+geschroefd, dus het paneel blijft 480 × 320 welke indeling je ook kiest — de
+staande pagina merkt dat en zet er een kwartslag op zodat hij het paneel vult.
+Hang het scherm rechtop en het staat goed. Met **Kwartslag** in de instellingen
+kies je welke kant op (90° of 270°), voor hoe jij hem opgehangen hebt.
+
+Er verandert niets aan het besturingssysteem. `display_rotate` en soortgelijke
+verschillen per driver en per Pi-OS, en één verkeerde regel in `config.txt`
+geeft je een zwart scherm zonder weg terug. Aanraken blijft werken — de browser
+rekent tikken zelf door de draaiing heen terug.
 
 ### De VESC uitlezen
 

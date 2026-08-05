@@ -214,6 +214,30 @@ Staand is 320 px breed, en dat dwingt een paar dingen af:
   `align-items: last baseline`. Een vast aantal pixels klopt niet meer zodra
   Inter wel of juist niet geïnstalleerd is.
 
+## De pagina draait zichzelf
+
+Het paneel op het stuur is 480 × 320 en blijft dat, ook als je de staande
+indeling kiest. `fitRotation()` vergelijkt daarom waar de pagina voor getekend
+is (`DESIGN`) met wat hij krijgt (`innerWidth/innerHeight`), en zet er een
+kwartslag op als die niet overeenkomen. De body vult het paneel, `#root` houdt
+de ontwerpmaat en wordt geroteerd om zijn eigen midden.
+
+Waarom niet op OS-niveau: `display_rotate` in `config.txt` werkt alleen bij
+bepaalde drivers, fbtft wil een moduleparameter, en onder Wayland is het weer
+`wlr-randr`. Eén verkeerde poging en je scherm blijft zwart terwijl je er niet
+meer bij kunt. Dit is één regel CSS die overal hetzelfde doet.
+
+Aanraken hoefde niet omgerekend te worden: de browser doet hit-testing dwars
+door de transform heen. Getest met een echte `touchscreen.tap()` op de
+Instellingen-knop in het gedraaide systeemvenster.
+
+Welke kant op staat in `cfg.rotate` (90 of 270) — hoe je het scherm ophangt
+bepaalt welke van de twee klopt.
+
+In de designomgeving zit er een knop **Staand op 480 × 320** voor: die laadt de
+staande pagina in een liggend frame, precies zoals op de step. Zonder die knop
+zie je een verkeerde draaiing pas op het stuur staan.
+
 ## Lagen op het scherm
 
 De overlays zitten op vaste z-index-niveaus:

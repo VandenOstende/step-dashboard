@@ -29,8 +29,13 @@ var $ = function (id) { return document.getElementById(id); };
    niet meteen naar de andere springt als er geen server is. */
 var PAGE_LAYOUT = document.body.getAttribute("data-layout") === "Staand" ? "Staand" : "Liggend";
 
+/* Waar deze pagina voor getekend is. Past dat niet op het paneel waar hij op
+   staat, dan draait hij zichzelf een kwartslag — zie fitRotation(). */
+var DESIGN = PAGE_LAYOUT === "Staand" ? { w: 320, h: 480 } : { w: 480, h: 320 };
+
 var cfg = {
   layout: PAGE_LAYOUT,
+  rotate: 90,
   theme: "Auto",
   tempWarn: 70,
   tempCrit: 90,
@@ -436,6 +441,9 @@ function renderSettings() {
   [].slice.call(document.querySelectorAll(".seg.lay")).forEach(function (b) {
     b.classList.toggle("on", b.dataset.lay === cfg.layout);
   });
+  [].slice.call(document.querySelectorAll(".seg.rot")).forEach(function (b) {
+    b.classList.toggle("on", +b.dataset.rot === cfg.rotate);
+  });
 }
 
 function bump(key, step) {
@@ -468,6 +476,38 @@ function saveSettingsNow() {
 
 function layoutFile(name) { return name === "Staand" ? "portrait.html" : "index.html"; }
 
+/* ── het scherm draaien ────────────────────────────────────────────────────
+   Het schermpje op het stuur zit in één stand vastgeschroefd: het paneel is
+   480 × 320, ook als je de staande indeling kiest. Het besturingssysteem laten
+   draaien (display_rotate, xrandr, wlr-randr) verschilt per driver en per
+   Pi-OS, en een verkeerde regel in config.txt levert een zwart scherm op
+   zonder dat je er nog bij kunt. Daarom draait de pagina zichzelf: hij
+   vergelijkt waarvoor hij getekend is met wat hij krijgt, en zet er een
+   kwartslag op als die twee niet overeenkomen.
+
+   Aanraken blijft gewoon werken: de browser rekent tikken door de transform
+   heen terug, dus we hoeven zelf geen coördinaten om te klappen. */
+function fitRotation() {
+  var root = $("root");
+  var paneelLiggend = window.innerWidth >= window.innerHeight;
+  var ontwerpLiggend = DESIGN.w >= DESIGN.h;
+  var deg = paneelLiggend === ontwerpLiggend ? 0 : (cfg.rotate === 270 ? 270 : 90);
+
+  root.style.width = DESIGN.w + "px";
+  root.style.height = DESIGN.h + "px";
+  if (!deg) {
+    root.style.position = "relative";
+    root.style.left = "";
+    root.style.top = "";
+    root.style.transform = "";
+    return;
+  }
+  root.style.position = "absolute";
+  root.style.left = "50%";
+  root.style.top = "50%";
+  root.style.transform = "translate(-50%, -50%) rotate(" + deg + "deg)";
+}
+
 function gotoLayout(name) {
   if (name === PAGE_LAYOUT) return;
   location.replace(layoutFile(name));
@@ -490,6 +530,15 @@ $("setlist").addEventListener("pointerdown", function (e) {
   if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
   var t = e.target.closest(".seg[data-theme]");
   if (t) { e.preventDefault(); cfg.theme = t.dataset.theme; applyTheme(true); renderSettings(); saveSettings(); return; }
+  var rt = e.target.closest(".seg.rot");
+  if (rt) {
+    e.preventDefault();
+    cfg.rotate = +rt.dataset.rot;
+    renderSettings();
+    saveSettings();
+    fitRotation();
+    return;
+  }
   var ly = e.target.closest(".seg.lay");
   if (ly) {
     e.preventDefault();
@@ -1234,6 +1283,9 @@ function boot(saved) {
   /* Staat er een andere indeling opgeslagen, dan is dit de verkeerde pagina.
      Meteen doorsturen, vóór de timers gaan lopen. */
   if (cfg.layout !== PAGE_LAYOUT) { location.replace(layoutFile(cfg.layout)); return; }
+
+  fitRotation();
+  window.addEventListener("resize", fitRotation);
 
   applyTheme(true);
   renderSettings();
