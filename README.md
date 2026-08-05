@@ -30,6 +30,8 @@ Beyond that:
   through them when there's more than one. Tapping opens the full list.
 - The theme follows the clock: light between 07:30 and 18:00, dark outside that.
 - Joining a Wi-Fi network needs no keyboard — there's one on screen (AZERTY).
+- The Bluetooth tab searches for devices nearby, the same way the Wi-Fi tab
+  scans — including while something is already connected.
 - Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
 - On boot it checks whether a newer version is on GitHub. If there is, the
@@ -137,7 +139,7 @@ The page talks to a handful of endpoints on the same origin:
 | `POST /power` | reboot or shut down |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | outside temperature |
-| `GET/POST /net` | scan networks and connect |
+| `GET/POST /net` | list networks and devices, search, and connect |
 | `GET/POST /update` | compare the version with GitHub, and update |
 
 If a system tool is missing — no backlight, no ModemManager — the endpoint
@@ -247,6 +249,8 @@ Verder:
   doorloopt als er meerdere zijn. Tikken opent de volledige lijst.
 - Het thema volgt de klok: licht tussen 07:30 en 18:00, daarbuiten donker.
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
+- Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
+  wifi-tabblad scant — ook als er al iets verbonden is.
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
 - Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
@@ -355,7 +359,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `POST /power` | herstarten of afsluiten |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
-| `GET/POST /net` | netwerken scannen en verbinden |
+| `GET/POST /net` | netwerken en apparaten tonen, zoeken en verbinden |
 | `GET/POST /update` | versie vergelijken met GitHub, en bijwerken |
 
 Ontbreekt er een systeemtool — geen backlight, geen ModemManager — dan geeft

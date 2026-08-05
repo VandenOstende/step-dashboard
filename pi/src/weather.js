@@ -9,9 +9,8 @@
  *   3. het IP-adres, via een opzoekdienst (weather.ipFallback)
  *
  * Die derde is er omdat de meeste steps geen modem hebben en niemand zin
- * heeft om coördinaten in een bestand te typen. Hij levert meteen ook een
- * plaatsnaam, dus dan staat er "18° Gent" in plaats van alleen een getal.
- * Het weer zelf komt van Open-Meteo, dat geen sleutel vraagt.
+ * heeft om coördinaten in een bestand te typen. Het weer zelf komt van
+ * Open-Meteo, dat geen sleutel vraagt.
  *
  * Zonder netwerk faalt dit endpoint netjes en laat de UI het veld leeg.
  */
@@ -93,9 +92,9 @@ class Weather {
         const j = await fetchJson(url, 8000);
         const t = j && j.current && j.current.temperature_2m;
         if (typeof t !== "number") throw new Error("geen temperatuur");
-        /* Open-Meteo doet geen reverse geocoding. De plaatsnaam komt dus uit
-           config.json, of anders van de IP-opzoeking hierboven. */
-        const out = { temp_c: t, place: this.cfg.place || loc.place || "" };
+        /* De topbalk toont alleen het getal; de plaatsnaam gaat mee zodat je
+           met een curl kunt zien waar hij denkt te staan. */
+        const out = { temp_c: t, place: loc.place || "" };
         this.cache = out;
         this.cachedAt = Date.now();
         return out;

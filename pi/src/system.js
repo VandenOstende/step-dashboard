@@ -214,14 +214,74 @@ async function btStatus() {
   return { connected: true, name: conn[0].name, mac: conn[0].mac };
 }
 
+/* Zoeken naar apparaten in de buurt.
+ *
+ * bluetoothctl houdt de zoektocht alleen aan zolang zijn eigen proces leeft;
+ * `scan on` met gesloten stdin start hem dus en zet hem meteen weer stil.
+ * `--timeout` laat het proces precies zo lang staan en stopt daarna zelf —
+ * geen achtergrondproces dat we moeten bewaken. We wachten er niet op: de
+ * gevonden apparaten komen bij de volgende `devices` binnendruppelen, dus de
+ * UI blijft ondertussen gewoon de lijst verversen. */
+const BT_SCAN_S = 12;
+let btScanUntil = 0;
+let btScanError = "";
+
+function btScanning(now) {
+  return (now || Date.now()) < btScanUntil;
+}
+
+async function btStartScan(seconds) {
+  if (btScanning()) return { ok: true, until: btScanUntil };
+  const sec = Math.max(4, Math.min(30, seconds || BT_SCAN_S));
+  btScanUntil = Date.now() + sec * 1000;
+  btScanError = "";
+  // Staat de adapter uit, dan levert zoeken niets op. Aanzetten is idempotent.
+  await run("bluetoothctl", ["power", "on"], 5000);
+  run("bluetoothctl", ["--timeout", String(sec), "scan", "on"], (sec + 5) * 1000)
+    .then((r) => {
+      if (r.ok) return;
+      // Oude bluez (< 5.55) kent --timeout niet; dan blijft het bij de
+      // gekoppelde apparaten en zeggen we dat eerlijk.
+      btScanUntil = 0;
+      btScanError = /timeout|unknown|invalid/i.test(r.err) ? "zoeken niet ondersteund" : "zoeken mislukt";
+    });
+  return { ok: true, until: btScanUntil };
+}
+
 async function btList() {
-  const paired = (await btDevices("Paired")) || (await btDevices(null)) || [];
-  const conn = await btConnected();
+  const [pairedRaw, allRaw, conn] = await Promise.all([
+    btDevices("Paired"),
+    btDevices(null),        // ook wat de zoektocht net heeft opgeleverd
+    btConnected()
+  ]);
+  const paired = new Set((pairedRaw || []).map((d) => d.mac));
   const live = new Set(conn.map((d) => d.mac));
-  for (const d of conn) if (!paired.some((p) => p.mac === d.mac)) paired.push(d);
-  return paired
-    .map((d) => ({ id: d.mac, name: d.name, active: live.has(d.mac) }))
-    .sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name));
+
+  const byMac = new Map();
+  for (const d of [...(pairedRaw || []), ...(allRaw || []), ...conn]) {
+    const prev = byMac.get(d.mac);
+    // Een naam is beter dan een mac-adres als naam, welke bron hem ook geeft.
+    if (!prev || (prev.name === prev.mac && d.name !== d.mac)) byMac.set(d.mac, d);
+  }
+
+  return [...byMac.values()]
+    .map((d) => ({
+      id: d.mac,
+      name: d.name,
+      active: live.has(d.mac),
+      known: paired.has(d.mac),
+      named: d.name !== d.mac
+    }))
+    /* Verbonden bovenaan, dan gekoppeld, dan wat een naam heeft. Zoeken levert
+       ook naamloze apparaten op — die zijn zelden wat je zoekt, maar ze staan
+       er wel, want soms is dat rare mac-adres net je koptelefoon. */
+    .sort((a, b) => (b.active - a.active) || (b.known - a.known)
+      || (b.named - a.named) || a.name.localeCompare(b.name))
+    .slice(0, 40);
+}
+
+function btScanState() {
+  return { scanning: btScanning(), until: btScanUntil, error: btScanError || undefined };
 }
 
 async function btConnect(mac) {
@@ -343,7 +403,7 @@ async function setBacklight(level, sysCfg) {
 module.exports = {
   wifiStatus, wifiList, wifiConnect, wifiDisconnect,
   wifiConnectPlan, wifiConnectPlanFallback,
-  btStatus, btList, btConnect, btDisconnect,
+  btStatus, btList, btConnect, btDisconnect, btStartScan, btScanState,
   modem, modemLocation,
   power, powerCommand,
   setBacklight
