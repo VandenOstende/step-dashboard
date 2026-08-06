@@ -9,9 +9,9 @@
  *
  * De opmaak is voor allebei letterlijk hetzelfde — dezelfde element-id's,
  * dezelfde volgorde. Het verschil zit alleen in het kenmerk data-layout op
- * <body>: public/layout.css houdt de maatvoering voor beide indelingen vast
- * en dat kenmerk kiest welke helft telt. De vormtaal komt uit
- * public/styles/<stijl>.css en het gedrag uit public/app.js.
+ * <body>: public/theme.css houdt de vormtaal én de maatvoering voor beide
+ * indelingen vast en dat kenmerk kiest welke helft telt. Het gedrag komt uit
+ * public/app.js.
  *
  * Twee handgeschreven pagina's zouden bij de eerste wijziging al uit elkaar
  * lopen, en dan werkt een knop in de ene indeling wel en in de andere niet.
@@ -57,8 +57,7 @@ function page(titel, viewport, layout) {
 <meta charset="utf-8">
 <meta name="viewport" content="${viewport}">
 <title>${titel}</title>
-<link rel="stylesheet" href="layout.css">
-<link id="stylecss" rel="stylesheet" href="styles/windows.css">
+<link rel="stylesheet" href="theme.css">
 </head>
 <body data-layout="${layout}">
 ${body}
@@ -81,9 +80,9 @@ for (const r of [/\$\("([^"]+)"\)/g, /getElementById\("([^"]+)"\)/g,
   for (const m of js.matchAll(r)) ids.add(m[1]);
 }
 const have = new Set([...body.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
-/* Deze staan niet in layout-body.html: btscan/netempty maakt app.js zelf aan,
-   root komt uit de opmaak hierboven en stylecss is de <link> in de <head>. */
-const DYNAMIC = new Set(["btscan", "netempty", "root", "stylecss"]);
+/* Deze staan niet in layout-body.html: btscan en netempty maakt app.js zelf
+   aan, en root komt uit de opmaak hierboven. */
+const DYNAMIC = new Set(["btscan", "netempty", "root"]);
 const missing = [...ids].filter((i) => !have.has(i) && !DYNAMIC.has(i));
 console.log("ids die app.js aanraakt:", ids.size);
 console.log("ontbreekt in de opmaak:", missing.length ? missing.join(", ") : "niets");

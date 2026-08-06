@@ -54,7 +54,6 @@ const DEFAULT_STATE = {
   settings: {
     layout: "Liggend",     // "Liggend" = index.html, "Staand" = portrait.html
     rotate: 90,            // kwartslag als de UI niet bij het paneel past
-    style: "Windows",      // vormtaal: public/styles/<stijl>.css
     theme: "Auto",
     tempWarn: 70,
     tempCrit: 90,

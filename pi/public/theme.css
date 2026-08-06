@@ -1,21 +1,72 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Step Dashboard — de maatvoering.
+   Step Dashboard — de vormtaal, gedeeld door beide indelingen.
 
-   Dit bestand zegt wát waar staat en hoe groot het is; het zegt niets over
-   hoe het eruitziet. Kleuren, randen, hoeken en het lettertype komen uit een
-   stijlbestand in styles/, dat er ná dit bestand overheen wordt geladen. Zo
-   kun je in de app van stijl wisselen zonder dat de indeling verschuift:
-   app.js verwisselt één <link> en klaar.
+   Nocturne: donkerblauwe ondergrond, paars accent, kaarten met een rand van
+   1 px en verder geen opsmuk. Geen lichtlijn langs de bovenkant, geen gevulde
+   tabs — waar een besturingssysteem een vlak zet, zet Nocturne een lijn.
+   Puntjes onderaan in plaats van een tabstrip, en een lege accu kleurt de hele
+   kaart in plaats van alleen het cijfer.
 
-   Alles is opgeschreven in tokens — var(--card), var(--accent), var(--r-card)
-   en zo verder. Een stijlbestand dat die tokens invult is daarmee al een
-   compleet ander uiterlijk; wil het meer, dan zet het er een paar eigen
-   regels achteraan.
+   De tokens komen uit
+   _ds/nocturne-6cd0eed5-43bd-40e8-9e93-c4bd292c6682/styles.css. Alles staat
+   lokaal: de Pi heeft geen internet, dus geen @import, geen CDN, geen externe
+   fonts. Inter wordt gebruikt als hij geïnstalleerd is (apt install
+   fonts-inter), anders valt hij terug op system-ui.
 
    Onderaan staat de maatvoering per indeling, met body[data-layout="…"]
-   ervoor. Beide indelingen laden hetzelfde bestand; het kenmerk op <body>
-   kiest welke helft telt.
+   ervoor. index.html (liggend) en portrait.html (staand) laden allebei dit
+   bestand; het kenmerk op <body> kiest welke helft telt. Zo kan de vormtaal
+   niet uit elkaar lopen tussen de twee.
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Donker eerst; body.light zet het lichte thema. */
+:root{
+  --mica:#161826;
+  --card:#232532;
+  --card2:#292b31;
+  --stroke:#3f424d;
+  --stroke-top:transparent;   /* geen lichtlijn: Nocturne is plat */
+  --text:#e9e9ed;
+  --text2:#9397ab;
+  --text3:#9397ab;
+  --accent:#9184d9;
+  --on-accent:#161826;
+  --track:#3f424d;
+  --warn:#e0a94a;
+  --crit:#e0645c;
+  --crit-fill:#e0645c;
+  --warn-fill:#e0a94a;
+
+  --color-crit-fill:var(--crit-fill);
+  --color-warn-fill:var(--warn-fill);
+  --color-warn:var(--warn);
+  --color-accent:var(--accent);
+  --color-neutral-800:var(--stroke);
+  --color-neutral-500:var(--text2);
+  --color-text:var(--text);
+
+  --font:"Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
+  --r-card:8px;
+  --r-ctl:4px;
+}
+/* Licht thema — de ramp-stappen uit dezelfde tokenset. */
+body.light{
+  --mica:#f3f5fe;
+  --card:#e4e7f5;
+  --card2:#dfe3f2;
+  --stroke:#cfd3e5;
+  --stroke-top:transparent;
+  --text:#292b31;
+  --text2:#595d6c;
+  --text3:#595d6c;
+  --accent:#5d5294;
+  --on-accent:#f3f5fe;
+  --track:#cfd3e5;
+  --warn:#8a5d10;
+  --crit:#a83229;
+  --crit-fill:#a83229;
+  --warn-fill:#e0a94a;
+}
 
 *,*::before,*::after{box-sizing:border-box}
 /* Het paneel bepaalt de body-maat, niet het ontwerp: staat de staande UI op
@@ -444,8 +495,14 @@ body[data-layout="Staand"] .sheet{inset:26px 0 0;padding:8px 10px 10px}
 body[data-layout="Staand"] .sheettitle{font-size:17px}
 body[data-layout="Staand"] .xbtn{width:40px;height:32px}
 /* Drie knoppen naast elkaar passen niet met leesbare labels. */
-body[data-layout="Staand"] .sysbtns{flex-direction:column;gap:6px}
-body[data-layout="Staand"] .pbtn{height:46px}
+/* Drie knoppen naast elkaar passen niet met leesbare labels, dus onder elkaar.
+   Let op flex:none: de gedeelde .pbtn heeft flex:1, en in een kolom die zelf
+   niet meegroeit betekent dat een basis van 0 — dan kruipen de knoppen samen
+   tot de hoogte van hun tekst. Ze werden zo 20 px hoog, en daar mik je met een
+   duim niet op. Vaste 64 px, en margin-top:auto houdt ze onderaan waar je duim
+   toch al is. */
+body[data-layout="Staand"] .sysbtns{flex-direction:column;gap:8px}
+body[data-layout="Staand"] .pbtn{flex:none;height:64px;font-size:15px}
 /* Krap gemeten: "Temp waarschuwing" heeft de ruimte nodig die de smallere
    knoppen vrijmaken. */
 body[data-layout="Staand"] .setrow{padding:0 11px;gap:5px}
@@ -476,3 +533,38 @@ body[data-layout="Staand"] #alarmhead svg{width:40px;height:40px}
 body[data-layout="Staand"] #alarmtitle{font-size:30px}
 body[data-layout="Staand"] #alarmmsg{font-size:18px}
 body[data-layout="Staand"] #alarmclose{height:46px;min-width:180px;padding:0 20px;font-size:14px}
+
+/* ═══ waar Nocturne afwijkt van een plat kaartenspel ═══════════════════════ */
+/* De titelbalk drijft op de ondergrond; alleen een haarlijn eronder. */
+#top{background:transparent}
+#dots{background:transparent}
+
+/* Puntjes in plaats van een accentpil: dat is waar het scherm zijn naam aan
+   dankt. Ze staan gecentreerd, niet over de breedte verdeeld. */
+#dots{justify-content:center;gap:6px;align-items:center}
+#dots span{flex:none;width:6px;height:6px;border-radius:50%;
+  background:var(--stroke);font-size:0;color:transparent}
+#dots span.on{background:var(--accent)}
+#dots span.on::after{display:none}
+
+/* Knoppen markeren met een rand, niet met een vlak. */
+.seg.on,.key.go,.key.on,.key.hit,.rowbtn.hit,.pbtn.hit,.xbtn.hit,.powbtn.hit,
+#netseg button.on{background:transparent;color:var(--accent);border-color:var(--accent)}
+
+/* Een lege accu kleurt bij Nocturne de hele kaart, niet alleen het cijfer. */
+#batcard.low,#rangecard.low{background:var(--warn-fill);border-color:var(--warn-fill);color:#161826}
+#batcard.low .k,#batcard.low .u,#rangecard.low .k,#rangecard.low .u{color:#161826}
+#batcard.low .n,#rangecard.low .n{color:#161826}
+#batcard.empty,#rangecard.empty{background:var(--crit-fill);border-color:var(--crit-fill);color:#f3f5fe}
+#batcard.empty .k,#batcard.empty .u,#rangecard.empty .k,#rangecard.empty .u{color:#f3f5fe}
+#batcard.empty .n,#rangecard.empty .n{color:#f3f5fe}
+#batcard.low #battrack,#batcard.empty #battrack{background:rgba(22,24,38,.25)}
+#batcard.low #batbar{background:#161826}
+#batcard.empty #batbar{background:#f3f5fe}
+
+/* De melding is tekst in kleur, geen InfoBar met een streep ernaast. */
+#notice{background:transparent;border:0;color:var(--warn)}
+#notice.crit{color:var(--crit)}
+#notice.info{color:var(--accent)}
+#notice svg{color:currentColor}
+#noticemore{color:currentColor;opacity:.7}

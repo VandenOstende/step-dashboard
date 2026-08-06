@@ -620,53 +620,5 @@ await atest("status meldt dat er een installatie loopt", async () => {
     assert.strictEqual(await w._location(), null);   // geen modem in de testomgeving
   });
 
-  /* ── stijlen ────────────────────────────────────────────────────────────
-     Drie plekken moeten dezelfde namen kennen: de knoppen in de opmaak, de
-     lijst in app.js en de whitelist in de server. Loopt er eentje uit de pas,
-     dan kies je een stijl die na een herstart weer weg is — of erger, een
-     stijlblad dat niet bestaat, en dan is de UI kaal. */
-  console.log("\nstijlen");
-
-  const fs2 = require("fs");
-  const pad = (f) => require("path").join(__dirname, "..", f);
-  const appjs = fs2.readFileSync(pad("public/app.js"), "utf8");
-  const stijlen = {};
-  for (const m of appjs.match(/var STIJLEN = \{([^}]*)\}/)[1].matchAll(/(\w+): "(\w+)"/g)) {
-    stijlen[m[1]] = m[2];
-  }
-
-  test("app.js kent vier stijlen", () => {
-    assert.deepStrictEqual(Object.keys(stijlen), ["Windows", "Nocturne", "Apple", "Cyber"]);
-  });
-
-  test("elke stijl heeft een stijlblad in public/styles/", () => {
-    for (const bestand of Object.values(stijlen)) {
-      assert.ok(fs2.existsSync(pad("public/styles/" + bestand + ".css")), bestand + ".css ontbreekt");
-    }
-  });
-
-  test("elk stijlblad vult de tokens die layout.css gebruikt", () => {
-    const layout = fs2.readFileSync(pad("public/layout.css"), "utf8");
-    const gebruikt = new Set([...layout.matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]));
-    for (const bestand of Object.values(stijlen)) {
-      const css = fs2.readFileSync(pad("public/styles/" + bestand + ".css"), "utf8");
-      const gezet = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
-      const mist = [...gebruikt].filter((t) => !gezet.has(t));
-      assert.strictEqual(mist.length, 0, bestand + ".css mist: " + mist.join(", "));
-    }
-  });
-
-  test("de server laat precies dezelfde namen door", () => {
-    const srv = fs2.readFileSync(pad("src/server.js"), "utf8");
-    const lijst = srv.match(/style: \[([^\]]*)\]/)[1].match(/"(\w+)"/g).map((q) => q.slice(1, -1));
-    assert.deepStrictEqual(lijst, Object.keys(stijlen));
-  });
-
-  test("de knoppen in de opmaak dekken alle stijlen", () => {
-    const html = fs2.readFileSync(pad("tools/layout-body.html"), "utf8");
-    const knoppen = [...html.matchAll(/data-sty="(\w+)"/g)].map((m) => m[1]);
-    assert.deepStrictEqual(knoppen, Object.keys(stijlen));
-  });
-
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();
