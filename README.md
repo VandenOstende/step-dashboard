@@ -34,7 +34,7 @@ Beyond that:
   scans — including while something is already connected.
 - Two layouts: landscape 480 × 320 and portrait 320 × 480. Settings → Layout
   switches between them and the choice survives a reboot.
-- Settings for thresholds, start screen, and resetting the trip
+- Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
 - On boot it checks whether a newer version is on GitHub. If there is, the
   notification bar says so — tap it and you land straight in the settings, on
@@ -161,7 +161,7 @@ The page talks to a handful of endpoints on the same origin:
 | `GET /data` | speed, battery, temperatures, charging state — every 150 ms |
 | `GET/POST /settings` | store settings |
 | `POST /reset-trip`, `/reset-top` | zero the counters |
-| `POST /backlight` | screen brightness — not in the UI, curl only |
+| `POST /backlight` | screen brightness |
 | `POST /power` | reboot or shut down |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | outside temperature |
@@ -279,7 +279,7 @@ Verder:
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
 - Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
   wifi-tabblad scant — ook als er al iets verbonden is.
-- Instellingen voor drempels, startscherm en het resetten van de
+- Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
 - Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
   er, dan zegt de meldingsbalk dat — tik erop en je staat meteen in de
@@ -406,7 +406,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `GET /data` | snelheid, accu, temperaturen, laadstatus — elke 150 ms |
 | `GET/POST /settings` | instellingen bewaren |
 | `POST /reset-trip`, `/reset-top` | tellers op nul |
-| `POST /backlight` | schermhelderheid — staat niet in de UI, alleen via curl |
+| `POST /backlight` | schermhelderheid |
 | `POST /power` | herstarten of afsluiten |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
