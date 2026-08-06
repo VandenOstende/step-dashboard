@@ -142,6 +142,7 @@ const routes = {
     const next = {
       layout: ["Liggend", "Staand"].includes(body.layout) ? body.layout : s.layout,
       rotate: [90, 270].includes(Number(body.rotate)) ? Number(body.rotate) : s.rotate,
+      style: ["Windows", "Nocturne", "Apple", "Cyber"].includes(body.style) ? body.style : s.style,
       theme: ["Auto", "Licht", "Donker"].includes(body.theme) ? body.theme : s.theme,
       tempWarn: num(body.tempWarn, 40, 120, s.tempWarn),
       tempCrit: num(body.tempCrit, 50, 130, s.tempCrit),

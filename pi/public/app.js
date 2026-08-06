@@ -36,6 +36,7 @@ var DESIGN = PAGE_LAYOUT === "Staand" ? { w: 320, h: 480 } : { w: 480, h: 320 };
 var cfg = {
   layout: PAGE_LAYOUT,
   rotate: 90,
+  style: "Windows",
   theme: "Auto",
   tempWarn: 70,
   tempCrit: 90,
@@ -78,6 +79,26 @@ pn.addEventListener("pointerup", function (e) {
 pn.addEventListener("pointercancel", function () { tp = null; });
 document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+/* ── stijl — de vormtaal, als los stijlblad ────────────────────────────────
+   layout.css houdt de maatvoering vast en is in tokens geschreven; een
+   bestand uit styles/ vult die tokens in en zet er zijn eigen vormregels
+   achteraan. Van stijl wisselen is daarmee één link verwisselen: geen
+   herladen, geen sprong, en de indeling verschuift niet.
+
+   Onbekende namen vallen terug op Windows — dat is de stijl waar layout.css
+   van uitgaat, dus daar kan de UI nooit kaal van worden. */
+var STIJLEN = { Windows: "windows", Nocturne: "nocturne", Apple: "apple", Cyber: "cyber" };
+
+function applyStyle() {
+  var el = $("stylecss");
+  if (!el) return;
+  var bestand = (STIJLEN[cfg.style] || "windows") + ".css";
+  var href = "styles/" + bestand;
+  if (el.getAttribute("href") === href) return;
+  el.setAttribute("href", href);
+  cacheT = {}; cacheS = {};
+}
 
 /* ── thema — automatisch op de klok: 07:30–18:00 licht ──────────────────── */
 function wantLight() {
@@ -464,6 +485,9 @@ function renderSettings() {
   [].slice.call(document.querySelectorAll(".seg[data-theme]")).forEach(function (b) {
     b.classList.toggle("on", b.dataset.theme === cfg.theme);
   });
+  [].slice.call(document.querySelectorAll(".seg.sty")).forEach(function (b) {
+    b.classList.toggle("on", b.dataset.sty === cfg.style);
+  });
   [].slice.call(document.querySelectorAll(".seg.lay")).forEach(function (b) {
     b.classList.toggle("on", b.dataset.lay === cfg.layout);
   });
@@ -556,6 +580,15 @@ $("setlist").addEventListener("pointerdown", function (e) {
   if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
   var t = e.target.closest(".seg[data-theme]");
   if (t) { e.preventDefault(); cfg.theme = t.dataset.theme; applyTheme(true); renderSettings(); saveSettings(); return; }
+  var sy = e.target.closest(".seg.sty");
+  if (sy) {
+    e.preventDefault();
+    cfg.style = sy.dataset.sty;
+    applyStyle();
+    renderSettings();
+    saveSettings();
+    return;
+  }
   var rt = e.target.closest(".seg.rot");
   if (rt) {
     e.preventDefault();
@@ -1313,6 +1346,7 @@ function boot(saved) {
   fitRotation();
   window.addEventListener("resize", fitRotation);
 
+  applyStyle();
   applyTheme(true);
   renderSettings();
   show(cfg.start);

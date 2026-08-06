@@ -1,80 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Step Dashboard — de vormtaal, gedeeld door beide indelingen.
+   Step Dashboard — de maatvoering.
 
-   Fluent, zoals Windows 11 het doet:
+   Dit bestand zegt wát waar staat en hoe groot het is; het zegt niets over
+   hoe het eruitziet. Kleuren, randen, hoeken en het lettertype komen uit een
+   stijlbestand in styles/, dat er ná dit bestand overheen wordt geladen. Zo
+   kun je in de app van stijl wisselen zonder dat de indeling verschuift:
+   app.js verwisselt één <link> en klaar.
 
-   · Mica als ondergrond, met kaarten die er net iets lichter op liggen. Elke
-     kaart heeft een echte rand van 1 px plus een lichtere lijn langs de
-     bovenkant. Die "control stroke" is wat een Fluent-vlak doet lijken alsof
-     er licht van boven op valt; laat je hem weg, dan wordt het een plat vak.
-   · Hoeken van 8 px voor kaarten, 4 px voor knoppen. Rustiger dan de grote
-     radii van iOS — dit is een besturingssysteem, geen telefoon.
-   · Het accentblauw markeert met een balkje, niet met een vlak: onder de
-     actieve tab ligt een pil van 3 px. Dat is het navigatie-idioom van
-     Windows 11.
-   · Meldingen zijn InfoBars: een kaart met een gekleurde streep links en een
-     icoon in dezelfde kleur. Geen gevulde balk — dat bewaart Fluent voor
-     knoppen.
-   · Voortgang is een dunne afgeronde balk in accentkleur, 4 px hoog.
-   · Instellingen zien eruit als de app Instellingen zelf: elke regel een eigen
-     kaartje met de titel links en het knopje rechts.
+   Alles is opgeschreven in tokens — var(--card), var(--accent), var(--r-card)
+   en zo verder. Een stijlbestand dat die tokens invult is daarmee al een
+   compleet ander uiterlijk; wil het meer, dan zet het er een paar eigen
+   regels achteraan.
 
-   index.html (liggend) en portrait.html (staand) laden allebei dit bestand en
-   zetten er alleen hun eigen maatvoering achter. Zo kan de vormtaal niet uit
-   elkaar lopen tussen de twee.
+   Onderaan staat de maatvoering per indeling, met body[data-layout="…"]
+   ervoor. Beide indelingen laden hetzelfde bestand; het kenmerk op <body>
+   kiest welke helft telt.
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Donker eerst; body.light zet het lichte thema. Beide kleursets zijn die van
-   Windows 11 zelf. */
-:root{
-  --mica:#202020;
-  --card:#2b2b2b;
-  --card2:#323232;
-  --stroke:#3d3d3d;
-  --stroke-top:#4a4a4a;
-  --text:#ffffff;
-  --text2:#c5c5c5;
-  --text3:#8a8a8a;
-  --accent:#60cdff;
-  --on-accent:#003a52;
-  --track:#3a3a3a;
-  --warn:#fce100;
-  --crit:#ff99a4;
-  --crit-fill:#c42b1c;
-  --warn-fill:#9d5d00;
-
-  /* app.js schrijft een paar kleuren rechtstreeks in style-attributen, met de
-     namen uit de oorspronkelijke tokenset: de achtergrond van het alarm en de
-     boogjes van het wifi-icoon. Die namen moeten dus blijven bestaan. */
-  --color-crit-fill:var(--crit-fill);
-  --color-warn-fill:var(--warn-fill);
-  --color-warn:var(--warn);
-  --color-accent:var(--accent);
-  --color-neutral-800:var(--stroke);
-  --color-neutral-500:var(--text3);
-  --color-text:var(--text);
-
-  --font:"Segoe UI Variable Text","Segoe UI","Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
-  --r-card:8px;
-  --r-ctl:4px;
-}
-body.light{
-  --mica:#f3f3f3;
-  --card:#fbfbfb;
-  --card2:#ffffff;
-  --stroke:#e2e2e2;
-  --stroke-top:#ffffff;
-  --text:#1a1a1a;
-  --text2:#5d5d5d;
-  --text3:#767676;
-  --accent:#0067c0;
-  --on-accent:#ffffff;
-  --track:#dcdcdc;
-  --warn:#9d5d00;
-  --crit:#c42b1c;
-  --crit-fill:#c42b1c;
-  --warn-fill:#9d5d00;
-}
 
 *,*::before,*::after{box-sizing:border-box}
 /* Het paneel bepaalt de body-maat, niet het ontwerp: staat de staande UI op
@@ -246,6 +187,9 @@ svg{display:block}
   border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:12px}
 .seg.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .seg.lay{width:76px}
+/* Vier stijlnamen op één regel: laat ze de breedte verdelen in plaats van
+   vier vaste maten te verzinnen die in staand toch niet passen. */
+.seg.sty{flex:1;width:auto;min-width:0;padding:0 2px}
 .step{flex:none;width:34px;height:30px;background:var(--card2);color:var(--text);
   border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:16px}
 .setval{flex:none;width:48px;text-align:center;font-size:13px;color:var(--text2)}
@@ -367,3 +311,168 @@ svg{display:block}
 #alarmmsg{line-height:1.3;white-space:pre-line}
 #alarmclose{margin-top:2px;background:rgba(255,255,255,.16);
   border:1px solid currentColor;border-radius:var(--r-ctl)}
+
+/* ═══ maatvoering · liggend, 480 × 320 ═════════════════════════════════════ */
+body[data-layout="Liggend"] #root{width:480px;height:320px}
+body[data-layout="Liggend"] #top{height:26px;gap:10px;padding:0 12px}
+body[data-layout="Liggend"] #statusbtn{height:26px}
+body[data-layout="Liggend"] #notice{height:28px;margin:6px 12px 0;padding:0 11px}
+
+body[data-layout="Liggend"] .pane{gap:8px;padding:8px 12px}
+
+/* 1 · RIT — snelheid links, accu en bereik in een kolom ernaast. */
+body[data-layout="Liggend"] #p0{gap:8px}
+body[data-layout="Liggend"] #speedbox{flex:1;min-width:0;padding:10px 16px 12px;gap:8px}
+body[data-layout="Liggend"] #speed{font-size:100px;font-weight:600;line-height:.9;letter-spacing:-.035em}
+body[data-layout="Liggend"] #speedmeta{padding-bottom:9px}
+body[data-layout="Liggend"] #side{width:150px;flex:none;display:flex;flex-direction:column;gap:8px}
+body[data-layout="Liggend"] #side .card{flex:1}
+body[data-layout="Liggend"] #side .val{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Liggend"] #side .n{font-size:38px;font-weight:600;line-height:1;letter-spacing:-.03em}
+body[data-layout="Liggend"] #side .u{font-size:13px;color:var(--text2)}
+
+/* 2 · MOTOR — twee temperaturen boven, drie kleinere waarden eronder. */
+body[data-layout="Liggend"] #p1{flex-direction:column;gap:8px}
+body[data-layout="Liggend"] #temps{flex:1;min-height:0;display:flex;gap:8px}
+body[data-layout="Liggend"] #temps .card{flex:1}
+body[data-layout="Liggend"] #temps .val{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Liggend"] #p1 .v.big{font-size:44px;font-weight:600;line-height:1;letter-spacing:-.03em}
+body[data-layout="Liggend"] #temps .u{font-size:13px;color:var(--text2)}
+body[data-layout="Liggend"] #motorrow{flex:none;display:flex;gap:8px}
+body[data-layout="Liggend"] #motorrow .card{flex:1;gap:6px}
+body[data-layout="Liggend"] #motorrow .val{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Liggend"] #motorrow .n{font-size:23px;font-weight:600;line-height:1}
+body[data-layout="Liggend"] #motorrow .u{font-size:12px;color:var(--text2)}
+
+/* 3 · ACCU — percentage links, de rest als lijst ernaast. */
+body[data-layout="Liggend"] #p2{flex-direction:column;gap:8px}
+body[data-layout="Liggend"] #packtop{flex:1;min-height:0;display:flex;gap:8px}
+body[data-layout="Liggend"] #packbig{flex:1;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);padding:10px 14px;
+  display:flex;flex-direction:column;justify-content:center;gap:9px}
+body[data-layout="Liggend"] #packnum{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Liggend"] #bat2{font-size:62px;font-weight:600;line-height:1;letter-spacing:-.035em}
+body[data-layout="Liggend"] #packpct{font-size:18px;color:var(--text2)}
+body[data-layout="Liggend"] #cells{height:14px}
+body[data-layout="Liggend"] #packlist{width:188px;flex:none;display:flex;flex-direction:column;gap:5px}
+body[data-layout="Liggend"] #packlist .row{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 11px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+body[data-layout="Liggend"] #packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
+body[data-layout="Liggend"] #packlist .u{font-size:11px;color:var(--text2)}
+
+body[data-layout="Liggend"] #dots{height:28px;padding:0 12px 4px}
+
+body[data-layout="Liggend"] .sheet{inset:26px 0 0;padding:8px 12px 10px}
+body[data-layout="Liggend"] .sheettitle{font-size:18px}
+body[data-layout="Liggend"] .xbtn{width:40px;height:32px}
+body[data-layout="Liggend"] #charge{inset:26px 0 0;padding:16px 24px}
+body[data-layout="Liggend"] #chargepct{font-size:88px}
+body[data-layout="Liggend"] #chargepct span+span{font-size:22px}
+body[data-layout="Liggend"] #chargetrack{width:300px}
+body[data-layout="Liggend"] #kbd{padding:8px}
+body[data-layout="Liggend"] .key.wide{flex:0 0 54px}
+body[data-layout="Liggend"] .key.mode{flex:0 0 60px;font-size:12px}
+body[data-layout="Liggend"] .key.go{flex:0 0 102px}
+body[data-layout="Liggend"] #power{padding:10px 12px 12px}
+body[data-layout="Liggend"] #powerclose{height:40px}
+body[data-layout="Liggend"] #alarm{padding:20px 28px}
+body[data-layout="Liggend"] #alarmhead svg{width:34px;height:34px}
+body[data-layout="Liggend"] #alarmtitle{font-size:32px}
+body[data-layout="Liggend"] #alarmmsg{font-size:18px}
+body[data-layout="Liggend"] #alarmclose{height:42px;min-width:170px;padding:0 20px;font-size:14px}
+
+/* ═══ maatvoering · staand, 320 × 480 ══════════════════════════════════════ */
+/* Staand is er meer hoogte dan breedte, dus alles wat liggend naast elkaar
+   staat gaat hier onder elkaar — ook de knoppenrijen, want met een duim mik
+   je daar beter op. */
+body[data-layout="Staand"] #root{width:320px;height:480px}
+body[data-layout="Staand"] #top{height:26px;gap:8px;padding:0 10px}
+body[data-layout="Staand"] #statusbtn{height:26px}
+body[data-layout="Staand"] #notice{height:28px;margin:6px 10px 0;padding:0 10px;font-size:12px}
+
+body[data-layout="Staand"] .pane{flex-direction:column;gap:7px;padding:7px 10px}
+
+/* 1 · RIT — de snelheid krijgt de volle breedte. */
+body[data-layout="Staand"] #p0{gap:7px}
+body[data-layout="Staand"] #speedbox{flex:1;min-height:0;padding:12px 14px 14px;gap:10px}
+body[data-layout="Staand"] #speed{font-size:110px;font-weight:600;line-height:.88;letter-spacing:-.04em}
+body[data-layout="Staand"] #speedmeta{padding-bottom:11px}
+body[data-layout="Staand"] #speedunit{font-size:15px}
+body[data-layout="Staand"] #side{flex:none;display:flex;flex-direction:column;gap:7px}
+body[data-layout="Staand"] #side .card{padding:9px 13px}
+body[data-layout="Staand"] #side .val{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Staand"] #side .n{font-size:34px;font-weight:600;line-height:1;letter-spacing:-.03em}
+body[data-layout="Staand"] #side .u{font-size:13px;color:var(--text2)}
+body[data-layout="Staand"] #batcard{gap:7px}
+body[data-layout="Staand"] #rangecard{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+
+/* 2 · MOTOR — temperaturen onder elkaar, de drie kleine waarden in een rij. */
+body[data-layout="Staand"] #p1{gap:7px}
+body[data-layout="Staand"] #temps{flex:1;min-height:0;display:flex;flex-direction:column;gap:7px}
+body[data-layout="Staand"] #temps .card{flex:1}
+body[data-layout="Staand"] #temps .val{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Staand"] #p1 .v.big{font-size:42px;font-weight:600;line-height:1;letter-spacing:-.03em}
+body[data-layout="Staand"] #temps .u{font-size:13px;color:var(--text2)}
+body[data-layout="Staand"] #motorrow{flex:none;display:flex;gap:7px}
+body[data-layout="Staand"] #motorrow .card{flex:1;gap:5px;padding:8px 9px;min-width:0}
+body[data-layout="Staand"] #motorrow .k{font-size:9.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+body[data-layout="Staand"] #motorrow .val{display:flex;align-items:baseline;gap:3px}
+body[data-layout="Staand"] #motorrow .n{font-size:19px;font-weight:600;line-height:1}
+body[data-layout="Staand"] #motorrow .u{font-size:10px;color:var(--text2)}
+
+/* 3 · ACCU — percentage boven, de lijst eronder. */
+body[data-layout="Staand"] #p2{gap:7px}
+/* packtop moet de hoogte pakken, anders heeft de lijst erin niets om over te
+   verdelen en kruipen de rijen bovenin. */
+body[data-layout="Staand"] #packtop{flex:1;min-height:0;display:flex;flex-direction:column;gap:7px}
+body[data-layout="Staand"] #packbig{flex:none;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);padding:11px 14px;
+  display:flex;flex-direction:column;gap:9px}
+body[data-layout="Staand"] #packnum{display:flex;align-items:baseline;gap:4px}
+body[data-layout="Staand"] #bat2{font-size:60px;font-weight:600;line-height:1;letter-spacing:-.035em}
+body[data-layout="Staand"] #packpct{font-size:17px;color:var(--text2)}
+body[data-layout="Staand"] #cells{height:15px}
+body[data-layout="Staand"] #packlist{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px}
+body[data-layout="Staand"] #packlist .row{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 12px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+body[data-layout="Staand"] #packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
+body[data-layout="Staand"] #packlist .u{font-size:11px;color:var(--text2)}
+
+body[data-layout="Staand"] #dots{height:30px;padding:0 10px 4px}
+
+body[data-layout="Staand"] .sheet{inset:26px 0 0;padding:8px 10px 10px}
+body[data-layout="Staand"] .sheettitle{font-size:17px}
+body[data-layout="Staand"] .xbtn{width:40px;height:32px}
+/* Drie knoppen naast elkaar passen niet met leesbare labels. */
+body[data-layout="Staand"] .sysbtns{flex-direction:column;gap:6px}
+body[data-layout="Staand"] .pbtn{height:46px}
+/* Krap gemeten: "Temp waarschuwing" heeft de ruimte nodig die de smallere
+   knoppen vrijmaken. */
+body[data-layout="Staand"] .setrow{padding:0 11px;gap:5px}
+body[data-layout="Staand"] .setrow .lbl{font-size:12px}
+body[data-layout="Staand"] .seg{width:52px;height:30px;font-size:11.5px}
+body[data-layout="Staand"] .seg.lay{width:70px}
+body[data-layout="Staand"] .step{width:32px}
+body[data-layout="Staand"] .setval{width:44px}
+body[data-layout="Staand"] .setval.wide{width:52px}
+body[data-layout="Staand"] #charge{inset:26px 0 0;padding:16px 20px}
+body[data-layout="Staand"] #chargepct{font-size:92px}
+body[data-layout="Staand"] #chargepct span+span{font-size:20px}
+body[data-layout="Staand"] #chargetrack{width:100%}
+/* Tien toetsen op 320 px geeft ~27 px breed. Smal, maar er is hoogte zat: de
+   toetsen worden 58 px hoog en staan onderaan, waar je duim al is. */
+body[data-layout="Staand"] #kbd{padding:8px}
+body[data-layout="Staand"] #kbdkeys{flex:none;height:246px;margin-top:auto}
+body[data-layout="Staand"] .key{font-size:16px}
+body[data-layout="Staand"] .key.wide{flex:0 0 42px}
+body[data-layout="Staand"] .key.mode{flex:0 0 48px;font-size:11px}
+body[data-layout="Staand"] .key.go{flex:0 0 82px;font-size:11px}
+body[data-layout="Staand"] #power{padding:10px}
+body[data-layout="Staand"] #powerbtns{flex-direction:column;gap:8px}
+body[data-layout="Staand"] #powerclose{height:44px}
+body[data-layout="Staand"] #alarm{padding:18px 22px}
+body[data-layout="Staand"] #alarmhead{flex-direction:column;gap:10px}
+body[data-layout="Staand"] #alarmhead svg{width:40px;height:40px}
+body[data-layout="Staand"] #alarmtitle{font-size:30px}
+body[data-layout="Staand"] #alarmmsg{font-size:18px}
+body[data-layout="Staand"] #alarmclose{height:46px;min-width:180px;padding:0 20px;font-size:14px}
