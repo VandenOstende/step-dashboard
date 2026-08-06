@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=320,height=480,initial-scale=1,user-scalable=no">
+<title>Step Dashboard — concept Nocturne (staand)</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONCEPT · NOCTURNE — 320 × 480
+
+   Het oorspronkelijke ontwerp, zoals het uit Claude Design kwam en tot en
+   met versie 8e3b5cb op de step draaide. Bewaard als concept toen de
+   Windows-vormtaal productie werd, zodat je ernaar terug kunt kijken —
+   en desnoods terug kunt.
+
+   Nocturne-tokens: donkerblauwe ondergrond, paars accent, kaarten met een
+   rand van 1 px en een radius van 8. Het gedrag komt uit public/app.js,
+   net als bij de andere concepten.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Step Dashboard — staand, 320 × 480.
+
+   Dezelfde gegevens en dezelfde tokens als de liggende versie; alleen de
+   indeling is opnieuw gemaakt. Staand is er meer hoogte dan breedte, dus:
+
+   · één kolom in plaats van twee, met de snelheid als volle-breedte kop;
+   · meldingen krijgen een eigen band over de volle 320 px in plaats van een
+     hoekje naast de buitentemperatuur;
+   · alles wat een bereik heeft — snelheid, accu, duty, temperatuur — krijgt
+     dezelfde dunne meter, zodat je in één oogopslag ziet waar iets staat
+     zonder het getal te lezen;
+   · knoppenrijen die in de breedte niet meer passen (systeem, aan/uit) staan
+     onder elkaar. Dat is op een aanraakscherm sowieso prettiger mikken.
+
+   Nocturne-tokens overgenomen uit de liggende versie. Inline, want de Pi
+   heeft geen internet.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  --color-bg:#161826;
+  --color-surface:#232532;
+  --color-text:#e9e9ed;
+  --color-neutral-500:#9397ab;
+  --color-neutral-800:#3f424d;
+  --color-neutral-900:#292b31;
+  --color-accent:#9184d9;
+  --color-accent-300:#d2cefd;
+  --color-accent-900:#2b2741;
+
+  --color-warn:#e0a94a;
+  --color-crit:#e0645c;
+  --color-warn-fill:#e0a94a;
+  --color-crit-fill:#e0645c;
+
+  --space-1:2.8px;
+  --space-2:5.6px;
+  --space-3:8.4px;
+  --space-4:11.2px;
+  --space-6:16.8px;
+  --space-8:22.4px;
+
+  --radius-sm:4px;
+  --radius-md:8px;
+  --radius-lg:14px;
+
+  --font-body:"Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
+}
+body.light{
+  --color-bg:#f3f5fe;
+  --color-surface:#e4e7f5;
+  --color-text:#292b31;
+  --color-neutral-500:#595d6c;
+  --color-neutral-800:#cfd3e5;
+  --color-neutral-900:#cfd3e5;
+  --color-accent:#5d5294;
+  --color-accent-300:#423a6a;
+  --color-accent-900:#d2cefd;
+  --color-warn:#8a5d10;
+  --color-crit:#a83229;
+  --color-warn-fill:#e0a94a;
+  --color-crit-fill:#a83229;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+/* Het paneel bepaalt de body-maat, niet het ontwerp: staat de staande UI op
+   een liggend schermpje, dan draait fitRotation() #root een kwartslag en moet
+   de body de échte afmetingen houden. */
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:var(--color-bg);
+  color:var(--color-text);
+  font-family:var(--font-body);
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;
+  cursor:none;
+}
+body,body *{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font-family:inherit;font-variant-numeric:inherit}
+svg{display:block}
+
+#root{position:relative;width:320px;height:480px;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── labels en meters: één taal voor alle schermen ─────────────────────── */
+.k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--color-neutral-500);line-height:1}
+.meter{height:4px;border-radius:2px;background:var(--color-neutral-900);overflow:hidden}
+.meter>i{display:block;height:100%;width:0%;background:var(--color-accent);border-radius:2px}
+.fill-warn{background:var(--color-warn-fill)!important}
+.fill-crit{background:var(--color-crit-fill)!important}
+
+/* ── topbalk ───────────────────────────────────────────────────────────── */
+#top{height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:var(--space-3);padding:0 var(--space-4);border-bottom:1px solid var(--color-neutral-800)}
+#topleft{display:flex;align-items:center;min-width:0}
+#outside{display:flex;align-items:center;gap:4px;flex:none;color:var(--color-neutral-500)}
+#outside svg{flex:none}
+#outtemp{font-size:13px;color:var(--color-text)}
+
+#status{display:flex;align-items:center;gap:var(--space-3);height:30px;flex:none;
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-500)}
+#wifiico,#btico{display:none;flex:none}
+/* Het mobiele stukje staat er alleen als er een modem in zit. */
+#cellgrp{display:none;align-items:center;gap:var(--space-2);flex:none}
+#cellgrp.on{display:flex}
+#sig{display:flex;align-items:flex-end;gap:2px;height:12px;flex:none}
+#sig span{width:3px;border-radius:1px;background:var(--color-neutral-800)}
+#sig span:nth-child(1){height:3px}
+#sig span:nth-child(2){height:5px}
+#sig span:nth-child(3){height:7px}
+#sig span:nth-child(4){height:9px}
+#sig span:nth-child(5){height:12px}
+#sig span.on{background:var(--color-accent)}
+#sig span.weak{background:var(--color-warn)}
+#tech{font-size:10px;letter-spacing:.06em;color:var(--color-text)}
+#clock{font-size:14px;letter-spacing:.02em;color:var(--color-text)}
+#statusbtn{display:flex;align-items:center;height:30px;padding:0;background:transparent;border:0}
+#dot{width:7px;height:7px;border-radius:50%;background:var(--color-accent);flex:none}
+#dot.demo{background:var(--color-warn)}
+#dot.off{background:var(--color-crit)}
+/* De verbindingstekst zelf staat in het systeemvenster; in de balk is de
+   stip genoeg. Op 320 px telt elke pixel. */
+
+/* ── meldingsband ──────────────────────────────────────────────────────────
+   Eigen rij over de volle breedte. In de liggende versie deelt hij zijn
+   plaats met de buitentemperatuur; staand is 320 px daar te smal voor, en een
+   waarschuwing die je half moet raden is geen waarschuwing. */
+#notice{display:none;align-items:center;gap:var(--space-2);width:100%;height:28px;flex:none;
+  padding:0 var(--space-4);background:var(--color-surface);border:0;border-bottom:1px solid var(--color-neutral-800);
+  color:var(--color-warn);font-size:13px;text-align:left}
+#notice.on{display:flex}
+#notice.crit{color:var(--color-crit)}
+#notice.info{color:var(--color-accent)}
+#notice svg{flex:none}
+#noticetxt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#noticemore{flex:none;color:var(--color-neutral-500);font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase}
+
+/* ── panelen ───────────────────────────────────────────────────────────── */
+#panes{position:relative;flex:1;min-height:0}
+.pane{position:absolute;inset:0;display:none;flex-direction:column;
+  gap:var(--space-3);padding:var(--space-4)}
+.pane.on{display:flex}
+
+/* 1 · RIT ─────────────────────────────────────────────────────────────────
+   De snelheid krijgt staand de hele breedte. Het getal staat optisch
+   gecentreerd: de eenheid en de topsnelheid hangen er rechtsonder aan, zodat
+   de cijfers zelf niet uit het midden geduwd worden. */
+#speedbox{flex:1;min-height:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:var(--space-2)}
+/* "max 41" staat op dezelfde basislijn als de cijfers. Met `last baseline`
+   rekent de browser dat zelf uit — dat blijft kloppen of Inter nu wel of niet
+   op de Pi staat, en een vast aantal pixels niet. De regel ervoor is de
+   terugval voor een browser die het niet kent. */
+#speedrow{display:flex;justify-content:center;gap:var(--space-3);
+  align-items:flex-end;
+  align-items:last baseline}
+#speed{font-size:132px;font-weight:600;line-height:.82;letter-spacing:-.055em}
+#speedmeta{text-align:left}
+#speedunit{font-size:17px;color:var(--color-neutral-500);line-height:1.1}
+#vmaxrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--color-neutral-500);margin-top:3px}
+#speedtrack{width:100%;height:5px;border-radius:3px;background:var(--color-neutral-900);
+  overflow:hidden;flex:none}
+#speedbar{height:100%;width:0%;background:var(--color-accent);border-radius:3px}
+
+#side{flex:none;display:flex;flex-direction:column;gap:var(--space-3)}
+#p0 .card{background:var(--color-surface);border-radius:var(--radius-lg);
+  padding:var(--space-4) var(--space-4) var(--space-3)}
+#p0 #batcard{display:flex;flex-direction:column;gap:9px}
+#p0 .toprow{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3)}
+#p0 .v.big{font-size:34px;font-weight:600;line-height:1;letter-spacing:-.02em}
+#p0 .v .u{font-size:14px;font-weight:400;color:var(--color-neutral-500);margin-left:3px}
+#p0 #rangecard{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);
+  padding:var(--space-3) var(--space-4)}
+#p0 #rangecard .v.big{font-size:26px}
+/* Onder de 30 % kleurt de rand mee, onder de 15 % het hele vlak. Dat leest
+   sneller dan een getal dat je moet interpreteren. */
+#p0 .card.low{box-shadow:inset 0 0 0 1px var(--color-warn)}
+#p0 .card.empty{box-shadow:inset 0 0 0 1px var(--color-crit)}
+#p0 .card.empty .v.big{color:var(--color-crit)}
+#batbar{background:var(--color-accent)}
+
+/* 2 · MOTOR ───────────────────────────────────────────────────────────────
+   De twee temperaturen zijn wat je onderweg echt in de gaten houdt, dus die
+   krijgen een hele rij met een meter erbij. De rest staat eronder in drieën. */
+#p1{gap:var(--space-2)}
+/* Eén grote waarde per kaart, verticaal gecentreerd, gelijk verdeeld over de
+   hoogte die overblijft. Het motor- en het accuscherm gebruiken hem allebei. */
+.bigcard{flex:1;min-height:0;background:var(--color-surface);border-radius:var(--radius-lg);
+  padding:var(--space-3) var(--space-4);display:flex;flex-direction:column;justify-content:center;
+  gap:var(--space-2)}
+.bigcard .val{display:flex;align-items:baseline;gap:5px}
+#p1 .v.big{font-size:44px;font-weight:600;line-height:1;letter-spacing:-.03em}
+#p1 .v.big.warn{color:var(--color-warn)}
+#p1 .v.big.crit{color:var(--color-crit)}
+.bigcard .unit{font-size:15px;color:var(--color-neutral-500)}
+
+/* Drie kleine waarden naast elkaar. Dezelfde vorm op het motor- en het
+   accuscherm, zodat de twee schermen als familie lezen. */
+.trio{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2)}
+.trio .card{min-width:0;background:var(--color-surface);border-radius:var(--radius-md);
+  padding:var(--space-3) 6px;text-align:center;display:flex;
+  flex-direction:column;align-items:center;gap:6px}
+.trio .k{max-width:100%;font-size:9px;letter-spacing:.07em;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.trio .v.mid{font-size:19px;font-weight:600;line-height:1}
+.trio .v .u{font-size:10px;font-weight:400;color:var(--color-neutral-500);margin-left:2px}
+#dutycard{flex:none;background:var(--color-surface);border-radius:var(--radius-lg);
+  padding:var(--space-3) var(--space-4);display:flex;flex-direction:column;gap:8px}
+#dutycard .head{display:flex;align-items:baseline;justify-content:space-between}
+#dutycard .v.big{font-size:24px;font-weight:600;line-height:1}
+#dutycard .v .u{font-size:12px;font-weight:400;color:var(--color-neutral-500);margin-left:2px}
+
+/* 3 · ACCU ────────────────────────────────────────────────────────────────
+   Het percentage voert de boventoon, met spanning en celspanning eronder in
+   dezelfde kaart — die drie horen bij elkaar. */
+#p2 #bat2{font-size:58px;font-weight:600;line-height:1;letter-spacing:-.04em}
+#p2 #bat2.warn{color:var(--color-warn)}
+#p2 #bat2.crit{color:var(--color-crit)}
+#p2 #vv{font-size:44px;font-weight:600;line-height:1;letter-spacing:-.03em}
+#accuvolt{font-size:14px;color:var(--color-neutral-500)}
+#accuvolt b{color:var(--color-text);font-weight:600;font-size:16px}
+
+/* ── positie-indicator ─────────────────────────────────────────────────── */
+#dots{height:20px;flex:none;display:flex;align-items:center;justify-content:center;gap:6px}
+#dots span{width:6px;height:6px;border-radius:3px;background:var(--color-neutral-800)}
+#dots span.on{width:18px;background:var(--color-accent)}
+
+/* ── overlays ──────────────────────────────────────────────────────────────
+   7  temperatuuralarm
+   6  aan/uit
+   5  schermtoetsenbord
+   4  systeem en instellingen
+   3  meldingen
+   2  verbindingen
+   1  laden                                                                 */
+.sheet{position:absolute;inset:30px 0 20px;display:none;flex-direction:column;
+  gap:var(--space-3);background:var(--color-bg);padding:var(--space-4)}
+.sheet.on{display:flex}
+#net{z-index:2}
+#notices{z-index:3}
+#sys,#settings{z-index:4}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none}
+.sheettitle{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-500);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sheetnav{display:flex;align-items:center;gap:var(--space-2);flex:none}
+.xbtn{width:44px;height:40px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center}
+.xbtn.off{opacity:.45}
+.xbtn.hit,#netseg .xbtn.hit{border-color:var(--color-accent);color:var(--color-accent)}
+.scroller{flex:1;position:relative;display:flex;flex-direction:column;gap:var(--space-2);
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  touch-action:pan-y;scrollbar-width:none}
+.scroller::-webkit-scrollbar{width:0;height:0}
+
+/* systeemvenster */
+.inforows{display:flex;flex-direction:column;gap:var(--space-2);flex:none}
+.inforow{min-height:52px;display:flex;flex-direction:column;justify-content:center;gap:3px;
+  padding:var(--space-2) var(--space-4);background:var(--color-surface);border-radius:var(--radius-md)}
+.inforow .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-neutral-500)}
+.inforow .val{font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
+/* Staand passen drie knoppen niet naast elkaar met leesbare labels, en onder
+   elkaar mik je er met een duim toch makkelijker op. */
+.sysbtns{margin-top:auto;display:flex;flex-direction:column;gap:var(--space-2);flex:none}
+.pbtn{height:52px;background:transparent;color:var(--color-text);
+  border:1px solid var(--color-accent);border-radius:var(--radius-md);
+  font-size:13px;letter-spacing:.1em;text-transform:uppercase}
+.pbtn.hit{background:var(--color-accent-900)}
+
+/* instellingen */
+.setrow{min-height:54px;flex:none;display:flex;align-items:center;gap:var(--space-2);
+  padding:0 var(--space-3);background:var(--color-surface);border-radius:var(--radius-md)}
+.setrow .lbl{flex:1;min-width:0;font-size:10.5px;letter-spacing:.04em;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setrow.stack{flex-direction:column;align-items:stretch;justify-content:center;
+  gap:5px;padding:var(--space-3)}
+.setrow.stack .lbl{flex:none}
+.setrow.stack .line{display:flex;align-items:center;gap:var(--space-2)}
+.seg{flex:none;width:54px;height:40px;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:12px}
+.seg.on{color:var(--color-text);border-color:var(--color-accent)}
+/* "Liggend" en "Staand" passen niet in de smalle segmentknop. */
+.seg.lay{width:88px;font-size:11px}
+.step{flex:none;width:42px;height:40px;background:transparent;color:var(--color-text);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:19px}
+/* Krap gemeten: "Temp waarschuwing" heeft de laatste twee pixels nodig. */
+.setval{flex:none;width:46px;text-align:center;font-size:16px}
+.setval.wide{width:56px}
+.setstat{flex:1;min-width:0;font-size:13px;color:var(--color-neutral-500);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setstat.new{color:var(--color-accent)}
+.setstat.bad{color:var(--color-crit)}
+.rowbtn{flex:none;height:40px;padding:0 var(--space-4);background:transparent;color:var(--color-text);
+  border:1px solid var(--color-accent);border-radius:var(--radius-sm);
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.rowbtn.hit{background:var(--color-accent-900)}
+.rowbtn[disabled]{opacity:.45}
+
+/* meldingen */
+#noticelist .row{flex:none;display:flex;align-items:flex-start;gap:var(--space-3);
+  min-height:56px;padding:var(--space-3) var(--space-4);background:var(--color-surface);
+  border-left:3px solid var(--color-warn);border-radius:var(--radius-md)}
+#noticelist .row.crit{border-left-color:var(--color-crit)}
+#noticelist .row.info{border-left-color:var(--color-accent)}
+#noticelist .row svg{flex:none;margin-top:1px;color:var(--color-warn)}
+#noticelist .row.crit svg{color:var(--color-crit)}
+#noticelist .row.info svg{color:var(--color-accent)}
+#noticelist .msg{flex:1;font-size:15px;line-height:1.25;color:var(--color-text)}
+#noticelist .lv{flex:none;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--color-warn);margin-top:2px}
+#noticelist .row.crit .lv{color:var(--color-crit)}
+#noticelist .row.info .lv{color:var(--color-accent)}
+/* Een melding die ergens heen brengt in plaats van alleen iets meldt: de rand
+   licht op, en het label rechts zegt "openen" in plaats van "info". */
+#noticelist .row.act{box-shadow:inset 0 0 0 1px var(--color-accent);cursor:pointer}
+#noticelist .row.act .lv{color:var(--color-accent)}
+
+/* verbindingen */
+#netseg{display:flex;gap:var(--space-2);flex:none}
+#netseg button{flex:1;min-width:0;height:40px;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);font-size:13px}
+#netseg button.on{color:var(--color-text);border-color:var(--color-accent)}
+/* Smaller dan de tabs: staand is er geen ruimte voor vijf even brede knoppen. */
+#netseg .xbtn{flex:none;width:38px;height:40px}
+#netclose{flex:none!important;width:40px;height:40px;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center}
+#netlist button{min-height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 var(--space-4);background:var(--color-surface);border:1px solid transparent;
+  border-radius:var(--radius-md);color:var(--color-text);font-size:15px;text-align:left}
+#netlist button.sel{background:var(--color-accent-900);border-color:var(--color-accent)}
+#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#netlist .st{flex:none;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--color-neutral-500)}
+#netlist button.sel .st{color:var(--color-accent-300)}
+#netlist button.scanrow{min-height:46px;background:transparent;border-style:dashed;
+  border-color:var(--color-accent);color:var(--color-accent);font-size:13px}
+#netlist button.scanrow.busy{border-color:var(--color-neutral-800);color:var(--color-neutral-500)}
+#netlist button.scanrow .st{color:inherit;opacity:.7}
+#netempty{font-size:14px;color:var(--color-neutral-500);padding:var(--space-3) 2px}
+
+/* ── laadscherm ────────────────────────────────────────────────────────── */
+#charge{position:absolute;inset:30px 0 20px;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:var(--space-3);
+  padding:var(--space-6);background:var(--color-bg);z-index:1}
+#charge.on{display:flex}
+#chargehead{display:flex;align-items:center;gap:var(--space-2);color:var(--color-accent);
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+#chargepct{font-size:104px;font-weight:600;line-height:.85;letter-spacing:-.05em}
+#chargepct span+span{font-size:28px;font-weight:400;color:var(--color-neutral-500);margin-left:4px}
+#chargetrack{width:100%;height:8px;background:var(--color-neutral-900);
+  border-radius:4px;overflow:hidden}
+#chargebar{height:100%;width:0%;background:var(--color-accent);border-radius:4px}
+#chargeeta{font-size:18px;color:var(--color-text);text-align:center}
+#chargesub{font-size:11px;letter-spacing:.08em;color:var(--color-neutral-500)}
+
+/* ── schermtoetsenbord ─────────────────────────────────────────────────────
+   Tien toetsen op 320 px geeft ~28 px breed. Smal, maar staand is er hoogte
+   zat, dus ze worden 48 px hoog — en een hoge toets is makkelijker raken dan
+   een brede. Zo houdt het toetsenbord dezelfde AZERTY-indeling. */
+#kbd{position:absolute;inset:0;display:none;flex-direction:column;gap:6px;
+  background:var(--color-bg);padding:var(--space-3);z-index:5}
+#kbd.on{display:flex}
+#kbdhead{display:flex;align-items:center;gap:var(--space-2);flex:none;height:28px}
+#kbdtitle{flex:1;min-width:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--color-neutral-500);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#kbdclose{width:40px;height:28px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center}
+#kbdfield{flex:none;display:flex;align-items:center;gap:6px;height:46px}
+#kbdval{flex:1;min-width:0;height:46px;display:flex;align-items:center;padding:0 12px;
+  background:var(--color-surface);border:1px solid var(--color-accent);border-radius:var(--radius-md);
+  font-size:18px;letter-spacing:.04em;overflow:hidden;white-space:nowrap}
+#kbdval.empty{color:var(--color-neutral-500);letter-spacing:0}
+#kbdeye{width:46px;height:46px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center}
+#kbdeye.on{color:var(--color-accent);border-color:var(--color-accent)}
+/* Vaste hoogte en onderaan geplakt: uitrekken over de hele hoogte geeft
+   toetsen van 90 px, en daar mik je niet beter door. Zo staan ze waar je
+   duim al is. */
+#kbdkeys{flex:none;height:272px;margin-top:auto;display:flex;flex-direction:column;gap:5px}
+.krow{flex:1;display:flex;justify-content:center;gap:4px}
+.key{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+  background:var(--color-surface);color:var(--color-text);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);
+  font-size:18px;line-height:1;padding:0}
+.key.wide{flex:0 0 44px}
+.key.mode{flex:0 0 50px;font-size:12px;letter-spacing:.04em}
+.key.space{flex:1}
+.key.go{flex:0 0 84px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  border-color:var(--color-accent)}
+.key.on{border-color:var(--color-accent);color:var(--color-accent)}
+.key.hit{background:var(--color-accent-900);border-color:var(--color-accent)}
+
+/* ── aan/uit ───────────────────────────────────────────────────────────────
+   Staand onder elkaar: twee vlakken van 320 breed lezen beter dan twee van
+   150, en je zit met je duim nooit per ongeluk op de verkeerde. */
+#power{position:absolute;inset:0;display:none;flex-direction:column;gap:var(--space-3);
+  padding:var(--space-4);background:var(--color-bg);z-index:6}
+#power.on{display:flex}
+#powerhead{display:flex;align-items:center;gap:var(--space-2);flex:none;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-neutral-500)}
+#powerbtns{flex:1;min-height:0;display:flex;flex-direction:column;gap:var(--space-3)}
+.powbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:var(--space-2);background:transparent;color:var(--color-text);
+  border:1px solid var(--color-accent);border-radius:var(--radius-lg)}
+.powbtn.crit{border-color:var(--color-crit);color:var(--color-crit)}
+.powbtn.hit{background:var(--color-accent-900)}
+.powbtn[disabled]{opacity:.45}
+.powname{font-size:26px;letter-spacing:.06em}
+.powsub{font-size:12px;color:var(--color-neutral-500)}
+#powermsg{flex:none;min-height:16px;font-size:13px;text-align:center;color:var(--color-neutral-500)}
+#powermsg.bad{color:var(--color-crit)}
+#powerclose{height:48px;flex:none;background:transparent;color:var(--color-neutral-500);
+  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
+  font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+
+/* ── temperatuuralarm ──────────────────────────────────────────────────── */
+#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;gap:var(--space-4);padding:var(--space-6);
+  background:var(--color-crit-fill);color:#161826;z-index:7}
+#alarm.on{display:flex}
+#alarmhead{display:flex;flex-direction:column;align-items:center;gap:var(--space-3)}
+#alarmhead svg{width:52px;height:52px}
+#alarmtitle{font-size:38px;font-weight:600;letter-spacing:-.01em;line-height:1}
+#alarmmsg{font-size:19px;line-height:1.3;text-align:center;white-space:pre-line}
+#alarmclose{height:52px;min-width:180px;margin-top:var(--space-2);padding:0 var(--space-6);
+  background:transparent;color:#161826;border:2px solid #161826;border-radius:var(--radius-md);
+  font-size:15px;letter-spacing:.1em;text-transform:uppercase}
+</style>
+</head>
+<body data-layout="Staand">
+<div id="root">
+
+  <div id="top">
+    <div id="topleft">
+      <div id="outside">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
+        <span id="outtemp">--&deg;</span>
+      </div>
+    </div>
+    <div id="status">
+      <svg id="wifiico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke-width="2" stroke-linecap="round">
+        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--color-neutral-800)"/>
+        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--color-neutral-800)"/>
+        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--color-neutral-800)"/>
+        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--color-neutral-800)" stroke="none"/>
+      </svg>
+      <svg id="btico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <div id="cellgrp">
+        <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
+        <span id="tech">--</span>
+      </div>
+      <span id="clock">--:--</span>
+      <button id="statusbtn"><span id="dot"></span></button>
+    </div>
+  </div>
+
+  <button id="notice">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+    <span id="noticetxt">--</span>
+    <span id="noticemore">alle</span>
+  </button>
+
+  <div id="panes">
+
+    <!-- 1 · RIT -->
+    <div class="pane on" id="p0">
+      <div id="speedbox">
+        <div id="speedrow">
+          <div id="speed">0</div>
+          <div id="speedmeta">
+            <div id="speedunit">km/u</div>
+            <div id="vmaxrow">max <span id="vmaxtxt">0</span></div>
+          </div>
+        </div>
+        <div id="speedtrack"><div id="speedbar"></div></div>
+      </div>
+      <div id="side">
+        <div class="card" id="batcard">
+          <div class="toprow">
+            <span class="k">Batterij</span>
+            <span class="v big"><span id="bat">0</span><span class="u">%</span></span>
+          </div>
+          <div class="meter"><i id="batbar"></i></div>
+        </div>
+        <div class="card" id="rangecard">
+          <span class="k">Bereik ca.</span>
+          <span class="v big"><span id="range">0</span><span class="u">km</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · MOTOR -->
+    <div class="pane" id="p1">
+      <div class="bigcard">
+        <span class="k">Motortemperatuur</span>
+        <div class="val"><span class="v big" id="tm">0</span><span class="unit">&deg;C</span></div>
+        <div class="meter"><i id="tmbar"></i></div>
+      </div>
+      <div class="bigcard">
+        <span class="k">FET-temperatuur</span>
+        <div class="val"><span class="v big" id="tf">0</span><span class="unit">&deg;C</span></div>
+        <div class="meter"><i id="tfbar"></i></div>
+      </div>
+      <div id="dutycard">
+        <div class="head">
+          <span class="k">Duty</span>
+          <span class="v big"><span id="duty">0</span><span class="u">%</span></span>
+        </div>
+        <div class="meter"><i id="dutybar"></i></div>
+      </div>
+      <div class="trio">
+        <div class="card"><span class="k">Motorstroom</span><span class="v mid"><span id="im">0</span><span class="u">A</span></span></div>
+        <div class="card"><span class="k">Accustroom</span><span class="v mid"><span id="ib">0</span><span class="u">A</span></span></div>
+        <div class="card"><span class="k">RPM</span><span class="v mid" id="rpm">0</span></div>
+      </div>
+    </div>
+
+    <!-- 3 · ACCU -->
+    <div class="pane" id="p2">
+      <div class="bigcard">
+        <span class="k">Accupercentage</span>
+        <div class="val"><span class="v mid" id="bat2">0</span><span class="unit">%</span></div>
+        <div class="meter"><i id="bat2bar"></i></div>
+      </div>
+      <div class="bigcard">
+        <span class="k">Accuspanning</span>
+        <div class="val"><span class="v mid" id="vv">0</span><span class="unit">V</span></div>
+        <div id="accuvolt"><b id="vc">0</b> V per cel</div>
+      </div>
+      <div class="trio">
+        <div class="card"><span class="k">Verbruikt</span><span class="v mid"><span id="wh">0</span><span class="u">Wh</span></span></div>
+        <div class="card"><span class="k">Afstand</span><span class="v mid"><span id="trip">0</span><span class="u">km</span></span></div>
+        <div class="card"><span class="k">Per km</span><span class="v mid"><span id="whkm">0</span><span class="u">Wh</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dots"><span class="on"></span><span></span><span></span></div>
+
+  <!-- laden -->
+  <div id="charge">
+    <div id="chargehead">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
+      <span id="chargelabel">Laden</span>
+    </div>
+    <div id="chargepct"><span id="chargeval">0</span><span>%</span></div>
+    <div id="chargetrack"><div id="chargebar"></div></div>
+    <div id="chargeeta">tijd nog onbekend</div>
+    <div id="chargesub">--</div>
+  </div>
+
+  <!-- verbindingen -->
+  <div class="sheet" id="net">
+    <div id="netseg">
+      <button id="segwifi" class="on">Wi-Fi</button>
+      <button id="segbt">Bluetooth</button>
+      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+      <button id="netclose"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="scroller" id="netlist"></div>
+  </div>
+
+  <!-- schermtoetsenbord -->
+  <div id="kbd">
+    <div id="kbdhead">
+      <div id="kbdtitle">Wachtwoord</div>
+      <button id="kbdclose"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="kbdfield">
+      <div id="kbdval" class="empty"></div>
+      <button id="kbdeye"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.5 5.2 12 5.2 22.4 12 22.4 12 18.5 18.8 12 18.8 1.6 12 1.6 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+    </div>
+    <div id="kbdkeys"></div>
+  </div>
+
+  <!-- meldingen -->
+  <div class="sheet" id="notices">
+    <div class="sheethead">
+      <div class="sheettitle">Meldingen</div>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="noticelist"></div>
+  </div>
+
+  <!-- systeem -->
+  <div class="sheet" id="sys">
+    <div class="sheethead">
+      <div class="sheettitle">Systeem</div>
+      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="inforows">
+      <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
+      <div class="inforow" id="syscellrow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
+      <div class="inforow"><span class="lbl">VESC</span><span class="val" id="stxt">--</span></div>
+    </div>
+    <div class="sysbtns">
+      <button id="sysnet" class="pbtn">Verbindingen</button>
+      <button id="sysset" class="pbtn">Instellingen</button>
+      <button id="syspower" class="pbtn">Power</button>
+    </div>
+  </div>
+
+  <!-- instellingen -->
+  <div class="sheet" id="settings">
+    <div class="sheethead">
+      <div class="sheettitle">Instellingen</div>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="setlist">
+      <div class="setrow stack">
+        <span class="lbl">Update</span>
+        <div class="line">
+          <span class="setstat" id="setupd">controleren…</span>
+          <button id="updbtn" class="rowbtn">Zoeken</button>
+        </div>
+      </div>
+      <div class="setrow"><span class="lbl">Thema</span>
+        <button class="seg" data-theme="Auto">Auto</button>
+        <button class="seg" data-theme="Licht">Licht</button>
+        <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp waarschuwing</span>
+        <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
+        <span class="setval" id="setwarn">70&deg;</span>
+        <button class="step" data-k="tempWarn" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp kritiek</span>
+        <button class="step" data-k="tempCrit" data-d="-5">&minus;</button>
+        <span class="setval" id="setcrit">90&deg;</span>
+        <button class="step" data-k="tempCrit" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Helderheid</span>
+        <button class="step bright" data-d="-10">&minus;</button>
+        <span class="setval wide" id="setbright">80 %</span>
+        <button class="step bright" data-d="10">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Indeling</span>
+        <button class="seg lay" data-lay="Liggend">Liggend</button>
+        <button class="seg lay" data-lay="Staand">Staand</button>
+      </div>
+      <div class="setrow"><span class="lbl">Kwartslag</span>
+        <button class="seg rot" data-rot="90">90&deg;</button>
+        <button class="seg rot" data-rot="270">270&deg;</button>
+      </div>
+      <div class="setrow"><span class="lbl">Startscherm</span>
+        <button class="seg start" data-i="0">Rit</button>
+        <button class="seg start" data-i="1">Motor</button>
+        <button class="seg start" data-i="2">Accu</button>
+      </div>
+      <div class="setrow"><span class="lbl">Topsnelheid</span>
+        <button id="toprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow"><span class="lbl">Rit-teller</span>
+        <button id="triprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow stack"><span class="lbl">Versie</span>
+        <span class="setstat" id="setver">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- aan/uit -->
+  <div id="power">
+    <div id="powerhead">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+      <span>Aan / uit</span>
+    </div>
+    <div id="powerbtns">
+      <button id="powreboot" class="powbtn">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
+        <span class="powname">REBOOT</span>
+        <span class="powsub">opnieuw opstarten</span>
+      </button>
+      <button id="powshutdown" class="powbtn crit">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+        <span class="powname">SHUTDOWN</span>
+        <span class="powsub">uitschakelen</span>
+      </button>
+    </div>
+    <div id="powermsg"></div>
+    <button id="powerclose">Annuleren</button>
+  </div>
+
+  <!-- temperatuuralarm -->
+  <div id="alarm">
+    <div id="alarmhead">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <div id="alarmtitle">WARNING</div>
+    </div>
+    <div id="alarmmsg">Motortemperatuur te hoog</div>
+    <button id="alarmclose">Bevestigen</button>
+  </div>
+
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
