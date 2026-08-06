@@ -4,373 +4,76 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=480,height=320,initial-scale=1,user-scalable=no">
 <title>Step Dashboard</title>
+<link rel="stylesheet" href="theme.css">
 <style>
-/* ═══════════════════════════════════════════════════════════════════════════
-   Nocturne tokens — overgenomen uit
-   _ds/nocturne-6cd0eed5-43bd-40e8-9e93-c4bd292c6682/styles.css.
-   Inline omdat de Pi geen internet heeft: geen @import, geen CDN, geen
-   externe fonts. Inter wordt gebruikt als het lokaal geïnstalleerd is
-   (apt install fonts-inter), anders valt hij terug op system-ui.
-   ═══════════════════════════════════════════════════════════════════════ */
-:root{
-  --color-bg:#161826;
-  --color-surface:#232532;
-  --color-text:#e9e9ed;
-  --color-neutral-500:#9397ab;
-  --color-neutral-800:#3f424d;
-  --color-neutral-900:#292b31;
-  --color-accent:#9184d9;
-  --color-accent-300:#d2cefd;
-  --color-accent-900:#2b2741;
+/* Maatvoering voor het liggende schermpje. De vormtaal staat in theme.css. */
+#root{width:480px;height:320px}
+#top{height:26px;gap:10px;padding:0 12px}
+#statusbtn{height:26px}
+#notice{height:28px;margin:6px 12px 0;padding:0 11px}
 
-  --color-warn:#e0a94a;
-  --color-crit:#e0645c;
-  --color-warn-fill:#e0a94a;
-  --color-crit-fill:#e0645c;
+.pane{gap:8px;padding:8px 12px}
 
-  --space-1:2.8px;
-  --space-2:5.6px;
-  --space-3:8.4px;
-  --space-4:11.2px;
-  --space-6:16.8px;
-  --space-8:22.4px;
-
-  --radius-sm:4px;
-  --radius-md:8px;
-
-  --font-body:"Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
-}
-/* Licht thema — de ramp-stappen uit dezelfde tokenset, zoals applyTheme() in
-   het component ze zet. accent-300 wijkt bewust af van het component: daar
-   bleef hij #d2cefd staan, gelijk aan de lichte accent-900-achtergrond
-   eronder, waardoor het label op een verbonden netwerkrij onleesbaar werd. */
-body.light{
-  --color-bg:#f3f5fe;
-  --color-surface:#e4e7f5;
-  --color-text:#292b31;
-  --color-neutral-500:#595d6c;
-  --color-neutral-800:#cfd3e5;
-  --color-neutral-900:#cfd3e5;
-  --color-accent:#5d5294;
-  --color-accent-300:#423a6a;
-  --color-accent-900:#d2cefd;
-  --color-warn:#8a5d10;
-  --color-crit:#a83229;
-  --color-warn-fill:#e0a94a;
-  --color-crit-fill:#a83229;
-}
-
-*,*::before,*::after{box-sizing:border-box}
-/* Het paneel bepaalt de body-maat, niet het ontwerp: staat de staande UI op
-   een liggend schermpje, dan draait fitRotation() #root een kwartslag en moet
-   de body de échte afmetingen houden. */
-html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
-body{
-  background:var(--color-bg);
-  color:var(--color-text);
-  font-family:var(--font-body);
-  font-variant-numeric:tabular-nums;
-  font-feature-settings:"tnum" 1;
-  -webkit-font-smoothing:antialiased;
-  user-select:none;-webkit-user-select:none;
-  cursor:none;
-}
-body,body *{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-button{font-family:inherit;font-variant-numeric:inherit}
-svg{display:block}
-
-#root{position:relative;width:480px;height:320px;display:flex;flex-direction:column;overflow:hidden}
-
-/* ── topbalk / meldingsbalk ────────────────────────────────────────────── */
-#top{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;
-  padding:0 var(--space-4);border-bottom:1px solid var(--color-neutral-800)}
-#topleft{display:flex;align-items:center;gap:var(--space-3);min-width:0}
-#outside{display:flex;align-items:center;gap:5px;flex:none;color:var(--color-neutral-500)}
-#outside svg{flex:none}
-#outtemp{font-size:14px;color:var(--color-text)}
-
-#notice{display:none;align-items:center;gap:7px;height:34px;max-width:300px;padding:0;
-  background:transparent;border:0;color:var(--color-warn);font-size:14px;text-align:left}
-#notice.on{display:flex}
-#notice.crit{color:var(--color-crit)}
-#notice.info{color:var(--color-accent)}
-#notice svg{flex:none}
-#noticetxt{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-
-#status{display:flex;align-items:center;gap:var(--space-4);height:34px;padding-left:var(--space-4);
-  font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-500)}
-#wifiico,#btico{display:none;flex:none}
-/* Het mobiele stukje staat er alleen als er een modem in zit. Zit er geen
-   dongle in, dan is een lege balkjesmeter met "GEEN" ernaast geen informatie
-   maar ruis — dan valt de hele groep weg. */
-#cellgrp{display:none;align-items:center;gap:var(--space-4);flex:none}
-#cellgrp.on{display:flex}
-#sig{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
-#sig span{width:3px;border-radius:1px;background:var(--color-neutral-800)}
-#sig span:nth-child(1){height:4px}
-#sig span:nth-child(2){height:6px}
-#sig span:nth-child(3){height:8px}
-#sig span:nth-child(4){height:11px}
-#sig span:nth-child(5){height:14px}
-#sig span.on{background:var(--color-accent)}
-#sig span.weak{background:var(--color-warn)}
-#tech{font-size:11px;letter-spacing:.06em;color:var(--color-text)}
-#clock{font-size:15px;letter-spacing:.02em;color:var(--color-text)}
-#statusbtn{display:flex;align-items:center;gap:var(--space-2);height:34px;padding:0 0 0 var(--space-2);
-  background:transparent;border:0;color:inherit;font:inherit;font-size:12px;letter-spacing:.06em;
-  text-transform:uppercase;white-space:nowrap}
-#status>*{flex:none}
-#dot{width:9px;height:9px;border-radius:50%;background:var(--color-accent)}
-#dot.demo{background:var(--color-warn)}
-#dot.off{background:var(--color-crit)}
-
-/* ── panes ─────────────────────────────────────────────────────────────── */
-#panes{flex:1;position:relative}
-.pane{position:absolute;inset:0;display:none;padding:var(--space-3) var(--space-4)}
-.pane.on{display:flex}
-
-.card{background:var(--color-surface);border:1px solid var(--color-neutral-800);
-  border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);
-  display:flex;flex-direction:column;justify-content:center}
-.k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500);line-height:1.2}
-.v{font-weight:500;line-height:1}
-.v.big{font-size:34px}
-.v.mid{font-size:26px}
-.u{font-size:12px;color:var(--color-neutral-500);font-weight:400;margin-left:3px}
-
-/* pane 1 · Rit */
-#p0{gap:var(--space-3)}
-#speedbox{flex:1;display:flex;flex-direction:column;justify-content:center}
-#speedrow{display:flex;align-items:flex-end;gap:var(--space-3)}
-#speed{font-size:118px;font-weight:600;line-height:.86;letter-spacing:-.04em}
-#speedmeta{padding-bottom:14px;display:flex;flex-direction:column;gap:2px}
-#speedunit{font-size:19px;letter-spacing:.06em;color:var(--color-neutral-500)}
-#vmaxrow{font-size:12px;letter-spacing:.06em;color:var(--color-neutral-500)}
-#speedtrack{height:7px;background:var(--color-neutral-900);border-radius:var(--radius-sm);
-  overflow:hidden;margin-top:var(--space-4)}
-#speedbar{height:100%;width:0%;background:var(--color-accent)}
-#side{width:168px;flex:none;display:flex;flex-direction:column;gap:var(--space-3)}
+/* 1 · RIT — snelheid links, accu en bereik in een kolom ernaast. */
+#p0{gap:8px}
+#speedbox{flex:1;min-width:0;padding:10px 16px 12px;gap:8px}
+#speed{font-size:100px;font-weight:600;line-height:.9;letter-spacing:-.035em}
+#speedmeta{padding-bottom:9px}
+#side{width:150px;flex:none;display:flex;flex-direction:column;gap:8px}
 #side .card{flex:1}
-#battrack{height:9px;background:var(--color-neutral-900);border-radius:var(--radius-sm);
-  overflow:hidden;margin-top:var(--space-2)}
-#batbar{height:100%;width:0%;background:var(--color-accent)}
+#side .val{display:flex;align-items:baseline;gap:4px}
+#side .n{font-size:38px;font-weight:600;line-height:1;letter-spacing:-.03em}
+#side .u{font-size:13px;color:var(--text2)}
 
-/* De accu- en bereikkaart lopen vol vanaf 30 % (oranje) en 15 % (rood). */
-.card.low{background:var(--color-warn-fill);border-color:var(--color-warn-fill);color:#161826}
-.card.low .k,.card.low .u{color:#161826}
-.card.empty{background:var(--color-crit-fill);border-color:var(--color-crit-fill);color:#f3f5fe}
-.card.empty .k,.card.empty .u{color:#f3f5fe}
-.card.low #battrack,.card.empty #battrack{background:rgba(22,24,38,.25)}
-.card.low #batbar{background:#161826}
-.card.empty #batbar{background:#f3f5fe}
+/* 2 · MOTOR — twee temperaturen boven, drie kleinere waarden eronder. */
+#p1{flex-direction:column;gap:8px}
+#temps{flex:1;min-height:0;display:flex;gap:8px}
+#temps .card{flex:1}
+#temps .val{display:flex;align-items:baseline;gap:4px}
+#p1 .v.big{font-size:44px;font-weight:600;line-height:1;letter-spacing:-.03em}
+#temps .u{font-size:13px;color:var(--text2)}
+#motorrow{flex:none;display:flex;gap:8px}
+#motorrow .card{flex:1;gap:6px}
+#motorrow .val{display:flex;align-items:baseline;gap:4px}
+#motorrow .n{font-size:23px;font-weight:600;line-height:1}
+#motorrow .u{font-size:12px;color:var(--text2)}
 
-/* panes 2 en 3 · rasters */
-.grid{display:grid;width:100%;gap:var(--space-3)}
-#p1 .grid{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
-#p2 .grid{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr}
-#p1 .card,#p2 .card{gap:var(--space-1)}
-.trk{height:6px;background:var(--color-neutral-900);border-radius:var(--radius-sm);
-  overflow:hidden;margin-top:var(--space-1)}
-.trk>i{display:block;height:100%;width:0%;background:var(--color-accent)}
-.warn{color:var(--color-warn)}
-.crit{color:var(--color-crit)}
-.fill-warn{background:var(--color-warn)!important}
-.fill-crit{background:var(--color-crit)!important}
+/* 3 · ACCU — percentage links, de rest als lijst ernaast. */
+#p2{flex-direction:column;gap:8px}
+#packtop{flex:1;min-height:0;display:flex;gap:8px}
+#packbig{flex:1;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);padding:10px 14px;
+  display:flex;flex-direction:column;justify-content:center;gap:9px}
+#packnum{display:flex;align-items:baseline;gap:4px}
+#bat2{font-size:62px;font-weight:600;line-height:1;letter-spacing:-.035em}
+#packpct{font-size:18px;color:var(--text2)}
+#cells{height:14px}
+#packlist{width:188px;flex:none;display:flex;flex-direction:column;gap:5px}
+#packlist .row{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 11px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+#packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
+#packlist .u{font-size:11px;color:var(--text2)}
 
-/* ── overlays ──────────────────────────────────────────────────────────── */
-.sheet{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;gap:var(--space-2);
-  background:var(--color-bg);padding:var(--space-3) var(--space-4)}
-.sheet.on{display:flex}
-#net{z-index:2}
-#notices{z-index:3}
-#sys,#settings{z-index:4}
-.sheethead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:none}
-.sheettitle{font-size:13px;letter-spacing:.10em;text-transform:uppercase;color:var(--color-neutral-500);
-  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.sheetnav{display:flex;align-items:center;gap:var(--space-2);flex:none}
-.xbtn{width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
-  display:flex;align-items:center;justify-content:center}
-/* Aan het begin of het eind van de lijst: gedimd, zoals de gids voor
-   uitgeschakelde knoppen voorschrijft. */
-.xbtn.off{opacity:.45}
-/* #netseg staat erbij omdat `#netseg button` anders de randkleur wint. */
-.xbtn.hit,#netseg .xbtn.hit{border-color:var(--color-accent);color:var(--color-accent)}
-/* position:relative zodat offsetTop van een rij vanaf de lijst zelf telt en
-   niet vanaf het scherm eromheen — anders klopt de sprong per rij niet. */
-.scroller{flex:1;position:relative;display:flex;flex-direction:column;gap:var(--space-2);overflow-y:auto;
-  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
-.scroller::-webkit-scrollbar{width:0;height:0}
+#dots{height:28px;padding:0 12px 4px}
 
-/* systeemvenster */
-.inforows{display:flex;flex-direction:column;gap:var(--space-2);flex:none}
-.inforow{height:46px;display:flex;align-items:center;gap:12px;padding:0 14px;
-  background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)}
-.inforow .lbl{width:74px;flex:none}
-.inforow .val{font-size:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.lbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
-.sysbtns{margin-top:auto;display:flex;gap:var(--space-2);flex:none}
-.pbtn{flex:1;height:56px;background:transparent;color:var(--color-text);border:1px solid var(--color-accent);
-  border-radius:var(--radius-md);font-size:13px;letter-spacing:.09em;text-transform:uppercase}
-
-/* instellingen */
-.setrow{min-height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;
-  background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)}
-.setrow .lbl{flex:1}
-.seg{width:66px;height:44px;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:13px;text-transform:uppercase}
-.seg.on{color:var(--color-text);border-color:var(--color-accent)}
-/* "Liggend" en "Staand" passen niet in de smalle segmentknop. */
-.seg.lay{width:104px}
-.step{width:56px;height:44px;background:transparent;color:var(--color-text);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:20px}
-.setval{width:64px;text-align:center;font-size:18px}
-.setval.wide{width:78px}
-.setstat{font-size:13px;color:var(--color-neutral-500);text-align:right;
-  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;flex:1}
-.setstat.new{color:var(--color-accent)}
-.setstat.bad{color:var(--color-crit)}
-.rowbtn{height:44px;padding:0 var(--space-4);background:transparent;color:var(--color-text);
-  border:1px solid var(--color-accent);border-radius:var(--radius-sm);
-  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
-
-/* meldingen */
-#noticelist .row{min-height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:8px 14px;
-  background:var(--color-surface);border:1px solid var(--color-neutral-800);
-  border-left:4px solid var(--color-warn);border-radius:var(--radius-md)}
-#noticelist .row.crit{border-left-color:var(--color-crit)}
-#noticelist .row.info{border-left-color:var(--color-accent)}
-#noticelist .row svg{flex:none;color:var(--color-warn)}
-#noticelist .row.crit svg{color:var(--color-crit)}
-#noticelist .row.info svg{color:var(--color-accent)}
-#noticelist .msg{font-size:16px;line-height:1.2;color:var(--color-text)}
-#noticelist .lv{margin-left:auto;flex:none;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-warn)}
-#noticelist .row.crit .lv{color:var(--color-crit)}
-#noticelist .row.info .lv{color:var(--color-accent)}
-/* Een melding die ergens heen brengt in plaats van alleen iets meldt: de rand
-   licht op, en het label rechts zegt "openen" in plaats van "info". */
-#noticelist .row.act{box-shadow:inset 0 0 0 1px var(--color-accent);cursor:pointer}
-#noticelist .row.act .lv{color:var(--color-accent)}
-
-/* verbindingen */
-#netseg{display:flex;gap:var(--space-2);flex:none}
-#netseg button{flex:1;height:44px;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
-  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
-#netseg button.on{color:var(--color-text);border-color:var(--color-accent)}
-/* De scrollknoppen staan in dezelfde rij als de tabs maar rekken niet mee. */
-#netseg .xbtn{flex:none;width:56px;height:44px}
-#netclose{width:56px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
-  display:flex;align-items:center;justify-content:center}
-#netlist button{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;
-  gap:12px;padding:0 14px;background:var(--color-surface);border:1px solid var(--color-neutral-800);
-  border-radius:var(--radius-md);color:var(--color-text);font-size:16px;text-align:left}
-#netlist button.sel{background:var(--color-accent-900);border-color:var(--color-accent)}
-/* De zoekrij is geen apparaat: geen vlak eromheen, wel dezelfde hoogte zodat
-   de scrollknoppen op rijgrenzen blijven mikken. */
-#netlist button.scanrow{height:48px;background:transparent;border-style:dashed;
-  border-color:var(--color-accent);color:var(--color-accent);font-size:14px}
-#netlist button.scanrow.busy{border-color:var(--color-neutral-800);color:var(--color-neutral-500)}
-#netlist button.scanrow .st{color:inherit;opacity:.7}
-#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-#netlist .st{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
-#netlist button.sel .st{color:var(--color-accent-300)}
-#netempty{font-size:14px;color:var(--color-neutral-500);padding:var(--space-3) 2px}
-
-/* ── laadscherm ────────────────────────────────────────────────────────────
-   Verschijnt zodra de lader eraan hangt. Staat boven de drie panes maar onder
-   alle vensters, zodat je nog gewoon bij de instellingen kunt. */
-#charge{position:absolute;inset:34px 0 16px;display:none;flex-direction:column;
-  align-items:center;justify-content:center;gap:var(--space-2);
-  padding:var(--space-3) var(--space-6);background:var(--color-bg);z-index:1}
-#charge.on{display:flex}
-#chargehead{display:flex;align-items:center;gap:var(--space-2);color:var(--color-accent);
-  font-size:13px;letter-spacing:.10em;text-transform:uppercase}
-#chargepct{font-size:86px;font-weight:600;line-height:.9;letter-spacing:-.03em}
-#chargepct span{font-size:24px;font-weight:400;color:var(--color-neutral-500);margin-left:4px}
-#chargetrack{width:100%;height:10px;background:var(--color-neutral-900);
-  border-radius:var(--radius-sm);overflow:hidden}
-#chargebar{height:100%;width:0%;background:var(--color-accent)}
-#chargeeta{font-size:20px;color:var(--color-text)}
-#chargesub{font-size:12px;letter-spacing:.06em;color:var(--color-neutral-500)}
-
-/* ── schermtoetsenbord ─────────────────────────────────────────────────────
-   Vult het hele scherm in plaats van alleen het verbindingsvlak: dat levert
-   de 50 px van de topbalk en de puntjes op, en daarmee toetsen van ~43 × 50
-   px. Meer past er op 480 px breed niet bij tien toetsen per rij. */
-#kbd{position:absolute;inset:0;display:none;flex-direction:column;gap:5px;
-  background:var(--color-bg);padding:var(--space-3);z-index:5}
-#kbd.on{display:flex}
-#kbdhead{display:flex;align-items:center;gap:var(--space-3);flex:none;height:28px}
-#kbdtitle{flex:1;font-size:13px;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--color-neutral-500);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-#kbdclose{width:44px;height:28px;flex:none;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);
-  display:flex;align-items:center;justify-content:center}
-#kbdfield{flex:none;display:flex;align-items:center;gap:5px;height:44px}
-#kbdval{flex:1;height:44px;display:flex;align-items:center;padding:0 12px;
-  background:var(--color-surface);border:1px solid var(--color-accent);border-radius:var(--radius-sm);
-  font-size:18px;letter-spacing:.04em;overflow:hidden;white-space:nowrap}
-#kbdval.empty{color:var(--color-neutral-500);letter-spacing:0}
-#kbdeye{width:52px;height:44px;flex:none;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);
-  display:flex;align-items:center;justify-content:center}
-#kbdeye.on{color:var(--color-accent);border-color:var(--color-accent)}
-#kbdkeys{flex:1;display:flex;flex-direction:column;gap:4px}
-.krow{flex:1;display:flex;justify-content:center;gap:4px}
-.key{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
-  background:var(--color-surface);color:var(--color-text);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);
-  font-size:19px;line-height:1;padding:0}
-.key.wide{flex:0 0 64px}
-.key.mode{flex:0 0 72px;font-size:13px;letter-spacing:.06em}
-.key.space{flex:1}
-.key.go{flex:0 0 120px;font-size:13px;letter-spacing:.09em;text-transform:uppercase;
-  border-color:var(--color-accent)}
-.key.on{border-color:var(--color-accent);color:var(--color-accent)}
-/* Tikfeedback: kort oplichten, geen transitie — de SPI-display is traag. */
-.key.hit{background:var(--color-accent-900);border-color:var(--color-accent)}
-
-/* volledig-scherm aan/uit — boven het toetsenbord, want tik je hier op
-   afsluiten dan is een half ingetypt wachtwoord niet meer interessant. */
-#power{position:absolute;inset:0;display:none;flex-direction:column;gap:var(--space-3);
-  padding:var(--space-4) var(--space-6) var(--space-6);background:var(--color-bg);z-index:6}
-#power.on{display:flex}
-#powerhead{display:flex;align-items:center;gap:var(--space-2);flex:none;
-  font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)}
-#powerbtns{flex:1;display:flex;gap:var(--space-3);min-height:0}
-.powbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:var(--space-2);background:transparent;color:var(--color-text);
-  border:1px solid var(--color-accent);border-radius:var(--radius-md)}
-.powbtn.crit{border-color:var(--color-crit);color:var(--color-crit)}
-.powbtn.hit{background:var(--color-accent-900)}
-.powbtn[disabled]{opacity:.45}
-.powname{font-size:22px;letter-spacing:.06em}
-.powsub{font-size:12px;color:var(--color-neutral-500)}
-#powermsg{flex:none;min-height:16px;font-size:13px;text-align:center;color:var(--color-neutral-500)}
-#powermsg.bad{color:var(--color-crit)}
-#powerclose{height:48px;flex:none;background:transparent;color:var(--color-neutral-500);
-  border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);
-  font-size:13px;letter-spacing:.09em;text-transform:uppercase}
-
-/* volledig-scherm alarm — moet boven alles komen: een te warme motor is
-   belangrijker dan wat je aan het typen of aan het afsluiten bent. */
-#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
-  text-align:center;gap:var(--space-3);padding:var(--space-6) var(--space-8);
-  background:var(--color-crit-fill);color:#161826;z-index:7}
-#alarm.on{display:flex}
-#alarmhead{display:flex;align-items:center;gap:var(--space-4)}
-#alarmtitle{font-size:44px;font-weight:600;letter-spacing:-.02em;line-height:1}
-#alarmmsg{font-size:22px;line-height:1.25;align-self:center;text-align:center;white-space:pre-line}
-#alarmclose{height:56px;min-width:160px;align-self:center;margin-top:var(--space-2);padding:0 var(--space-6);
-  background:transparent;color:#161826;border:2px solid #161826;border-radius:var(--radius-md);
-  font-size:16px;letter-spacing:.09em;text-transform:uppercase}
-
-/* positie-indicator */
-#dots{height:16px;flex:none;display:flex;align-items:center;justify-content:center;gap:var(--space-2)}
-#dots span{width:6px;height:6px;border-radius:50%;background:var(--color-neutral-800)}
-#dots span.on{background:var(--color-accent)}
+.sheet{inset:26px 0 0;padding:8px 12px 10px}
+.sheettitle{font-size:18px}
+.xbtn{width:40px;height:32px}
+#charge{inset:26px 0 0;padding:16px 24px}
+#chargepct{font-size:88px}
+#chargepct span+span{font-size:22px}
+#chargetrack{width:300px}
+#kbd{padding:8px}
+.key.wide{flex:0 0 54px}
+.key.mode{flex:0 0 60px;font-size:12px}
+.key.go{flex:0 0 102px}
+#power{padding:10px 12px 12px}
+#powerclose{height:40px}
+#alarm{padding:20px 28px}
+#alarmhead svg{width:34px;height:34px}
+#alarmtitle{font-size:32px}
+#alarmmsg{font-size:18px}
+#alarmclose{height:42px;min-width:170px;padding:0 20px;font-size:14px}
 </style>
 </head>
 <body data-layout="Liggend">
@@ -379,36 +82,39 @@ svg{display:block}
   <div id="top">
     <div id="topleft">
       <div id="outside">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
         <span id="outtemp">--&deg;</span>
       </div>
-      <button id="notice">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
-        <span id="noticetxt">--</span>
-      </button>
     </div>
     <div id="status">
-      <svg id="wifiico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke-width="2" stroke-linecap="round">
-        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--color-neutral-800)"/>
-        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--color-neutral-800)"/>
-        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--color-neutral-800)"/>
-        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--color-neutral-800)" stroke="none"/>
+      <svg id="wifiico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke-width="1.8" stroke-linecap="round">
+        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--track)"/>
+        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--track)"/>
+        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--track)"/>
+        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--track)" stroke="none"/>
       </svg>
-      <svg id="btico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <svg id="btico" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
       <div id="cellgrp">
         <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
         <span id="tech">--</span>
       </div>
       <span id="clock">--:--</span>
-      <button id="statusbtn"><span id="dot"></span><span id="stxt">demo</span></button>
+      <button id="statusbtn"><span id="dot"></span><span id="stxt">--</span></button>
     </div>
   </div>
+
+  <button id="notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+    <span id="noticetxt">--</span>
+    <span id="noticemore">alle</span>
+  </button>
 
   <div id="panes">
 
     <!-- 1 · RIT -->
     <div class="pane on" id="p0">
       <div id="speedbox">
+        <span class="k">Snelheid</span>
         <div id="speedrow">
           <div id="speed">0</div>
           <div id="speedmeta">
@@ -416,58 +122,87 @@ svg{display:block}
             <div id="vmaxrow">max <span id="vmaxtxt">0</span></div>
           </div>
         </div>
-        <div id="speedtrack"><div id="speedbar"></div></div>
+        <div id="speedtrack"><i id="speedbar"></i></div>
       </div>
+
       <div id="side">
         <div class="card" id="batcard">
-          <div class="k">Batterij</div>
-          <div class="v big"><span id="bat">0</span><span class="u">%</span></div>
-          <div id="battrack"><div id="batbar"></div></div>
+          <span class="k">Batterij</span>
+          <div class="val"><span class="n" id="bat">0</span><span class="u">%</span></div>
+          <div id="battrack"><i id="batbar"></i></div>
         </div>
         <div class="card" id="rangecard">
-          <div class="k">Bereik ca.</div>
-          <div class="v big"><span id="range">0</span><span class="u">km</span></div>
+          <span class="k">Bereik</span>
+          <div class="val"><span class="n" id="range">0</span><span class="u">km</span></div>
         </div>
       </div>
     </div>
 
     <!-- 2 · MOTOR -->
     <div class="pane" id="p1">
-      <div class="grid">
-        <div class="card"><div class="k">Motor &deg;C</div><div class="v big" id="tm">0</div></div>
-        <div class="card"><div class="k">FET &deg;C</div><div class="v big" id="tf">0</div></div>
-        <div class="card"><div class="k">Duty</div>
-          <div class="v big"><span id="duty">0</span><span class="u">%</span></div>
-          <div class="trk"><i id="dutybar"></i></div></div>
-        <div class="card"><div class="k">Motorstroom</div><div class="v mid"><span id="im">0</span><span class="u">A</span></div></div>
-        <div class="card"><div class="k">Accustroom</div><div class="v mid"><span id="ib">0</span><span class="u">A</span></div></div>
-        <div class="card"><div class="k">RPM</div><div class="v mid" id="rpm">0</div></div>
+      <div id="temps">
+        <div class="card">
+          <span class="k">Motortemperatuur</span>
+          <div class="val"><span class="v big" id="tm">0</span><span class="u">&deg;C</span></div>
+        </div>
+        <div class="card">
+          <span class="k">FET-temperatuur</span>
+          <div class="val"><span class="v big" id="tf">0</span><span class="u">&deg;C</span></div>
+        </div>
       </div>
+      <div id="motorrow">
+        <div class="card">
+          <span class="k">Duty</span>
+          <div class="val"><span class="n" id="duty">0</span><span class="u">%</span></div>
+          <div class="bar"><i id="dutybar"></i></div>
+        </div>
+        <div class="card">
+          <span class="k">Motorstroom</span>
+          <div class="val"><span class="n" id="im">0</span><span class="u">A</span></div>
+        </div>
+        <div class="card">
+          <span class="k">Accustroom</span>
+          <div class="val"><span class="n" id="ib">0</span><span class="u">A</span></div>
+        </div>
+      </div>
+      <span id="rpmhold"><span id="rpm">0</span></span>
     </div>
 
     <!-- 3 · ACCU -->
     <div class="pane" id="p2">
-      <div class="grid">
-        <div class="card"><div class="k">Accuvoltage</div><div class="v mid"><span id="vv">0</span><span class="u">V</span></div></div>
-        <div class="card"><div class="k">Cel</div><div class="v mid"><span id="vc">0</span><span class="u">V</span></div></div>
-        <div class="card"><div class="k">Accupercentage</div>
-          <div class="v mid"><span id="bat2">0</span><span class="u">%</span></div>
-          <div class="trk"><i id="bat2bar"></i></div></div>
-        <div class="card"><div class="k">Verbruikt</div><div class="v mid"><span id="wh">0</span><span class="u">Wh</span></div></div>
-        <div class="card"><div class="k">Afstand</div><div class="v mid"><span id="trip">0</span><span class="u">km</span></div></div>
-        <div class="card"><div class="k">Wh / km</div><div class="v mid" id="whkm">0</div></div>
+      <div id="packtop">
+        <div id="packbig">
+          <span class="k">Accuniveau</span>
+          <div id="packnum"><span id="bat2">0</span><span id="packpct">%</span></div>
+          <div id="cells"></div>
+        </div>
+        <div id="packlist">
+          <div class="row"><span class="lbl">Pakspanning</span>
+            <span class="v"><span id="vv">0</span><span class="u">V</span></span></div>
+          <div class="row"><span class="lbl">Per cel</span>
+            <span class="v"><span id="vc">0</span><span class="u">V</span></span></div>
+          <div class="row"><span class="lbl">Verbruikt</span>
+            <span class="v"><span id="wh">0</span><span class="u">Wh</span></span></div>
+          <div class="row"><span class="lbl">Afstand</span>
+            <span class="v"><span id="trip">0</span><span class="u">km</span></span></div>
+          <div class="row"><span class="lbl">Per kilometer</span>
+            <span class="v"><span id="whkm">0</span><span class="u">Wh</span></span></div>
+        </div>
       </div>
+      <div id="bat2bar"></div>
     </div>
   </div>
+
+  <div id="dots"><span class="on">Rit</span><span>Motor</span><span>Accu</span></div>
 
   <!-- laden -->
   <div id="charge">
     <div id="chargehead">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
       <span id="chargelabel">Laden</span>
     </div>
     <div id="chargepct"><span id="chargeval">0</span><span>%</span></div>
-    <div id="chargetrack"><div id="chargebar"></div></div>
+    <div id="chargetrack"><i id="chargebar"></i></div>
     <div id="chargeeta">tijd nog onbekend</div>
     <div id="chargesub">--</div>
   </div>
@@ -477,9 +212,9 @@ svg{display:block}
     <div id="netseg">
       <button id="segwifi" class="on">Wi-Fi</button>
       <button id="segbt">Bluetooth</button>
-      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-      <button id="netclose"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+      <button id="netclose"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="scroller" id="netlist"></div>
   </div>
@@ -488,11 +223,11 @@ svg{display:block}
   <div id="kbd">
     <div id="kbdhead">
       <div id="kbdtitle">Wachtwoord</div>
-      <button id="kbdclose"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button id="kbdclose"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="kbdfield">
       <div id="kbdval" class="empty"></div>
-      <button id="kbdeye"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.5 5.2 12 5.2 22.4 12 22.4 12 18.5 18.8 12 18.8 1.6 12 1.6 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+      <button id="kbdeye"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.5 5.2 12 5.2 22.4 12 22.4 12 18.5 18.8 12 18.8 1.6 12 1.6 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
     </div>
     <div id="kbdkeys"></div>
   </div>
@@ -502,9 +237,9 @@ svg{display:block}
     <div class="sheethead">
       <div class="sheettitle">Meldingen</div>
       <div class="sheetnav">
-        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
     </div>
     <div class="scroller" id="noticelist"></div>
@@ -514,7 +249,7 @@ svg{display:block}
   <div class="sheet" id="sys">
     <div class="sheethead">
       <div class="sheettitle">Systeem</div>
-      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="inforows">
       <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
@@ -532,20 +267,31 @@ svg{display:block}
     <div class="sheethead">
       <div class="sheettitle">Instellingen</div>
       <div class="sheetnav">
-        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       </div>
     </div>
     <div class="scroller" id="setlist">
-      <div class="setrow"><span class="lbl" style="flex:none">Update</span>
-        <span class="setstat" id="setupd">controleren…</span>
-        <button id="updbtn" class="rowbtn">Zoeken</button>
+      <div class="setrow stack">
+        <span class="lbl">Update</span>
+        <div class="line">
+          <span class="setstat" id="setupd">controleren…</span>
+          <button id="updbtn" class="rowbtn">Zoeken</button>
+        </div>
       </div>
       <div class="setrow"><span class="lbl">Thema</span>
         <button class="seg" data-theme="Auto">Auto</button>
         <button class="seg" data-theme="Licht">Licht</button>
         <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow"><span class="lbl">Indeling</span>
+        <button class="seg lay" data-lay="Liggend">Liggend</button>
+        <button class="seg lay" data-lay="Staand">Staand</button>
+      </div>
+      <div class="setrow"><span class="lbl">Kwartslag</span>
+        <button class="seg rot" data-rot="90">90&deg;</button>
+        <button class="seg rot" data-rot="270">270&deg;</button>
       </div>
       <div class="setrow"><span class="lbl">Temp waarschuwing</span>
         <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
@@ -557,18 +303,10 @@ svg{display:block}
         <span class="setval" id="setcrit">90&deg;</span>
         <button class="step" data-k="tempCrit" data-d="5">+</button>
       </div>
-      <div class="setrow"><span class="lbl">Schermhelderheid</span>
+      <div class="setrow"><span class="lbl">Helderheid</span>
         <button class="step bright" data-d="-10">&minus;</button>
         <span class="setval wide" id="setbright">80 %</span>
         <button class="step bright" data-d="10">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Indeling</span>
-        <button class="seg lay" data-lay="Liggend">Liggend</button>
-        <button class="seg lay" data-lay="Staand">Staand</button>
-      </div>
-      <div class="setrow"><span class="lbl">Kwartslag</span>
-        <button class="seg rot" data-rot="90">90&deg;</button>
-        <button class="seg rot" data-rot="270">270&deg;</button>
       </div>
       <div class="setrow"><span class="lbl">Startscherm</span>
         <button class="seg start" data-i="0">Rit</button>
@@ -581,47 +319,67 @@ svg{display:block}
       <div class="setrow"><span class="lbl">Rit-teller</span>
         <button id="triprst" class="rowbtn">Reset</button>
       </div>
-      <div class="setrow"><span class="lbl" style="flex:none">Versie</span>
+      <div class="setrow stack"><span class="lbl">Versie</span>
         <span class="setstat" id="setver">—</span>
       </div>
     </div>
   </div>
 
-  <!-- volledig-scherm aan/uit -->
+  <!-- aan/uit -->
   <div id="power">
     <div id="powerhead">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
       <span>Aan / uit</span>
     </div>
     <div id="powerbtns">
       <button id="powreboot" class="powbtn">
-        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
-        <span class="powname">REBOOT</span>
-        <span class="powsub">opnieuw opstarten</span>
+        <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
+        <span class="powname">Opnieuw opstarten</span>
+        <span class="powsub">reboot</span>
       </button>
       <button id="powshutdown" class="powbtn crit">
-        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
-        <span class="powname">SHUTDOWN</span>
-        <span class="powsub">uitschakelen</span>
+        <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+        <span class="powname">Afsluiten</span>
+        <span class="powsub">shutdown</span>
       </button>
     </div>
     <div id="powermsg"></div>
     <button id="powerclose">Annuleren</button>
   </div>
 
-  <!-- volledig-scherm alarm -->
+  <!-- alarm -->
   <div id="alarm">
     <div id="alarmhead">
-      <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
-      <div id="alarmtitle">WARNING</div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <div id="alarmtitle">Waarschuwing</div>
     </div>
     <div id="alarmmsg">Motortemperatuur te hoog</div>
-    <button id="alarmclose">Bevestigen</button>
+    <button id="alarmclose">Sluiten</button>
   </div>
 
-  <div id="dots"><span class="on"></span><span></span><span></span></div>
 </div>
 
 <script src="app.js"></script>
+<script>
+"use strict";
+/* Alleen de cellenrij op het accuscherm tekent deze pagina zelf; app.js zet
+   tekst en breedtes, geen losse blokjes. */
+(function () {
+  var CELLEN = 13;
+  var box = document.getElementById("cells");
+  if (box) for (var i = 0; i < CELLEN; i++) box.appendChild(document.createElement("i"));
+
+  function teken() {
+    var d = window.last;
+    if (!d || !box) return;
+    var bp = d.battery_pct || 0;
+    var kl = bp < 10 ? "crit" : (bp < 20 ? "warn" : "on");
+    var vol = Math.round(bp / 100 * CELLEN);
+    for (var i = 0; i < box.children.length; i++) box.children[i].className = i < vol ? kl : "";
+  }
+  function start() { teken(); setInterval(teken, 160); }
+  if (window.last) start(); else setTimeout(start, 300);
+})();
+</script>
 </body>
 </html>

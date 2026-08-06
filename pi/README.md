@@ -5,8 +5,11 @@ Dit is meer een notitieblok voor mezelf over hoe de code werkt en waarom
 sommige dingen zo raar zijn.
 
 ```
-public/index.html   opmaak liggend, 480 × 320
-public/portrait.html opmaak staand, 320 × 480
+tools/layout-body.html   de opmaak — één bron voor beide indelingen
+tools/build-layouts.js   zet daar de twee pagina's uit samen
+public/index.html   liggend, 480 × 320   ← uitvoer
+public/portrait.html staand,  320 × 480   ← uitvoer
+public/theme.css    de vormtaal, gedeeld door allebei
 public/app.js       het gedrag, gedeeld door allebei
 src/serial.js       seriële poort zonder npm-modules
 src/vesc.js         VESC-protocol: framing, CRC16, pakketten
@@ -24,18 +27,31 @@ tools/vesc-probe.js kijken wat je VESC vertelt
 tools/selftest.js   tests, zonder hardware
 ```
 
-## Twee indelingen, één script
+## Twee indelingen, één bron
 
-Geen build, geen framework, geen bundler. De Pi heeft geen internet, dus alles
-zit lokaal: de kleuren en maten uit het ontwerp staan als CSS-variabelen
-bovenaan elke pagina, de iconen zijn inline SVG. Inter wordt gebruikt als je hem
-lokaal hebt (`apt install fonts-inter`), anders valt hij terug op system-ui.
+Geen framework en geen bundler. De Pi heeft geen internet, dus alles staat
+lokaal: `theme.css` voor de vormtaal, `app.js` voor het gedrag, iconen als
+inline SVG. Segoe UI wordt gebruikt als je hem hebt, anders valt hij terug op
+system-ui — het ontwerp leunt op vorm en niet op één specifiek lettertype.
 
-`index.html` is liggend, `portrait.html` staand. Ze verschillen **alleen** in
-opmaak: dezelfde element-id's, hetzelfde `app.js`. Dat script apart houden is
-geen nettigheid maar noodzaak — twee kopieën van negenhonderd regels lopen bij
-de eerste wijziging al uit elkaar, en dan werkt een knop in de ene indeling wel
-en in de andere niet.
+`index.html` is liggend, `portrait.html` staand, en ze zijn **allebei
+uitvoer**. De opmaak staat één keer in `tools/layout-body.html`; wat per
+indeling verschilt is alleen maatvoering, en die staat in een `<style>`-blok
+dat `tools/build-layouts.js` erbij zet:
+
+```bash
+node tools/build-layouts.js     # na elke wijziging in layout-body.html
+```
+
+Alles wat gedeeld kan worden is ook echt gedeeld — opmaak, vormtaal, gedrag.
+Twee handgeschreven pagina's lopen bij de eerste wijziging al uit elkaar, en
+dan werkt een knop in de ene indeling wel en in de andere niet. Dat is precies
+het soort fout dat je pas op het stuur ziet.
+
+De vormtaal is die van Windows 11: mica als ondergrond, kaarten met een rand
+van 1 px plus een lichtere lijn langs de bovenkant, hoeken van 8 px, en een
+accentbalkje onder de actieve tab in plaats van een gevuld vlak. Er zijn drie
+andere ontwerpen geweest; die staan nog in `tools/concepts/`.
 
 Welke pagina je voor je hebt staat op de body:
 
