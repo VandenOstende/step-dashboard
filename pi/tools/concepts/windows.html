@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=480,height=320,initial-scale=1,user-scalable=no">
+<title>Step Dashboard — concept Windows</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONCEPT · WINDOWS — 480 × 320
+
+   De vormtaal van Windows 11 (Fluent). Waar iOS eilanden op een grijze vloer
+   legt, stapelt Fluent lagen op elkaar en trekt er een lijn omheen. Wat er
+   overgenomen is:
+
+   · Mica als ondergrond: een grijs dat net iets donkerder is dan de kaarten
+     die erop liggen. De kaarten hebben een echte rand van 1 px, plus een
+     lichtere lijn langs de bovenkant — die "control stroke" is wat een Fluent-
+     kaart doet lijken alsof er licht van boven op valt.
+   · Hoeken van 8 px voor kaarten en 4 px voor knoppen. Rustiger dan de 22 px
+     van iOS; het is een besturingssysteem, geen telefoon.
+   · Het accentblauw markeert met een balkje, niet met een vlak: onder de
+     actieve tab ligt een pil van 3 px. Dat is het navigatie-idioom van
+     Windows 11.
+   · Instellingen zoals de app Instellingen zelf: elke regel een eigen kaartje
+     met de titel links en het knopje rechts, met ruimte ertussen.
+   · Voortgang is een dunne afgeronde balk in accentkleur — de Fluent
+     ProgressBar, 4 px hoog en verder niks.
+
+   Gedrag komt uit public/app.js: dezelfde element-id's, hetzelfde script.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Donker eerst; body.light zet het lichte thema. Beide zijn de kleuren die
+   Windows 11 zelf gebruikt. */
+:root{
+  --mica:#202020;
+  --card:#2b2b2b;
+  --card2:#323232;
+  --stroke:#3d3d3d;
+  --stroke-top:#4a4a4a;
+  --text:#ffffff;
+  --text2:#c5c5c5;
+  --text3:#8a8a8a;
+  --accent:#60cdff;
+  --on-accent:#003a52;
+  --track:#3a3a3a;
+  --warn:#fce100;
+  --crit:#ff99a4;
+  --crit-fill:#c42b1c;
+  --warn-fill:#9d5d00;
+
+  --color-crit-fill:var(--crit-fill);
+  --color-warn-fill:var(--warn-fill);
+  --color-warn:var(--warn);
+  --color-accent:var(--accent);
+  --color-neutral-800:var(--stroke);
+  --color-neutral-500:var(--text3);
+  --color-text:var(--text);
+
+  --font:"Segoe UI Variable Text","Segoe UI","Inter",system-ui,"DejaVu Sans",sans-serif;
+  --r-card:8px;
+  --r-ctl:4px;
+}
+body.light{
+  --mica:#f3f3f3;
+  --card:#fbfbfb;
+  --card2:#ffffff;
+  --stroke:#e2e2e2;
+  --stroke-top:#ffffff;
+  --text:#1a1a1a;
+  --text2:#5d5d5d;
+  --text3:#767676;
+  --accent:#0067c0;
+  --on-accent:#ffffff;
+  --track:#dcdcdc;
+  --warn:#9d5d00;
+  --crit:#c42b1c;
+  --crit-fill:#c42b1c;
+  --warn-fill:#9d5d00;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:var(--mica);color:var(--text);font-family:var(--font);
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;cursor:none;
+}
+body,body *{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font-family:inherit;font-variant-numeric:inherit;color:inherit}
+svg{display:block}
+
+#root{position:relative;width:480px;height:320px;display:flex;flex-direction:column;overflow:hidden}
+
+/* De Fluent-kaart: vlak, rand, en een lichtere lijn langs de bovenkant. */
+.card,.blk{background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);
+  display:flex;flex-direction:column;justify-content:center;gap:7px;padding:9px 13px}
+
+.k,.lbl{font-size:11px;font-weight:600;color:var(--text2);line-height:1}
+
+.bar{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+.bar>i{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+.fill-warn{background:var(--warn-fill)!important}
+.fill-crit{background:var(--crit-fill)!important}
+
+/* ── titelbalk ────────────────────────────────────────────────────────────── */
+#top{height:26px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 12px;background:var(--card);border-bottom:1px solid var(--stroke);
+  font-size:12px}
+#topleft{display:flex;align-items:center;min-width:0}
+#outside{display:flex;align-items:center;gap:5px;color:var(--text2)}
+#outside svg{flex:none;width:12px;height:12px}
+#outtemp{font-size:12px;color:var(--text)}
+#status{display:flex;align-items:center;gap:9px;flex:none;color:var(--text2)}
+#wifiico,#btico{display:none;flex:none}
+#cellgrp{display:none;align-items:center;gap:5px;flex:none}
+#cellgrp.on{display:flex}
+#sig{display:flex;align-items:flex-end;gap:2px;height:10px}
+#sig span{width:2px;background:var(--track)}
+#sig span:nth-child(1){height:3px}
+#sig span:nth-child(2){height:5px}
+#sig span:nth-child(3){height:7px}
+#sig span:nth-child(4){height:8px}
+#sig span:nth-child(5){height:10px}
+#sig span.on{background:var(--accent)}
+#sig span.weak{background:var(--warn)}
+#tech{font-size:10px}
+#clock{font-size:12px;color:var(--text)}
+#statusbtn{display:flex;align-items:center;gap:5px;height:26px;padding:0;background:transparent;border:0}
+#dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+#dot.demo{background:var(--warn)}
+#dot.off{background:var(--crit)}
+#stxt{display:none}
+
+/* ── InfoBar ──────────────────────────────────────────────────────────────
+   Windows meldt in een InfoBar: een kaart met een gekleurde streep links en
+   een icoon in dezelfde kleur. Geen gevuld vlak — dat bewaart Fluent voor
+   knoppen. */
+#notice{display:none;align-items:center;gap:9px;height:28px;flex:none;margin:6px 12px 0;
+  padding:0 11px;background:var(--card2);border:1px solid var(--stroke);
+  border-left:4px solid var(--warn-fill);border-radius:var(--r-ctl);
+  color:var(--text);font-size:12.5px;text-align:left}
+#notice.on{display:flex}
+#notice.crit{border-left-color:var(--crit-fill)}
+#notice.info{border-left-color:var(--accent)}
+#notice svg{flex:none;width:14px;height:14px;color:var(--warn-fill)}
+#notice.crit svg{color:var(--crit-fill)}
+#notice.info svg{color:var(--accent)}
+#noticetxt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#noticemore{flex:none;font-size:11px;color:var(--accent)}
+
+/* ── panelen ──────────────────────────────────────────────────────────────── */
+#panes{position:relative;flex:1;min-height:0}
+.pane{position:absolute;inset:0;display:none;gap:8px;padding:8px 12px}
+.pane.on{display:flex}
+
+/* 1 · RIT ------------------------------------------------------------------ */
+#p0{gap:8px}
+#speedbox{flex:1;min-width:0;background:var(--card);border:1px solid var(--stroke);
+  border-radius:var(--r-card);box-shadow:inset 0 1px 0 var(--stroke-top);
+  padding:10px 16px 12px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+#speedrow{display:flex;align-items:baseline;gap:7px}
+#speed{font-size:100px;font-weight:600;line-height:.9;letter-spacing:-.035em}
+#speedmeta{display:flex;flex-direction:column;gap:1px;padding-bottom:9px}
+#speedunit{font-size:14px;color:var(--text2)}
+#vmaxrow{font-size:11px;color:var(--text3)}
+#speedtrack{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+#speedbar{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+
+#side{width:150px;flex:none;display:flex;flex-direction:column;gap:8px}
+#side .card{flex:1}
+#side .val{display:flex;align-items:baseline;gap:4px}
+#side .n{font-size:38px;font-weight:600;line-height:1;letter-spacing:-.03em}
+#side .u{font-size:13px;color:var(--text2)}
+#battrack{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+#batbar{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+#batcard.low .n,#rangecard.low .n{color:var(--warn)}
+#batcard.empty .n,#rangecard.empty .n{color:var(--crit)}
+#batcard.low #batbar{background:var(--warn-fill)}
+#batcard.empty #batbar{background:var(--crit-fill)}
+
+/* 2 · MOTOR ---------------------------------------------------------------- */
+#p1{flex-direction:column;gap:8px}
+#temps{flex:1;min-height:0;display:flex;gap:8px}
+#temps .card{flex:1}
+#temps .val{display:flex;align-items:baseline;gap:4px}
+#p1 .v.big{font-size:44px;font-weight:600;line-height:1;letter-spacing:-.03em}
+#p1 .v.big.warn{color:var(--warn)}
+#p1 .v.big.crit{color:var(--crit)}
+#temps .u{font-size:13px;color:var(--text2)}
+#motorrow{flex:none;display:flex;gap:8px}
+#motorrow .card{flex:1;gap:6px}
+#motorrow .val{display:flex;align-items:baseline;gap:4px}
+#motorrow .n{font-size:23px;font-weight:600;line-height:1}
+#motorrow .u{font-size:12px;color:var(--text2)}
+
+/* 3 · ACCU ----------------------------------------------------------------- */
+#p2{flex-direction:column;gap:8px}
+#packtop{flex:1;min-height:0;display:flex;gap:8px}
+#packbig{flex:1;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);padding:10px 14px;
+  display:flex;flex-direction:column;justify-content:center;gap:9px}
+#packnum{display:flex;align-items:baseline;gap:4px}
+#bat2{font-size:62px;font-weight:600;line-height:1;letter-spacing:-.035em}
+#bat2.warn{color:var(--warn)}
+#bat2.crit{color:var(--crit)}
+#packpct{font-size:18px;color:var(--text2)}
+#cells{display:flex;gap:3px;height:14px}
+#cells i{flex:1;border-radius:1px;background:var(--track)}
+#cells i.on{background:var(--accent)}
+#cells i.warn{background:var(--warn-fill)}
+#cells i.crit{background:var(--crit-fill)}
+#bat2bar{display:none}
+#packlist{width:188px;flex:none;display:flex;flex-direction:column;gap:5px}
+#packlist .row{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 11px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+#packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
+#packlist .u{font-size:11px;color:var(--text2)}
+#rpmhold{display:none}
+
+/* ── tabstrip met accentpil ───────────────────────────────────────────────── */
+#dots{height:28px;flex:none;display:flex;align-items:stretch;gap:0;padding:0 12px 4px;
+  border-top:1px solid var(--stroke);background:var(--card)}
+#dots span{flex:1;position:relative;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--text2)}
+#dots span.on{color:var(--text);font-weight:600}
+#dots span.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
+  bottom:2px;width:22px;height:3px;border-radius:2px;background:var(--accent)}
+
+/* ── overlays ─────────────────────────────────────────────────────────────── */
+.sheet{position:absolute;inset:26px 0 0;display:none;flex-direction:column;gap:8px;
+  background:var(--mica);padding:8px 12px 10px}
+.sheet.on{display:flex}
+#net{z-index:2}
+#notices{z-index:3}
+#sys,#settings{z-index:4}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
+.sheettitle{font-size:18px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sheetnav{display:flex;align-items:center;gap:5px;flex:none}
+.xbtn{width:40px;height:32px;flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+.xbtn.off{opacity:.35}
+.xbtn.hit,#netseg .xbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.scroller{flex:1;position:relative;display:flex;flex-direction:column;gap:5px;overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
+.scroller::-webkit-scrollbar{width:0;height:0}
+
+.inforows{display:flex;flex-direction:column;gap:5px;flex:none}
+.inforow{min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 13px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+.inforow .lbl{flex:none;font-size:13px;font-weight:400;color:var(--text)}
+.inforow .val{font-size:13px;color:var(--text2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sysbtns{margin-top:auto;display:flex;gap:6px;flex:none}
+.pbtn{flex:1;height:42px;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-bottom-width:2px;border-radius:var(--r-ctl);font-size:13px}
+.pbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+/* instellingen — elke regel een eigen kaartje, zoals in de app Instellingen */
+.setrow{min-height:44px;flex:none;display:flex;align-items:center;gap:6px;padding:0 13px;
+  background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+.setrow .lbl{flex:1;min-width:0;font-size:13px;font-weight:400;color:var(--text);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setrow.stack{flex-direction:column;align-items:stretch;justify-content:center;gap:6px;padding:8px 13px}
+.setrow.stack .lbl{flex:none}
+.setrow.stack .line{display:flex;align-items:center;gap:6px}
+.seg{flex:none;width:58px;height:30px;background:var(--card2);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:12px}
+.seg.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.seg.lay{width:76px}
+.step{flex:none;width:34px;height:30px;background:var(--card2);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:16px}
+.setval{flex:none;width:48px;text-align:center;font-size:13px;color:var(--text2)}
+.setval.wide{width:56px}
+.setstat{flex:1;min-width:0;font-size:12px;color:var(--text2);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setstat.new{color:var(--accent)}
+.setstat.bad{color:var(--crit)}
+.rowbtn{flex:none;height:30px;padding:0 14px;background:var(--card2);color:var(--text);
+  border:1px solid var(--stroke);border-bottom-width:2px;border-radius:var(--r-ctl);font-size:12px}
+.rowbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.rowbtn[disabled]{opacity:.4}
+
+/* meldingen — dezelfde InfoBar als in de balk */
+#noticelist .row{flex:none;display:flex;align-items:center;gap:10px;min-height:46px;
+  padding:8px 12px;background:var(--card);border:1px solid var(--stroke);
+  border-left:4px solid var(--warn-fill);border-radius:var(--r-ctl)}
+#noticelist .row.crit{border-left-color:var(--crit-fill)}
+#noticelist .row.info{border-left-color:var(--accent)}
+#noticelist .row svg{flex:none;width:16px;height:16px;color:var(--warn-fill)}
+#noticelist .row.crit svg{color:var(--crit-fill)}
+#noticelist .row.info svg{color:var(--accent)}
+#noticelist .msg{flex:1;font-size:13.5px;line-height:1.25}
+#noticelist .lv{flex:none;font-size:11px;color:var(--text2)}
+#noticelist .row.act .lv{color:var(--accent)}
+
+/* verbindingen */
+#netseg{display:flex;gap:5px;flex:none}
+#netseg button{flex:1;min-width:0;height:32px;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:12.5px}
+#netseg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#netseg .xbtn{flex:none;width:38px;height:32px}
+#netclose{flex:none!important;width:38px;height:32px;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+#netlist button{min-height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 13px;background:var(--card);border:1px solid var(--stroke);
+  border-radius:var(--r-ctl);color:var(--text);font-size:13.5px;text-align:left}
+#netlist button.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#netlist .st{flex:none;font-size:11px;color:var(--text2)}
+#netlist button.sel .st{color:var(--accent)}
+#netlist button.scanrow{min-height:40px;border-style:dashed;color:var(--accent);font-size:12.5px}
+#netlist button.scanrow.busy{color:var(--text2);border-color:var(--stroke)}
+#netlist button.scanrow .st{color:inherit;opacity:.75}
+#netempty{font-size:13px;color:var(--text2);padding:12px 2px}
+
+/* laden */
+#charge{position:absolute;inset:26px 0 0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;padding:16px 24px;background:var(--mica);z-index:1}
+#charge.on{display:flex}
+#chargehead{display:flex;align-items:center;gap:6px;color:var(--accent);font-size:12px;font-weight:600}
+#chargepct{font-size:88px;font-weight:600;line-height:.9;letter-spacing:-.04em}
+#chargepct span+span{font-size:22px;font-weight:400;color:var(--text2);margin-left:4px}
+#chargetrack{width:300px;height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+#chargebar{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+#chargeeta{font-size:15px}
+#chargesub{font-size:11.5px;color:var(--text2)}
+
+/* schermtoetsenbord */
+#kbd{position:absolute;inset:0;display:none;flex-direction:column;gap:5px;
+  background:var(--mica);padding:8px;z-index:5}
+#kbd.on{display:flex}
+#kbdhead{display:flex;align-items:center;gap:8px;flex:none;height:24px}
+#kbdtitle{flex:1;min-width:0;font-size:12px;color:var(--text2);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#kbdclose{width:40px;height:24px;flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+#kbdfield{flex:none;display:flex;align-items:center;gap:5px;height:38px}
+#kbdval{flex:1;min-width:0;height:38px;display:flex;align-items:center;padding:0 11px;
+  background:var(--card2);border:1px solid var(--stroke);border-bottom:2px solid var(--accent);
+  border-radius:var(--r-ctl);font-size:16px;overflow:hidden;white-space:nowrap}
+#kbdval.empty{color:var(--text3)}
+#kbdeye{width:44px;height:38px;flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+#kbdeye.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#kbdkeys{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px}
+.krow{flex:1;display:flex;justify-content:center;gap:4px}
+.key{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+  background:var(--card);color:var(--text);border:1px solid var(--stroke);
+  border-bottom-width:2px;border-radius:var(--r-ctl);font-size:17px;line-height:1;padding:0}
+.key.wide{flex:0 0 54px}
+.key.mode{flex:0 0 60px;font-size:12px}
+.key.space{flex:1}
+.key.go{flex:0 0 102px;background:var(--accent);color:var(--on-accent);border-color:var(--accent);
+  font-size:12.5px}
+.key.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.key.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+/* aan/uit */
+#power{position:absolute;inset:0;display:none;flex-direction:column;gap:8px;
+  padding:10px 12px 12px;background:var(--mica);z-index:6}
+#power.on{display:flex}
+#powerhead{display:flex;align-items:center;gap:6px;flex:none;font-size:12px;font-weight:600;color:var(--text2)}
+#powerbtns{flex:1;display:flex;gap:8px;min-height:0}
+.powbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:var(--card);color:var(--text);border:1px solid var(--stroke);
+  border-bottom-width:2px;border-radius:var(--r-card)}
+.powbtn.crit{border-color:var(--crit-fill);color:var(--crit)}
+.powbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.powbtn[disabled]{opacity:.4}
+.powname{font-size:19px;font-weight:600}
+.powsub{font-size:11.5px;color:var(--text2)}
+#powermsg{flex:none;min-height:14px;font-size:12px;text-align:center;color:var(--text2)}
+#powermsg.bad{color:var(--crit)}
+#powerclose{height:40px;flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-bottom-width:2px;border-radius:var(--r-ctl);font-size:13px}
+
+/* alarm */
+#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;gap:13px;padding:20px 28px;z-index:7}
+#alarm.on{display:flex}
+#alarmhead{display:flex;align-items:center;gap:12px}
+#alarmhead svg{width:34px;height:34px}
+#alarmtitle{font-size:32px;font-weight:600;line-height:1}
+#alarmmsg{font-size:18px;line-height:1.3;white-space:pre-line}
+#alarmclose{height:42px;min-width:170px;margin-top:2px;padding:0 20px;background:rgba(255,255,255,.16);
+  border:1px solid currentColor;border-radius:var(--r-ctl);font-size:14px}
+</style>
+</head>
+<body data-layout="Liggend">
+<div id="root">
+
+  <div id="top">
+    <div id="topleft">
+      <div id="outside">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
+        <span id="outtemp">--&deg;</span>
+      </div>
+    </div>
+    <div id="status">
+      <svg id="wifiico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke-width="1.8" stroke-linecap="round">
+        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--track)"/>
+        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--track)"/>
+        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--track)"/>
+        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--track)" stroke="none"/>
+      </svg>
+      <svg id="btico" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <div id="cellgrp">
+        <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
+        <span id="tech">--</span>
+      </div>
+      <span id="clock">--:--</span>
+      <button id="statusbtn"><span id="dot"></span><span id="stxt">--</span></button>
+    </div>
+  </div>
+
+  <button id="notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+    <span id="noticetxt">--</span>
+    <span id="noticemore">alle</span>
+  </button>
+
+  <div id="panes">
+
+    <!-- 1 · RIT -->
+    <div class="pane on" id="p0">
+      <div id="speedbox">
+        <span class="k">Snelheid</span>
+        <div id="speedrow">
+          <div id="speed">0</div>
+          <div id="speedmeta">
+            <div id="speedunit">km/u</div>
+            <div id="vmaxrow">max <span id="vmaxtxt">0</span></div>
+          </div>
+        </div>
+        <div id="speedtrack"><i id="speedbar"></i></div>
+      </div>
+
+      <div id="side">
+        <div class="card" id="batcard">
+          <span class="k">Batterij</span>
+          <div class="val"><span class="n" id="bat">0</span><span class="u">%</span></div>
+          <div id="battrack"><i id="batbar"></i></div>
+        </div>
+        <div class="card" id="rangecard">
+          <span class="k">Bereik</span>
+          <div class="val"><span class="n" id="range">0</span><span class="u">km</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · MOTOR -->
+    <div class="pane" id="p1">
+      <div id="temps">
+        <div class="card">
+          <span class="k">Motortemperatuur</span>
+          <div class="val"><span class="v big" id="tm">0</span><span class="u">&deg;C</span></div>
+        </div>
+        <div class="card">
+          <span class="k">FET-temperatuur</span>
+          <div class="val"><span class="v big" id="tf">0</span><span class="u">&deg;C</span></div>
+        </div>
+      </div>
+      <div id="motorrow">
+        <div class="card">
+          <span class="k">Duty</span>
+          <div class="val"><span class="n" id="duty">0</span><span class="u">%</span></div>
+          <div class="bar"><i id="dutybar"></i></div>
+        </div>
+        <div class="card">
+          <span class="k">Motorstroom</span>
+          <div class="val"><span class="n" id="im">0</span><span class="u">A</span></div>
+        </div>
+        <div class="card">
+          <span class="k">Accustroom</span>
+          <div class="val"><span class="n" id="ib">0</span><span class="u">A</span></div>
+        </div>
+      </div>
+      <span id="rpmhold"><span id="rpm">0</span></span>
+    </div>
+
+    <!-- 3 · ACCU -->
+    <div class="pane" id="p2">
+      <div id="packtop">
+        <div id="packbig">
+          <span class="k">Accuniveau</span>
+          <div id="packnum"><span id="bat2">0</span><span id="packpct">%</span></div>
+          <div id="cells"></div>
+        </div>
+        <div id="packlist">
+          <div class="row"><span class="lbl">Pakspanning</span>
+            <span class="v"><span id="vv">0</span><span class="u">V</span></span></div>
+          <div class="row"><span class="lbl">Per cel</span>
+            <span class="v"><span id="vc">0</span><span class="u">V</span></span></div>
+          <div class="row"><span class="lbl">Verbruikt</span>
+            <span class="v"><span id="wh">0</span><span class="u">Wh</span></span></div>
+          <div class="row"><span class="lbl">Afstand</span>
+            <span class="v"><span id="trip">0</span><span class="u">km</span></span></div>
+          <div class="row"><span class="lbl">Per kilometer</span>
+            <span class="v"><span id="whkm">0</span><span class="u">Wh</span></span></div>
+        </div>
+      </div>
+      <div id="bat2bar"></div>
+    </div>
+  </div>
+
+  <div id="dots"><span class="on">Rit</span><span>Motor</span><span>Accu</span></div>
+
+  <!-- laden -->
+  <div id="charge">
+    <div id="chargehead">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
+      <span id="chargelabel">Laden</span>
+    </div>
+    <div id="chargepct"><span id="chargeval">0</span><span>%</span></div>
+    <div id="chargetrack"><i id="chargebar"></i></div>
+    <div id="chargeeta">tijd nog onbekend</div>
+    <div id="chargesub">--</div>
+  </div>
+
+  <!-- verbindingen -->
+  <div class="sheet" id="net">
+    <div id="netseg">
+      <button id="segwifi" class="on">Wi-Fi</button>
+      <button id="segbt">Bluetooth</button>
+      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+      <button id="netclose"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="scroller" id="netlist"></div>
+  </div>
+
+  <!-- schermtoetsenbord -->
+  <div id="kbd">
+    <div id="kbdhead">
+      <div id="kbdtitle">Wachtwoord</div>
+      <button id="kbdclose"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="kbdfield">
+      <div id="kbdval" class="empty"></div>
+      <button id="kbdeye"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.5 5.2 12 5.2 22.4 12 22.4 12 18.5 18.8 12 18.8 1.6 12 1.6 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+    </div>
+    <div id="kbdkeys"></div>
+  </div>
+
+  <!-- meldingen -->
+  <div class="sheet" id="notices">
+    <div class="sheethead">
+      <div class="sheettitle">Meldingen</div>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="noticelist"></div>
+  </div>
+
+  <!-- systeem -->
+  <div class="sheet" id="sys">
+    <div class="sheethead">
+      <div class="sheettitle">Systeem</div>
+      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="inforows">
+      <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
+      <div class="inforow" id="syscellrow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
+    </div>
+    <div class="sysbtns">
+      <button id="sysnet" class="pbtn">Verbindingen</button>
+      <button id="sysset" class="pbtn">Instellingen</button>
+      <button id="syspower" class="pbtn">Power</button>
+    </div>
+  </div>
+
+  <!-- instellingen -->
+  <div class="sheet" id="settings">
+    <div class="sheethead">
+      <div class="sheettitle">Instellingen</div>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="setlist">
+      <div class="setrow stack">
+        <span class="lbl">Update</span>
+        <div class="line">
+          <span class="setstat" id="setupd">controleren…</span>
+          <button id="updbtn" class="rowbtn">Zoeken</button>
+        </div>
+      </div>
+      <div class="setrow"><span class="lbl">Thema</span>
+        <button class="seg" data-theme="Auto">Auto</button>
+        <button class="seg" data-theme="Licht">Licht</button>
+        <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow"><span class="lbl">Indeling</span>
+        <button class="seg lay" data-lay="Liggend">Liggend</button>
+        <button class="seg lay" data-lay="Staand">Staand</button>
+      </div>
+      <div class="setrow"><span class="lbl">Kwartslag</span>
+        <button class="seg rot" data-rot="90">90&deg;</button>
+        <button class="seg rot" data-rot="270">270&deg;</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp waarschuwing</span>
+        <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
+        <span class="setval" id="setwarn">70&deg;</span>
+        <button class="step" data-k="tempWarn" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp kritiek</span>
+        <button class="step" data-k="tempCrit" data-d="-5">&minus;</button>
+        <span class="setval" id="setcrit">90&deg;</span>
+        <button class="step" data-k="tempCrit" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Helderheid</span>
+        <button class="step bright" data-d="-10">&minus;</button>
+        <span class="setval wide" id="setbright">80 %</span>
+        <button class="step bright" data-d="10">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Startscherm</span>
+        <button class="seg start" data-i="0">Rit</button>
+        <button class="seg start" data-i="1">Motor</button>
+        <button class="seg start" data-i="2">Accu</button>
+      </div>
+      <div class="setrow"><span class="lbl">Topsnelheid</span>
+        <button id="toprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow"><span class="lbl">Rit-teller</span>
+        <button id="triprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow stack"><span class="lbl">Versie</span>
+        <span class="setstat" id="setver">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- aan/uit -->
+  <div id="power">
+    <div id="powerhead">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+      <span>Aan / uit</span>
+    </div>
+    <div id="powerbtns">
+      <button id="powreboot" class="powbtn">
+        <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
+        <span class="powname">Opnieuw opstarten</span>
+        <span class="powsub">reboot</span>
+      </button>
+      <button id="powshutdown" class="powbtn crit">
+        <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+        <span class="powname">Afsluiten</span>
+        <span class="powsub">shutdown</span>
+      </button>
+    </div>
+    <div id="powermsg"></div>
+    <button id="powerclose">Annuleren</button>
+  </div>
+
+  <!-- alarm -->
+  <div id="alarm">
+    <div id="alarmhead">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <div id="alarmtitle">Waarschuwing</div>
+    </div>
+    <div id="alarmmsg">Motortemperatuur te hoog</div>
+    <button id="alarmclose">Sluiten</button>
+  </div>
+
+</div>
+
+<script src="/app.js"></script>
+<script>
+"use strict";
+/* Alleen de cellenrij tekent dit concept zelf; de rest loopt via app.js. */
+(function () {
+  var CELLEN = 13;
+  var box = document.getElementById("cells");
+  if (box) for (var i = 0; i < CELLEN; i++) box.appendChild(document.createElement("i"));
+
+  function teken() {
+    var d = window.last;
+    if (!d || !box) return;
+    var bp = d.battery_pct || 0;
+    var kl = bp < 10 ? "crit" : (bp < 20 ? "warn" : "on");
+    var vol = Math.round(bp / 100 * CELLEN);
+    for (var i = 0; i < box.children.length; i++) box.children[i].className = i < vol ? kl : "";
+  }
+  function start() { teken(); setInterval(teken, 160); }
+  if (window.last) start(); else setTimeout(start, 300);
+})();
+</script>
+</body>
+</html>
