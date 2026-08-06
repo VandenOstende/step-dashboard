@@ -22,7 +22,6 @@ src/update.js       versie vergelijken met GitHub
 src/server.js       de HTTP-server
 install/step-update het script dat als root bijwerkt
 tools/design.js     designomgeving: de UI met nagemaakte hardware
-tools/concepts/     ontwerpen die nog geen productie zijn
 tools/vesc-probe.js kijken wat je VESC vertelt
 tools/selftest.js   tests, zonder hardware
 ```
@@ -237,21 +236,17 @@ Staand is 320 px breed, en dat dwingt een paar dingen af:
 
 ## Concepten
 
-In `tools/concepts/` staat ook **nocturne.html** en **nocturne-staand.html**:
-het oorspronkelijke ontwerp uit Claude Design met zijn eigen maatvoering,
-zoals het tot en met versie `8e3b5cb` op de step draaide. De vormtaal in
-`public/theme.css` is diezelfde, maar op de huidige maatvoering — dat scheelt
-in de topbalk en in de cijfergroottes. Het concept draait op het huidige
-`app.js`, dus het is geen plaatje maar een werkende UI.
+De map `tools/concepts/` is leeg — er staan geen ontwerpen meer naast de app.
+Wat er stond (nocturne, wijzerplaat, cyber, apple, windows) zit in de
+geschiedenis: `git show ab1a694:pi/tools/concepts/` laat ze zien.
 
-`tools/concepts/` is waar een ontwerp begint. Het zijn losse pagina's die het
-echte `public/app.js` laden — dezelfde element-id's, hetzelfde gedrag — met
-alleen een andere opmaak eromheen. Je klikt er dus doorheen als door een
-werkende UI, niet door een plaatje. Ze staan bewust níet in `public/`: tot een
-concept goedgekeurd is hoort het niet in de app.
-
-De designomgeving vindt ze vanzelf. Elk `.html`-bestand in die map verschijnt
-als knop onder het frame; de server serveert ze op `/concept/<naam>`.
+Het mechanisme is er nog wél. Zet je een `.html` in `tools/concepts/`, dan
+verschijnt hij vanzelf als knop onder het frame van de designomgeving en
+serveert de server hem op `/concept/<naam>`. Zulke pagina's laden het echte
+`public/app.js` — dezelfde element-id's, hetzelfde gedrag — met alleen een
+andere opmaak eromheen, dus je klikt er doorheen als door een werkende UI en
+niet door een plaatje. Ze horen bewust níet in `public/`: tot een ontwerp
+goedgekeurd is hoort het niet in de app.
 
 Wat een nieuwe opmaak moet naleven:
 
@@ -265,11 +260,11 @@ Wat een nieuwe opmaak moet naleven:
   bestaan**: `--color-crit-fill`, `--color-warn-fill`, `--color-warn`,
   `--color-accent`, `--color-neutral-800`, `--color-neutral-500` en
   `--color-text`. Vergeet je die, dan verliest het temperatuuralarm zijn
-  achtergrond en blijven de boogjes van het wifi-icoon grijs. In een concept
-  met een eigen palet laat je ze doorwijzen naar je eigen namen.
+  achtergrond en blijven de boogjes van het wifi-icoon grijs. Heeft je ontwerp
+  een eigen palet, laat ze dan doorwijzen naar je eigen namen.
 
 Wat `app.js` níet kan is tekenen: hij zet tekst en breedtes, meer niet. Een
-concept dat ringen of segmenten wil, leest daarvoor zelf `window.last` uit in
+ontwerp dat ringen of segmenten wil, leest daarvoor zelf `window.last` uit in
 een eigen scriptblok. Dat botst nergens mee, want app.js beheert alleen zijn
 eigen id's.
 

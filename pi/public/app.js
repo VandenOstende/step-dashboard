@@ -42,6 +42,7 @@ var cfg = {
   packWh: 1147,
   whPerKm: 18,
   speedMax: 35,
+  bright: 80,
   start: 0
 };
 var POLL_MS = 150;
@@ -454,6 +455,7 @@ $("powerclose").addEventListener("pointerdown", function (e) {
 
 /* ── instellingen ──────────────────────────────────────────────────────── */
 function renderSettings() {
+  $("setbright").textContent = cfg.bright + " %";
   $("setwarn").textContent = cfg.tempWarn + "°";
   $("setcrit").textContent = cfg.tempCrit + "°";
   [].slice.call(document.querySelectorAll(".seg.start")).forEach(function (b) {
@@ -538,6 +540,18 @@ function gotoLayout(name) {
 }
 
 $("setlist").addEventListener("pointerdown", function (e) {
+  var br = e.target.closest(".step.bright");
+  if (br) {
+    e.preventDefault();
+    cfg.bright = Math.max(20, Math.min(100, cfg.bright + (+br.dataset.d)));
+    fetch("/backlight", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: cfg.bright })
+    })["catch"](function () {});
+    renderSettings();
+    saveSettings();
+    return;
+  }
   var s = e.target.closest(".step");
   if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
   var t = e.target.closest(".seg[data-theme]");
