@@ -54,9 +54,9 @@ scooter is often out of range and it should just work.
 - 3.5" SPI touchscreen, 480 × 320 — portrait works too, see Layout below
 - Optional: a 5G dongle, for the signal bars in the top bar
 
-The interface follows the Windows 11 design language: mica as the ground,
-cards with a 1 px stroke plus a lighter line along the top edge, 8 px corners,
-and an accent bar under the active tab instead of a filled block.
+The interface uses the Nocturne design language: a dark blue ground, a purple
+accent, flat cards with a 1 px border, and dots at the bottom instead of a tab
+strip. A light theme comes with it, on the clock.
 
 The display is slow, so the UI repaints about 6 times a second and only touches
 the pixels that actually changed. No animations, no transitions.
@@ -276,8 +276,6 @@ Verder:
 - Het thema volgt de klok: licht tussen 07:30 en 18:00, daarbuiten donker.
 - Twee indelingen: liggend 480 × 320 en staand 320 × 480. Instellingen →
   Indeling wisselt ertussen, en die keuze overleeft een herstart.
-- Vier stijlen: Windows, Nocturne, Apple en Cyber. Instellingen → **Stijl**
-  wisselt ertussen zonder te herladen; de indeling blijft precies staan.
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
 - Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
   wifi-tabblad scant — ook als er al iets verbonden is.
@@ -301,10 +299,9 @@ step staat vaak buiten bereik en dan moet het gewoon werken.
 - 3,5" SPI-touchscreen, 480 × 320 — staand kan ook, zie Indeling hieronder
 - Optioneel: 5G-dongle, voor de bereikbalkjes in de topbalk
 
-De interface staat standaard in de vormtaal van Windows 11: mica als ondergrond,
-kaarten met een rand van 1 px plus een lichtere lijn langs de bovenkant, hoeken
-van 8 px, en een accentbalkje onder de actieve tab in plaats van een gevuld vlak.
-Er zijn er nog drie — zie Stijl hieronder.
+De interface volgt de vormtaal Nocturne: donkerblauwe ondergrond, paars accent,
+platte kaarten met een rand van 1 px en puntjes onderaan in plaats van een
+tabstrip. Er hoort een licht thema bij, dat de klok volgt.
 
 Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
 de pixels aan die echt veranderen. Geen animaties, geen transities.
@@ -341,23 +338,6 @@ toch niet toe. Zo is de hele installatie offline te doen.
 De SPI-driver van het schermpje valt hierbuiten, die verschilt per merk. Zorg
 dat je scherm werkt vóór je de kiosk aanzet; de UI is precies op 480 × 320 (of
 320 × 480) gemaakt en scrollt niet.
-
-### Stijl
-
-Instellingen → **Stijl** kiest de vormtaal. Alle vier tonen dezelfde gegevens
-op dezelfde plek; wat verandert is kleur, vorm en lettertype.
-
-| stijl | waar het op lijkt |
-|---|---|
-| **Windows** | Windows 11 · Fluent — de standaard |
-| **Nocturne** | het oorspronkelijke ontwerp: donkerblauw met een paars accent |
-| **Apple** | iOS: witte eilanden met ronde hoeken, systeemkleuren |
-| **Cyber** | Cyberpunk 2077 bij daglicht: geknipte hoeken, hazard-geel, mono-labels |
-
-Wisselen gaat meteen — er wordt niets herladen, de indeling verschuift niet en
-de keuze staat op de Pi, dus hij overleeft een herstart. Elke stijl heeft zijn
-eigen licht- en donkerversie, dus **Thema** (Auto / Licht / Donker) blijft
-gewoon werken zoals hij deed.
 
 ### Indeling
 
