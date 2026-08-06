@@ -234,6 +234,12 @@ Staand is 320 px breed, en dat dwingt een paar dingen af:
 
 ## Concepten
 
+In `tools/concepts/` staat ook **nocturne.html** en **nocturne-staand.html**:
+het oorspronkelijke ontwerp uit Claude Design, zoals het tot en met versie
+`8e3b5cb` op de step draaide. Bewaard toen de Windows-vormtaal productie werd,
+zodat je ernaar terug kunt kijken — en desnoods terug kunt. Het draait op het
+huidige `app.js`, dus het is geen plaatje maar een werkende UI.
+
 `tools/concepts/` is waar een ontwerp begint. Het zijn losse pagina's die het
 echte `public/app.js` laden — dezelfde element-id's, hetzelfde gedrag — met
 alleen een andere opmaak eromheen. Je klikt er dus doorheen als door een
