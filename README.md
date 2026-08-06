@@ -18,7 +18,7 @@ and I want to decide myself what goes on that screen.
 ### What it does
 
 Three screens: **Ride** (big speed, battery percentage, estimated range),
-**Motor** (temperatures, duty, currents, rpm) and **Battery** (pack voltage, cell
+**Motor** (temperatures, duty, currents) and **Battery** (pack voltage, cell
 voltage, Wh, distance, Wh/km). Tapping the screen moves to the next one; the
 three dots at the bottom show where you are.
 
@@ -263,7 +263,7 @@ een houder — en ik wil zelf bepalen wat er op dat scherm staat.
 ### Wat het doet
 
 Drie schermen: **Rit** (snelheid groot, accupercentage, geschat bereik),
-**Motor** (temperaturen, duty, stromen, rpm) en **Accu** (spanning, celspanning,
+**Motor** (temperaturen, duty, stromen) en **Accu** (spanning, celspanning,
 Wh, afstand, Wh/km). Tikken op het scherm gaat naar het volgende; de drie
 puntjes onderaan laten zien waar je zit.
 
