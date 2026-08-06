@@ -71,6 +71,7 @@
       <button id="lay-l" class="on">Liggend</button>
       <button id="lay-p">Staand</button>
       <button id="lay-pr" title="Staande UI op het liggende paneel van de Pi">Staand op 480 × 320</button>
+      <span id="conceptbtns" style="display:flex;gap:10px"></span>
       <span style="width:10px"></span>
       <button id="z1" class="on">1×</button>
       <button id="z2">2×</button>
@@ -314,6 +315,7 @@ function paintLayout(name) {
 
 function setLayout(name, paneel) {
   if (!state) return;
+  if (concept === null && state.layout === name && !!paneel === opPaneel && frame.src.indexOf("/concept/") < 0) return;
   opPaneel = !!paneel;
   state.layout = name;
   paintLayout(name);
@@ -321,9 +323,44 @@ function setLayout(name, paneel) {
     frame.src = name === "Staand" ? "/portrait.html" : "/index.html";
   });
 }
-$("lay-l").addEventListener("click", function () { setLayout("Liggend", false); });
-$("lay-p").addEventListener("click", function () { setLayout("Staand", false); });
-$("lay-pr").addEventListener("click", function () { setLayout("Staand", true); });
+/* Concepten: ontwerpen die nog niet in public/ staan. Ze draaien wel op het
+   echte app.js, dus je kunt er gewoon doorheen klikken. */
+var concept = null;
+
+function setConcept(naam) {
+  if (!state) return;
+  concept = naam;
+  opPaneel = false;
+  state.layout = "Liggend";
+  paintLayout("Liggend");
+  [].forEach.call($("conceptbtns").children, function (b) {
+    b.classList.toggle("on", b.dataset.naam === naam);
+  });
+  /* De pagina stuurt zichzelf door als de opgeslagen indeling niet klopt; op
+     Liggend zetten voorkomt dat het concept meteen naar portrait.html springt. */
+  post({ patch: { layout: "Liggend" } }).then(function () {
+    frame.src = "/concept/" + naam;
+  });
+}
+
+fetch("/design/concepts").then(function (r) { return r.json(); }).then(function (j) {
+  (j.concepts || []).forEach(function (naam) {
+    var b = document.createElement("button");
+    b.textContent = "Concept: " + naam;
+    b.dataset.naam = naam;
+    b.addEventListener("click", function () { setConcept(naam); });
+    $("conceptbtns").appendChild(b);
+  });
+})["catch"](function () {});
+
+function verlaatConcept() {
+  concept = null;
+  [].forEach.call($("conceptbtns").children, function (b) { b.classList.remove("on"); });
+}
+
+$("lay-l").addEventListener("click", function () { verlaatConcept(); setLayout("Liggend", false); });
+$("lay-p").addEventListener("click", function () { verlaatConcept(); setLayout("Staand", false); });
+$("lay-pr").addEventListener("click", function () { verlaatConcept(); setLayout("Staand", true); });
 
 function zoom(z) {
   $("bezel").style.setProperty("--z", z);

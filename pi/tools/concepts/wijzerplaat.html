@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=480,height=320,initial-scale=1,user-scalable=no">
+<title>Step Dashboard — concept Wijzerplaat</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONCEPT · WIJZERPLAAT — 480 × 320
+
+   Een ander idee dan de kaartenindeling: geen vlakken met getallen erin, maar
+   een instrument. Twee concentrische ringen — snelheid buiten, accu binnen —
+   met streepjes en cijfers eromheen, zoals op een teller die je in één blik
+   afleest zonder te lezen.
+
+   Wat er anders is aan de vormtaal:
+
+   · Kleur weg van paars. Diep petroleumzwart als het onverlichte deel van een
+     wijzerplaat, ivoor in plaats van wit voor de cijfers (warmer, minder
+     klinisch), mint-teal voor wat er leeft. Amber en signaalrood blijven over
+     voor waarschuwen — die twee doen niets anders meer.
+   · Dunne cijfers in plaats van vette. Gewicht 300 op 108 px leest als
+     gegraveerd; gewicht 600 leest als een app.
+   · Geen kaartranden. Groeperen doet de witruimte, en een haarlijn waar dat
+     echt nodig is.
+   · De puntjes onderaan zijn labels geworden: RIT · MOTOR · ACCU. Je ziet
+     waar je bent én waar je heen tikt.
+
+   Het gedrag komt uit public/app.js — hetzelfde script als de bestaande
+   indelingen, dezelfde element-id's. Wat app.js niet kan (bogen tekenen) doet
+   het painter-blok onderaan zelf, door window.last uit te lezen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --bg:#0a0e11;          /* onverlicht deel van de plaat */
+  --ink:#ede7da;         /* ivoor: gedrukte cijfers      */
+  --dim:#6c777d;         /* streepjes en labels          */
+  --hair:#1c2429;        /* haarlijnen en tracks         */
+  --live:#6fe3c6;        /* wat er beweegt               */
+  --live-dim:#264b47;
+  --warn:#f2a93b;
+  --crit:#ff5f52;
+  --crit-fill:#ff5f52;
+  --warn-fill:#f2a93b;
+
+  /* app.js schrijft een paar kleuren rechtstreeks in style-attributen, met de
+     namen uit de oorspronkelijke tokenset: de achtergrond van het alarm en de
+     boogjes van het wifi-icoon. Die namen moeten dus bestaan, anders valt het
+     alarm terug op doorzichtig en blijft het wifi-icoon grijs. Ze wijzen hier
+     door naar de kleuren van dít ontwerp. */
+  --color-crit-fill:var(--crit-fill);
+  --color-warn-fill:var(--warn-fill);
+  --color-warn:var(--warn);
+  --color-accent:var(--live);
+  --color-neutral-800:var(--hair);
+  --color-neutral-500:var(--dim);
+  --color-text:var(--ink);
+
+  --r-sm:3px;
+  --r-md:7px;
+
+  --font:"Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
+}
+body.light{
+  --bg:#edeae1;
+  --ink:#12171a;
+  --dim:#66707a;
+  --hair:#d5d1c6;
+  --live:#0e8c76;
+  --live-dim:#b9ded6;
+  --warn:#a9701a;
+  --crit:#c0392b;
+  --crit-fill:#c0392b;
+  --warn-fill:#e0a94a;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--font);
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;cursor:none;
+}
+body,body *{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font-family:inherit;font-variant-numeric:inherit;color:inherit}
+svg{display:block}
+
+#root{position:relative;width:480px;height:320px;display:flex;flex-direction:column;overflow:hidden}
+
+/* Eén labelstijl door het hele ontwerp. */
+.k,.lbl{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);line-height:1}
+
+/* ── statusrail ────────────────────────────────────────────────────────────
+   Geen balk met een rand eronder maar een rail die op de achtergrond drijft:
+   de plaat begint meteen. */
+#top{height:26px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 14px}
+#topleft{display:flex;align-items:center;min-width:0}
+#outside{display:flex;align-items:center;gap:5px;color:var(--dim)}
+#outside svg{flex:none;width:12px;height:12px}
+#outtemp{font-size:12px;color:var(--ink)}
+
+#status{display:flex;align-items:center;gap:11px;flex:none;color:var(--dim)}
+#wifiico,#btico{display:none;flex:none}
+#cellgrp{display:none;align-items:center;gap:6px;flex:none}
+#cellgrp.on{display:flex}
+#sig{display:flex;align-items:flex-end;gap:2px;height:11px}
+#sig span{width:2px;border-radius:1px;background:var(--hair)}
+#sig span:nth-child(1){height:3px}
+#sig span:nth-child(2){height:5px}
+#sig span:nth-child(3){height:7px}
+#sig span:nth-child(4){height:9px}
+#sig span:nth-child(5){height:11px}
+#sig span.on{background:var(--live)}
+#sig span.weak{background:var(--warn)}
+#tech{font-size:9px;letter-spacing:.18em;text-transform:uppercase}
+#clock{font-size:13px;letter-spacing:.04em;color:var(--ink)}
+#statusbtn{display:flex;align-items:center;gap:6px;height:26px;padding:0;
+  background:transparent;border:0;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+#dot{width:5px;height:5px;border-radius:50%;background:var(--live);flex:none}
+#dot.demo{background:var(--warn)}
+#dot.off{background:var(--crit)}
+#stxt{display:none}
+
+/* ── meldingsband ─────────────────────────────────────────────────────────
+   Een strook over de volle breedte met een streep in de kleur van de ernst.
+   Geen doos: alleen de streep en de tekst. */
+#notice{display:none;align-items:center;gap:9px;width:100%;height:26px;flex:none;
+  padding:0 14px 0 11px;background:transparent;border:0;border-left:3px solid var(--warn);
+  color:var(--warn);font-size:12.5px;text-align:left}
+#notice.on{display:flex}
+#notice.crit{border-left-color:var(--crit);color:var(--crit)}
+#notice.info{border-left-color:var(--live);color:var(--live)}
+#notice svg{flex:none;width:14px;height:14px}
+#noticetxt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#noticemore{flex:none;font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;opacity:.75}
+
+/* ── panelen ──────────────────────────────────────────────────────────────── */
+#panes{position:relative;flex:1;min-height:0}
+.pane{position:absolute;inset:0;display:none;padding:0 14px 2px}
+.pane.on{display:flex}
+
+/* 1 · RIT — de plaat ------------------------------------------------------- */
+#p0{align-items:center;gap:16px}
+#dialwrap{position:relative;width:236px;height:236px;flex:none;margin-left:-4px}
+#dialwrap svg{position:absolute;inset:0;width:236px;height:236px}
+.track{fill:none;stroke:var(--hair);stroke-linecap:butt}
+.arc{fill:none;stroke:var(--live);stroke-linecap:round;
+  transition:stroke-dashoffset .12s linear}
+/* De accu als dertien losse segmenten binnen de snelheidsring — net zoveel
+   als er cellen in het pak zitten. Een tweede dóórlopende boog las als een
+   tweede wijzer; losse blokjes lezen ondubbelzinnig als "hoeveel er nog in
+   zit", en het rijmt op de cellenrij op het accuscherm. */
+#batseg path{fill:none;stroke:var(--hair);stroke-linecap:butt;stroke-width:4}
+#batseg path.on{stroke:var(--ink);opacity:.72}
+#batseg path.warn{stroke:var(--warn);opacity:1}
+#batseg path.crit{stroke:var(--crit);opacity:1}
+#ticks line{stroke:var(--hair)}
+#ticks line.major{stroke:var(--dim)}
+#ticks text{fill:var(--dim);font-size:10px;letter-spacing:.08em;text-anchor:middle}
+
+/* Alles in het midden van de plaat. */
+#dialmid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;pointer-events:none}
+#speed{font-size:82px;font-weight:300;line-height:.9;letter-spacing:-.045em}
+#speedunit{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+#vmaxrow{margin-top:7px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+/* speedbar bestaat voor app.js — de boog toont hetzelfde, dus hij hoeft niet
+   ook nog eens zichtbaar te zijn. */
+#speedtrack{display:none}
+
+#rail{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:20px;
+  padding-right:2px}
+.railitem{display:flex;flex-direction:column;gap:7px}
+.railval{display:flex;align-items:baseline;gap:4px}
+.railval .n{font-size:38px;font-weight:300;line-height:1;letter-spacing:-.03em}
+.railval .u{font-size:12px;color:var(--dim)}
+.hair{height:1px;background:var(--hair)}
+/* app.js zet hier "card", "card low" of "card empty" op. Geen vlak dus, maar
+   het cijfer zelf verkleurt — dat valt eerder op dan een randje. */
+#batcard.low .n,#rangecard.low .n{color:var(--warn)}
+#batcard.empty .n,#rangecard.empty .n{color:var(--crit)}
+#battrack{height:2px;background:var(--hair);overflow:hidden}
+#batbar{display:block;height:100%;width:0%;background:var(--live)}
+#batcard.low #batbar{background:var(--warn)}
+#batcard.empty #batbar{background:var(--crit)}
+
+/* 2 · MOTOR --------------------------------------------------------------- */
+#p1{flex-direction:column;justify-content:center;gap:18px;padding-top:4px}
+#gauges{display:flex;align-items:flex-start;justify-content:center;gap:34px}
+.gauge{position:relative;width:118px;height:118px}
+.gauge svg{position:absolute;inset:0;width:118px;height:118px}
+.gauge .mid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px}
+.gauge .v{font-size:34px;font-weight:300;line-height:1;letter-spacing:-.03em}
+.gauge .v.warn{color:var(--warn)}
+.gauge .v.crit{color:var(--crit)}
+.gauge .cap{font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.arc.temp{stroke:var(--live)}
+.arc.temp.warn{stroke:var(--warn)}
+.arc.temp.crit{stroke:var(--crit)}
+
+#motorstrip{display:flex;align-items:flex-end;gap:0}
+#motorstrip .cell{flex:1;display:flex;flex-direction:column;gap:6px;padding:0 12px}
+#motorstrip .cell + .cell{border-left:1px solid var(--hair)}
+#motorstrip .n{font-size:22px;font-weight:300;line-height:1}
+#motorstrip .u{font-size:10px;color:var(--dim);margin-left:3px}
+#dutytrack{height:2px;background:var(--hair);overflow:hidden;margin-top:2px}
+#dutybar{display:block;height:100%;width:0%;background:var(--live)}
+
+/* 3 · ACCU ---------------------------------------------------------------- */
+#p2{flex-direction:column;justify-content:center;gap:16px}
+#packrow{display:flex;align-items:flex-end;gap:16px}
+#packnum{display:flex;align-items:baseline;gap:5px}
+#bat2{font-size:76px;font-weight:300;line-height:.9;letter-spacing:-.045em}
+#bat2.warn{color:var(--warn)}
+#bat2.crit{color:var(--crit)}
+#packpct{font-size:18px;color:var(--dim)}
+#packside{flex:1;display:flex;flex-direction:column;gap:9px;padding-bottom:6px}
+#packside .line{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+#packside .n{font-size:19px;font-weight:300}
+#packside .u{font-size:10px;color:var(--dim);margin-left:2px}
+/* De accu als een rij cellen in plaats van één balk: dichter bij wat er in de
+   step zit, en je ziet in stappen hoe leeg hij is. */
+#cells{display:flex;gap:3px;height:14px}
+#cells i{flex:1;background:var(--hair);border-radius:1px}
+#cells i.on{background:var(--live)}
+#cells i.warn{background:var(--warn)}
+#cells i.crit{background:var(--crit)}
+#bat2bar{display:none}
+#packfoot{display:flex;gap:0}
+#packfoot .cell{flex:1;display:flex;flex-direction:column;gap:6px;padding:0 12px}
+#packfoot .cell:first-child{padding-left:0}
+#packfoot .cell + .cell{border-left:1px solid var(--hair)}
+#packfoot .n{font-size:22px;font-weight:300;line-height:1}
+#packfoot .u{font-size:10px;color:var(--dim);margin-left:3px}
+
+/* ── schermwisselaar ──────────────────────────────────────────────────────
+   Geen anonieme puntjes maar de namen zelf. */
+#dots{height:24px;flex:none;display:flex;align-items:center;justify-content:center;gap:0}
+#dots span{padding:0 14px;font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--hair)}
+#dots span + span{border-left:1px solid var(--hair)}
+#dots span.on{color:var(--live)}
+
+/* ── overlays ─────────────────────────────────────────────────────────────── */
+.sheet{position:absolute;inset:26px 0 24px;display:none;flex-direction:column;gap:10px;
+  background:var(--bg);padding:12px 14px}
+.sheet.on{display:flex}
+#net{z-index:2}
+#notices{z-index:3}
+#sys,#settings{z-index:4}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
+.sheettitle{font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sheetnav{display:flex;align-items:center;gap:6px;flex:none}
+.xbtn{width:46px;height:36px;flex:none;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center}
+.xbtn.off{opacity:.4}
+.xbtn.hit,#netseg .xbtn.hit{border-color:var(--live);color:var(--live)}
+.scroller{flex:1;position:relative;display:flex;flex-direction:column;gap:1px;overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
+.scroller::-webkit-scrollbar{width:0;height:0}
+
+/* systeem */
+.inforows{display:flex;flex-direction:column;flex:none}
+.inforow{min-height:44px;display:flex;align-items:center;gap:14px;padding:0 2px;
+  border-bottom:1px solid var(--hair)}
+.inforow .lbl{width:70px;flex:none}
+.inforow .val{font-size:15px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sysbtns{margin-top:auto;display:flex;gap:8px;flex:none}
+.pbtn{flex:1;height:48px;background:transparent;color:var(--ink);
+  border:1px solid var(--hair);border-radius:var(--r-md);
+  font-size:10px;letter-spacing:.2em;text-transform:uppercase}
+.pbtn.hit{border-color:var(--live);color:var(--live)}
+
+/* instellingen */
+.setrow{min-height:48px;flex:none;display:flex;align-items:center;gap:8px;padding:0 2px;
+  border-bottom:1px solid var(--hair)}
+.setrow .lbl{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setrow.stack{flex-direction:column;align-items:stretch;justify-content:center;gap:7px;padding:9px 2px}
+.setrow.stack .lbl{flex:none}
+.setrow.stack .line{display:flex;align-items:center;gap:8px}
+.seg{flex:none;width:62px;height:34px;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-sm);font-size:11px}
+.seg.on{color:var(--live);border-color:var(--live)}
+.seg.lay{width:84px}
+.step{flex:none;width:40px;height:34px;background:transparent;color:var(--ink);
+  border:1px solid var(--hair);border-radius:var(--r-sm);font-size:17px}
+.setval{flex:none;width:52px;text-align:center;font-size:15px}
+.setval.wide{width:60px}
+.setstat{flex:1;min-width:0;font-size:12px;color:var(--dim);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setstat.new{color:var(--live)}
+.setstat.bad{color:var(--crit)}
+.rowbtn{flex:none;height:34px;padding:0 14px;background:transparent;color:var(--ink);
+  border:1px solid var(--hair);border-radius:var(--r-sm);
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+.rowbtn.hit{border-color:var(--live);color:var(--live)}
+.rowbtn[disabled]{opacity:.4}
+
+/* meldingen */
+#noticelist .row{flex:none;display:flex;align-items:center;gap:12px;min-height:50px;
+  padding:8px 2px 8px 11px;border-left:3px solid var(--warn);border-bottom:1px solid var(--hair)}
+#noticelist .row.crit{border-left-color:var(--crit)}
+#noticelist .row.info{border-left-color:var(--live)}
+#noticelist .row svg{flex:none;width:16px;height:16px;color:var(--warn)}
+#noticelist .row.crit svg{color:var(--crit)}
+#noticelist .row.info svg{color:var(--live)}
+#noticelist .msg{flex:1;font-size:14px;line-height:1.25}
+#noticelist .lv{flex:none;font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--warn)}
+#noticelist .row.crit .lv{color:var(--crit)}
+#noticelist .row.info .lv{color:var(--live)}
+#noticelist .row.act{background:rgba(111,227,198,.06)}
+#noticelist .row.act .lv{color:var(--live)}
+
+/* verbindingen */
+#netseg{display:flex;gap:6px;flex:none}
+#netseg button{flex:1;min-width:0;height:36px;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-md);
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+#netseg button.on{color:var(--live);border-color:var(--live)}
+#netseg .xbtn{flex:none;width:42px;height:36px}
+#netclose{flex:none!important;width:42px;height:36px;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center}
+#netlist button{min-height:48px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 2px;background:transparent;border:0;border-bottom:1px solid var(--hair);
+  color:var(--ink);font-size:15px;text-align:left}
+#netlist button.sel{color:var(--live)}
+#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#netlist .st{flex:none;font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+#netlist button.sel .st{color:var(--live)}
+#netlist button.scanrow{min-height:42px;border-bottom:1px dashed var(--live);color:var(--live);font-size:12px}
+#netlist button.scanrow.busy{border-bottom-color:var(--hair);color:var(--dim)}
+#netlist button.scanrow .st{color:inherit;opacity:.7}
+#netempty{font-size:13px;color:var(--dim);padding:10px 2px}
+
+/* laden */
+#charge{position:absolute;inset:26px 0 24px;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;padding:16px;background:var(--bg);z-index:1}
+#charge.on{display:flex}
+#chargehead{display:flex;align-items:center;gap:7px;color:var(--live);
+  font-size:9px;letter-spacing:.24em;text-transform:uppercase}
+#chargepct{font-size:92px;font-weight:300;line-height:.9;letter-spacing:-.045em}
+#chargepct span+span{font-size:22px;font-weight:300;color:var(--dim);margin-left:4px}
+#chargetrack{width:260px;height:2px;background:var(--hair);overflow:hidden}
+#chargebar{height:100%;width:0%;background:var(--live)}
+#chargeeta{font-size:15px}
+#chargesub{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+
+/* schermtoetsenbord */
+#kbd{position:absolute;inset:0;display:none;flex-direction:column;gap:5px;
+  background:var(--bg);padding:9px;z-index:5}
+#kbd.on{display:flex}
+#kbdhead{display:flex;align-items:center;gap:8px;flex:none;height:24px}
+#kbdtitle{flex:1;min-width:0;font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#kbdclose{width:42px;height:24px;flex:none;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center}
+#kbdfield{flex:none;display:flex;align-items:center;gap:5px;height:40px}
+#kbdval{flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;
+  background:transparent;border:1px solid var(--live);border-radius:var(--r-sm);
+  font-size:17px;letter-spacing:.06em;overflow:hidden;white-space:nowrap}
+#kbdval.empty{color:var(--dim);letter-spacing:0}
+#kbdeye{width:48px;height:40px;flex:none;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center}
+#kbdeye.on{color:var(--live);border-color:var(--live)}
+#kbdkeys{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px}
+.krow{flex:1;display:flex;justify-content:center;gap:4px}
+.key{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+  background:transparent;color:var(--ink);border:1px solid var(--hair);border-radius:var(--r-sm);
+  font-size:18px;font-weight:300;line-height:1;padding:0}
+.key.wide{flex:0 0 60px}
+.key.mode{flex:0 0 66px;font-size:11px;letter-spacing:.1em}
+.key.space{flex:1}
+.key.go{flex:0 0 112px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;border-color:var(--live);color:var(--live)}
+.key.on{border-color:var(--live);color:var(--live)}
+.key.hit{background:var(--live);color:var(--bg);border-color:var(--live)}
+
+/* aan/uit */
+#power{position:absolute;inset:0;display:none;flex-direction:column;gap:10px;
+  padding:12px 14px 14px;background:var(--bg);z-index:6}
+#power.on{display:flex}
+#powerhead{display:flex;align-items:center;gap:7px;flex:none;
+  font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+#powerbtns{flex:1;display:flex;gap:10px;min-height:0}
+.powbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  background:transparent;color:var(--ink);border:1px solid var(--hair);border-radius:var(--r-md)}
+.powbtn.crit{border-color:var(--crit);color:var(--crit)}
+.powbtn.hit{border-color:var(--live)}
+.powbtn[disabled]{opacity:.4}
+.powname{font-size:20px;font-weight:300;letter-spacing:.1em}
+.powsub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+#powermsg{flex:none;min-height:14px;font-size:12px;text-align:center;color:var(--dim)}
+#powermsg.bad{color:var(--crit)}
+#powerclose{height:42px;flex:none;background:transparent;color:var(--dim);
+  border:1px solid var(--hair);border-radius:var(--r-md);
+  font-size:10px;letter-spacing:.2em;text-transform:uppercase}
+
+/* temperatuuralarm — het enige scherm dat het hele vlak inkleurt */
+#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;gap:14px;padding:20px 28px;
+  background:var(--crit-fill);color:#0a0e11;z-index:7}
+#alarm.on{display:flex}
+#alarmhead{display:flex;align-items:center;gap:14px}
+#alarmhead svg{width:38px;height:38px}
+#alarmtitle{font-size:38px;font-weight:300;letter-spacing:.06em;line-height:1}
+#alarmmsg{font-size:19px;line-height:1.25;white-space:pre-line}
+#alarmclose{height:46px;min-width:170px;margin-top:4px;padding:0 22px;background:transparent;
+  color:#0a0e11;border:1px solid #0a0e11;border-radius:var(--r-md);
+  font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+</style>
+</head>
+<body data-layout="Liggend">
+<div id="root">
+
+  <div id="top">
+    <div id="topleft">
+      <div id="outside">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
+        <span id="outtemp">--&deg;</span>
+      </div>
+    </div>
+    <div id="status">
+      <svg id="wifiico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke-width="1.8" stroke-linecap="round">
+        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--hair)"/>
+        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--hair)"/>
+        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--hair)"/>
+        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--hair)" stroke="none"/>
+      </svg>
+      <svg id="btico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--live)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <div id="cellgrp">
+        <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
+        <span id="tech">--</span>
+      </div>
+      <span id="clock">--:--</span>
+      <button id="statusbtn"><span id="dot"></span><span id="stxt">--</span></button>
+    </div>
+  </div>
+
+  <button id="notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+    <span id="noticetxt">--</span>
+    <span id="noticemore">alle</span>
+  </button>
+
+  <div id="panes">
+
+    <!-- 1 · RIT -->
+    <div class="pane on" id="p0">
+      <div id="dialwrap">
+        <svg viewBox="0 0 236 236" aria-hidden="true">
+          <g id="ticks"></g>
+          <circle class="track" cx="118" cy="118" r="100" stroke-width="9"
+                  stroke-dasharray="471.24 628.32" transform="rotate(135 118 118)"/>
+          <circle class="arc" id="arcspeed" cx="118" cy="118" r="100" stroke-width="9"
+                  stroke-dasharray="471.24 628.32" stroke-dashoffset="471.24" transform="rotate(135 118 118)"/>
+          <g id="batseg"></g>
+        </svg>
+        <div id="dialmid">
+          <div id="speed">0</div>
+          <div id="speedunit">km/u</div>
+          <div id="vmaxrow">max <span id="vmaxtxt">0</span></div>
+        </div>
+        <div id="speedtrack"><div id="speedbar"></div></div>
+      </div>
+
+      <div id="rail">
+        <div class="railitem" id="batcard">
+          <span class="k">Batterij</span>
+          <div class="railval"><span class="n" id="bat">0</span><span class="u">%</span></div>
+          <div id="battrack"><i id="batbar"></i></div>
+        </div>
+        <div class="hair"></div>
+        <div class="railitem" id="rangecard">
+          <span class="k">Bereik ca.</span>
+          <div class="railval"><span class="n" id="range">0</span><span class="u">km</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · MOTOR -->
+    <div class="pane" id="p1">
+      <div id="gauges">
+        <div class="gauge">
+          <svg viewBox="0 0 118 118" aria-hidden="true">
+            <circle class="track" cx="59" cy="59" r="50" stroke-width="6"
+                    stroke-dasharray="235.62 314.16" transform="rotate(135 59 59)"/>
+            <circle class="arc temp" id="arctm" cx="59" cy="59" r="50" stroke-width="6"
+                    stroke-dasharray="235.62 314.16" stroke-dashoffset="235.62" transform="rotate(135 59 59)"/>
+          </svg>
+          <div class="mid">
+            <div class="v" id="tm">0</div>
+            <div class="cap">Motor &deg;C</div>
+          </div>
+        </div>
+        <div class="gauge">
+          <svg viewBox="0 0 118 118" aria-hidden="true">
+            <circle class="track" cx="59" cy="59" r="50" stroke-width="6"
+                    stroke-dasharray="235.62 314.16" transform="rotate(135 59 59)"/>
+            <circle class="arc temp" id="arctf" cx="59" cy="59" r="50" stroke-width="6"
+                    stroke-dasharray="235.62 314.16" stroke-dashoffset="235.62" transform="rotate(135 59 59)"/>
+          </svg>
+          <div class="mid">
+            <div class="v" id="tf">0</div>
+            <div class="cap">FET &deg;C</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="motorstrip">
+        <div class="cell">
+          <span class="k">Duty</span>
+          <div><span class="n" id="duty">0</span><span class="u">%</span></div>
+          <div id="dutytrack"><i id="dutybar"></i></div>
+        </div>
+        <div class="cell">
+          <span class="k">Motorstroom</span>
+          <div><span class="n" id="im">0</span><span class="u">A</span></div>
+        </div>
+        <div class="cell">
+          <span class="k">Accustroom</span>
+          <div><span class="n" id="ib">0</span><span class="u">A</span></div>
+        </div>
+        <div class="cell">
+          <span class="k">Toeren</span>
+          <div><span class="n" id="rpm">0</span><span class="u">rpm</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 · ACCU -->
+    <div class="pane" id="p2">
+      <div id="packrow">
+        <div id="packnum">
+          <span id="bat2">0</span><span id="packpct">%</span>
+        </div>
+        <div id="packside">
+          <div class="line"><span class="k">Pakspanning</span><span><span class="n" id="vv">0</span><span class="u">V</span></span></div>
+          <div class="line"><span class="k">Per cel</span><span><span class="n" id="vc">0</span><span class="u">V</span></span></div>
+        </div>
+      </div>
+      <div id="cells"></div>
+      <div id="bat2bar"></div>
+      <div id="packfoot">
+        <div class="cell">
+          <span class="k">Verbruikt</span>
+          <div><span class="n" id="wh">0</span><span class="u">Wh</span></div>
+        </div>
+        <div class="cell">
+          <span class="k">Afstand</span>
+          <div><span class="n" id="trip">0</span><span class="u">km</span></div>
+        </div>
+        <div class="cell">
+          <span class="k">Per kilometer</span>
+          <div><span class="n" id="whkm">0</span><span class="u">Wh</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dots"><span class="on">Rit</span><span>Motor</span><span>Accu</span></div>
+
+  <!-- laden -->
+  <div id="charge">
+    <div id="chargehead">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
+      <span id="chargelabel">Laden</span>
+    </div>
+    <div id="chargepct"><span id="chargeval">0</span><span>%</span></div>
+    <div id="chargetrack"><div id="chargebar"></div></div>
+    <div id="chargeeta">tijd nog onbekend</div>
+    <div id="chargesub">--</div>
+  </div>
+
+  <!-- verbindingen -->
+  <div class="sheet" id="net">
+    <div id="netseg">
+      <button id="segwifi" class="on">Wi-Fi</button>
+      <button id="segbt">Bluetooth</button>
+      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+      <button id="netclose"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="scroller" id="netlist"></div>
+  </div>
+
+  <!-- schermtoetsenbord -->
+  <div id="kbd">
+    <div id="kbdhead">
+      <div id="kbdtitle">Wachtwoord</div>
+      <button id="kbdclose"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="kbdfield">
+      <div id="kbdval" class="empty"></div>
+      <button id="kbdeye"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.5 5.2 12 5.2 22.4 12 22.4 12 18.5 18.8 12 18.8 1.6 12 1.6 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+    </div>
+    <div id="kbdkeys"></div>
+  </div>
+
+  <!-- meldingen -->
+  <div class="sheet" id="notices">
+    <div class="sheethead">
+      <div class="sheettitle">Meldingen</div>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="noticelist"></div>
+  </div>
+
+  <!-- systeem -->
+  <div class="sheet" id="sys">
+    <div class="sheethead">
+      <div class="sheettitle">Systeem</div>
+      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="inforows">
+      <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
+      <div class="inforow" id="syscellrow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
+    </div>
+    <div class="sysbtns">
+      <button id="sysnet" class="pbtn">Verbindingen</button>
+      <button id="sysset" class="pbtn">Instellingen</button>
+      <button id="syspower" class="pbtn">Power</button>
+    </div>
+  </div>
+
+  <!-- instellingen -->
+  <div class="sheet" id="settings">
+    <div class="sheethead">
+      <div class="sheettitle">Instellingen</div>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="setlist">
+      <div class="setrow stack">
+        <span class="lbl">Update</span>
+        <div class="line">
+          <span class="setstat" id="setupd">controleren…</span>
+          <button id="updbtn" class="rowbtn">Zoeken</button>
+        </div>
+      </div>
+      <div class="setrow"><span class="lbl">Thema</span>
+        <button class="seg" data-theme="Auto">Auto</button>
+        <button class="seg" data-theme="Licht">Licht</button>
+        <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow"><span class="lbl">Indeling</span>
+        <button class="seg lay" data-lay="Liggend">Liggend</button>
+        <button class="seg lay" data-lay="Staand">Staand</button>
+      </div>
+      <div class="setrow"><span class="lbl">Kwartslag</span>
+        <button class="seg rot" data-rot="90">90&deg;</button>
+        <button class="seg rot" data-rot="270">270&deg;</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp waarschuwing</span>
+        <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
+        <span class="setval" id="setwarn">70&deg;</span>
+        <button class="step" data-k="tempWarn" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Temp kritiek</span>
+        <button class="step" data-k="tempCrit" data-d="-5">&minus;</button>
+        <span class="setval" id="setcrit">90&deg;</span>
+        <button class="step" data-k="tempCrit" data-d="5">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Helderheid</span>
+        <button class="step bright" data-d="-10">&minus;</button>
+        <span class="setval wide" id="setbright">80 %</span>
+        <button class="step bright" data-d="10">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Startscherm</span>
+        <button class="seg start" data-i="0">Rit</button>
+        <button class="seg start" data-i="1">Motor</button>
+        <button class="seg start" data-i="2">Accu</button>
+      </div>
+      <div class="setrow"><span class="lbl">Topsnelheid</span>
+        <button id="toprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow"><span class="lbl">Rit-teller</span>
+        <button id="triprst" class="rowbtn">Reset</button>
+      </div>
+      <div class="setrow stack"><span class="lbl">Versie</span>
+        <span class="setstat" id="setver">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- aan/uit -->
+  <div id="power">
+    <div id="powerhead">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+      <span>Aan / uit</span>
+    </div>
+    <div id="powerbtns">
+      <button id="powreboot" class="powbtn">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
+        <span class="powname">REBOOT</span>
+        <span class="powsub">opnieuw opstarten</span>
+      </button>
+      <button id="powshutdown" class="powbtn crit">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
+        <span class="powname">SHUTDOWN</span>
+        <span class="powsub">uitschakelen</span>
+      </button>
+    </div>
+    <div id="powermsg"></div>
+    <button id="powerclose">Annuleren</button>
+  </div>
+
+  <!-- temperatuuralarm -->
+  <div id="alarm">
+    <div id="alarmhead">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
+      <div id="alarmtitle">WARNING</div>
+    </div>
+    <div id="alarmmsg">Motortemperatuur te hoog</div>
+    <button id="alarmclose">Bevestigen</button>
+  </div>
+
+</div>
+
+<script src="/app.js"></script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   Wat app.js niet kan: bogen en cellen tekenen.
+
+   app.js schrijft getallen naar id's en zet breedtes met style.width — prima
+   voor balken, niets voor een ring. Dit blok leest daarom gewoon window.last
+   (de laatste meting) en tekent de rest zelf. Het raakt niets aan van wat
+   app.js beheert, dus de twee zitten elkaar niet in de weg.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  var byId = function (id) { return document.getElementById(id); };
+  var clamp = function (v) { return v < 0 ? 0 : (v > 1 ? 1 : v); };
+
+  /* De zichtbare booglengte staat in stroke-dasharray; die lezen we uit het
+     element zelf, zodat de cijfers in de CSS en hier niet uit elkaar lopen. */
+  function boog(el, frac) {
+    if (!el) return;
+    var len = parseFloat(el.getAttribute("stroke-dasharray"));
+    el.setAttribute("stroke-dashoffset", (len * (1 - clamp(frac))).toFixed(1));
+  }
+
+  function kleur(el, cls) {
+    if (!el) return;
+    var basis = el.getAttribute("data-basis") || el.getAttribute("class");
+    el.setAttribute("data-basis", basis);
+    el.setAttribute("class", basis + (cls ? " " + cls : ""));
+  }
+
+  /* Streepjes rond de plaat: elke 5 km/u een korte, elke 10 een lange met een
+     cijfer erbij. De schaal volgt de ingestelde topsnelheid. */
+  function tekenStreepjes() {
+    var g = byId("ticks");
+    if (!g) return;
+    var max = (window.cfg && window.cfg.speedMax) || 35;
+    var stap = max > 60 ? 10 : 5;
+    var svg = "";
+    for (var v = 0; v <= max + 0.01; v += stap) {
+      var groot = (v % (stap * 2) === 0);
+      var hoek = (135 + (v / max) * 270) * Math.PI / 180;
+      var cx = 118, cy = 118;
+      var r1 = 111, r2 = groot ? 102 : 106;
+      var dx = Math.cos(hoek), dy = Math.sin(hoek);
+      svg += '<line class="' + (groot ? "major" : "") + '"'
+        + ' x1="' + (cx + dx * r1).toFixed(1) + '" y1="' + (cy + dy * r1).toFixed(1) + '"'
+        + ' x2="' + (cx + dx * r2).toFixed(1) + '" y2="' + (cy + dy * r2).toFixed(1) + '"'
+        + ' stroke-width="' + (groot ? 1.6 : 1) + '"/>';
+      if (groot) {
+        /* Binnen de binnenste ring: tussen de twee ringen in worden ze
+           doorsneden en zijn ze niet te lezen. */
+        svg += '<text x="' + (cx + dx * 73).toFixed(1) + '" y="' + (cy + dy * 73 + 3.5).toFixed(1) + '">'
+          + Math.round(v) + "</text>";
+      }
+    }
+    g.innerHTML = svg;
+  }
+
+  var CELLEN = 13;
+
+  /* De segmenten van de accuring: dertien boogjes over dezelfde 270 graden als
+     de snelheidsring, met een kier ertussen. */
+  (function () {
+    var g = byId("batseg");
+    if (!g) return;
+    var cx = 118, cy = 118, r = 86;
+    var vak = 270 / CELLEN, kier = 3.2;
+    var svg = "";
+    for (var i = 0; i < CELLEN; i++) {
+      var a1 = (135 + i * vak + kier / 2) * Math.PI / 180;
+      var a2 = (135 + (i + 1) * vak - kier / 2) * Math.PI / 180;
+      svg += '<path d="M ' + (cx + Math.cos(a1) * r).toFixed(1) + " " + (cy + Math.sin(a1) * r).toFixed(1)
+        + " A " + r + " " + r + ' 0 0 1 ' + (cx + Math.cos(a2) * r).toFixed(1)
+        + " " + (cy + Math.sin(a2) * r).toFixed(1) + '"/>';
+    }
+    g.innerHTML = svg;
+  })();
+
+  /* En dezelfde verdeling als losse blokjes op het accuscherm. */
+  (function () {
+    var box = byId("cells");
+    if (!box) return;
+    for (var i = 0; i < CELLEN; i++) box.appendChild(document.createElement("i"));
+  })();
+
+  function tempKlasse(v) {
+    var c = window.cfg || {};
+    return v >= (c.tempCrit || 90) ? "crit" : (v >= (c.tempWarn || 70) ? "warn" : "");
+  }
+
+  function teken() {
+    var d = window.last;
+    if (!d) return;
+    var c = window.cfg || {};
+
+    boog(byId("arcspeed"), (d.speed_kmh || 0) / Math.max(5, c.speedMax || 35));
+
+    var bp = d.battery_pct || 0;
+    /* Twee drempelstelsels in app.js: de kaart op het ritscherm springt bij
+       30 en 15 %, het getal op het accuscherm bij 20 en 10. Elke ring volgt
+       het stelsel van het cijfer waar hij naast staat, anders zeggen kleur en
+       getal iets anders. */
+    var railKl = bp <= 15 ? "crit" : (bp <= 30 ? "warn" : "on");
+    var bkl = bp < 10 ? "crit" : (bp < 20 ? "warn" : "on");
+    var vol = Math.round(bp / 100 * CELLEN);
+    var seg = byId("batseg");
+    if (seg) {
+      for (var s = 0; s < seg.children.length; s++) {
+        seg.children[s].setAttribute("class", s < vol ? railKl : "");
+      }
+    }
+
+    boog(byId("arctm"), (d.temp_motor || 0) / Math.max(20, c.tempCrit || 90));
+    kleur(byId("arctm"), tempKlasse(d.temp_motor || 0));
+    boog(byId("arctf"), (d.temp_fet || 0) / Math.max(20, c.tempCrit || 90));
+    kleur(byId("arctf"), tempKlasse(d.temp_fet || 0));
+
+    var cellen = byId("cells");
+    if (cellen) {
+      for (var i = 0; i < cellen.children.length; i++) {
+        cellen.children[i].className = i < vol ? bkl : "";
+      }
+    }
+  }
+
+  /* Even vaak als app.js tekent; sneller heeft op dit schermpje geen zin. */
+  function start() {
+    tekenStreepjes();
+    teken();
+    setInterval(teken, 160);
+    /* De schaal verandert mee als je de topsnelheid aanpast. */
+    setInterval(tekenStreepjes, 3000);
+  }
+  if (window.last) start(); else setTimeout(start, 300);
+})();
+</script>
+</body>
+</html>

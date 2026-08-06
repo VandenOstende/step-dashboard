@@ -24,6 +24,9 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
+/* Ontwerpen die nog geen productie zijn. Ze laden wel het echte /app.js, dus
+   je klikt door een volwaardige UI en niet door een plaatje. */
+const CONCEPTS = path.join(__dirname, "concepts");
 const PORT = Number(process.env.PORT || 8081);
 const HOST = process.env.HOST || "0.0.0.0";
 
@@ -237,6 +240,18 @@ const server = http.createServer(async (req, res) => {
 
   /* het paneel zelf */
   if (p === "/design" || p === "/design/") return file(res, path.join(__dirname, "design.html"));
+  if (p === "/design/concepts") {
+    let namen = [];
+    try {
+      namen = fs.readdirSync(CONCEPTS).filter((f) => f.endsWith(".html")).map((f) => f.slice(0, -5));
+    } catch { /* nog geen concepten */ }
+    return send(res, 200, { concepts: namen });
+  }
+  if (p.startsWith("/concept/")) {
+    const naam = path.basename(p.slice(9)).replace(/[^a-z0-9_-]/gi, "");
+    if (!naam) return send(res, 404, { error: "niet gevonden" });
+    return file(res, path.join(CONCEPTS, naam + ".html"));
+  }
   if (p === "/design/state" && m === "GET") return send(res, 200, { state: S, presets: Object.keys(PRESETS), log: log });
   if (p === "/design/state" && m === "POST") {
     const b = await body(req);
