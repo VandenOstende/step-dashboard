@@ -1,0 +1,369 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Step Dashboard — de vormtaal, gedeeld door beide indelingen.
+
+   Fluent, zoals Windows 11 het doet:
+
+   · Mica als ondergrond, met kaarten die er net iets lichter op liggen. Elke
+     kaart heeft een echte rand van 1 px plus een lichtere lijn langs de
+     bovenkant. Die "control stroke" is wat een Fluent-vlak doet lijken alsof
+     er licht van boven op valt; laat je hem weg, dan wordt het een plat vak.
+   · Hoeken van 8 px voor kaarten, 4 px voor knoppen. Rustiger dan de grote
+     radii van iOS — dit is een besturingssysteem, geen telefoon.
+   · Het accentblauw markeert met een balkje, niet met een vlak: onder de
+     actieve tab ligt een pil van 3 px. Dat is het navigatie-idioom van
+     Windows 11.
+   · Meldingen zijn InfoBars: een kaart met een gekleurde streep links en een
+     icoon in dezelfde kleur. Geen gevulde balk — dat bewaart Fluent voor
+     knoppen.
+   · Voortgang is een dunne afgeronde balk in accentkleur, 4 px hoog.
+   · Instellingen zien eruit als de app Instellingen zelf: elke regel een eigen
+     kaartje met de titel links en het knopje rechts.
+
+   index.html (liggend) en portrait.html (staand) laden allebei dit bestand en
+   zetten er alleen hun eigen maatvoering achter. Zo kan de vormtaal niet uit
+   elkaar lopen tussen de twee.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Donker eerst; body.light zet het lichte thema. Beide kleursets zijn die van
+   Windows 11 zelf. */
+:root{
+  --mica:#202020;
+  --card:#2b2b2b;
+  --card2:#323232;
+  --stroke:#3d3d3d;
+  --stroke-top:#4a4a4a;
+  --text:#ffffff;
+  --text2:#c5c5c5;
+  --text3:#8a8a8a;
+  --accent:#60cdff;
+  --on-accent:#003a52;
+  --track:#3a3a3a;
+  --warn:#fce100;
+  --crit:#ff99a4;
+  --crit-fill:#c42b1c;
+  --warn-fill:#9d5d00;
+
+  /* app.js schrijft een paar kleuren rechtstreeks in style-attributen, met de
+     namen uit de oorspronkelijke tokenset: de achtergrond van het alarm en de
+     boogjes van het wifi-icoon. Die namen moeten dus blijven bestaan. */
+  --color-crit-fill:var(--crit-fill);
+  --color-warn-fill:var(--warn-fill);
+  --color-warn:var(--warn);
+  --color-accent:var(--accent);
+  --color-neutral-800:var(--stroke);
+  --color-neutral-500:var(--text3);
+  --color-text:var(--text);
+
+  --font:"Segoe UI Variable Text","Segoe UI","Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
+  --r-card:8px;
+  --r-ctl:4px;
+}
+body.light{
+  --mica:#f3f3f3;
+  --card:#fbfbfb;
+  --card2:#ffffff;
+  --stroke:#e2e2e2;
+  --stroke-top:#ffffff;
+  --text:#1a1a1a;
+  --text2:#5d5d5d;
+  --text3:#767676;
+  --accent:#0067c0;
+  --on-accent:#ffffff;
+  --track:#dcdcdc;
+  --warn:#9d5d00;
+  --crit:#c42b1c;
+  --crit-fill:#c42b1c;
+  --warn-fill:#9d5d00;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+/* Het paneel bepaalt de body-maat, niet het ontwerp: staat de staande UI op
+   een liggend schermpje, dan draait fitRotation() #root een kwartslag en moet
+   de body de échte afmetingen houden. */
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:var(--mica);color:var(--text);font-family:var(--font);
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;cursor:none;
+}
+body,body *{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font-family:inherit;font-variant-numeric:inherit;color:inherit}
+svg{display:block}
+
+#root{position:relative;display:flex;flex-direction:column;overflow:hidden}
+
+/* De Fluent-kaart. */
+.card,.blk{background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);
+  display:flex;flex-direction:column;justify-content:center;gap:7px;padding:9px 13px}
+
+.k,.lbl{font-size:11px;font-weight:600;color:var(--text2);line-height:1}
+
+.bar{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+.bar>i{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+.fill-warn{background:var(--warn-fill)!important}
+.fill-crit{background:var(--crit-fill)!important}
+
+/* ── titelbalk ────────────────────────────────────────────────────────────── */
+#top{flex:none;display:flex;align-items:center;justify-content:space-between;
+  background:var(--card);border-bottom:1px solid var(--stroke);font-size:12px}
+#topleft{display:flex;align-items:center;min-width:0}
+#outside{display:flex;align-items:center;gap:5px;color:var(--text2)}
+#outside svg{flex:none;width:12px;height:12px}
+#outtemp{font-size:12px;color:var(--text)}
+#status{display:flex;align-items:center;gap:9px;flex:none;color:var(--text2)}
+#wifiico,#btico{display:none;flex:none}
+/* Het mobiele stukje staat er alleen als er een modem in zit. */
+#cellgrp{display:none;align-items:center;gap:5px;flex:none}
+#cellgrp.on{display:flex}
+#sig{display:flex;align-items:flex-end;gap:2px;height:10px}
+#sig span{width:2px;background:var(--track)}
+#sig span:nth-child(1){height:3px}
+#sig span:nth-child(2){height:5px}
+#sig span:nth-child(3){height:7px}
+#sig span:nth-child(4){height:8px}
+#sig span:nth-child(5){height:10px}
+#sig span.on{background:var(--accent)}
+#sig span.weak{background:var(--warn)}
+#tech{font-size:10px}
+#clock{font-size:12px;color:var(--text)}
+#statusbtn{display:flex;align-items:center;gap:5px;padding:0;background:transparent;border:0}
+#dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+#dot.demo{background:var(--warn)}
+#dot.off{background:var(--crit)}
+/* De verbindingstekst staat in het systeemvenster; in de balk is de stip
+   genoeg. */
+#stxt{display:none}
+
+/* ── InfoBar ──────────────────────────────────────────────────────────────── */
+#notice{display:none;align-items:center;gap:9px;flex:none;
+  background:var(--card2);border:1px solid var(--stroke);
+  border-left:4px solid var(--warn-fill);border-radius:var(--r-ctl);
+  color:var(--text);font-size:12.5px;text-align:left}
+#notice.on{display:flex}
+#notice.crit{border-left-color:var(--crit-fill)}
+#notice.info{border-left-color:var(--accent)}
+#notice svg{flex:none;width:14px;height:14px;color:var(--warn-fill)}
+#notice.crit svg{color:var(--crit-fill)}
+#notice.info svg{color:var(--accent)}
+#noticetxt{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#noticemore{flex:none;font-size:11px;color:var(--accent)}
+
+/* ── panelen ──────────────────────────────────────────────────────────────── */
+#panes{position:relative;flex:1;min-height:0}
+.pane{position:absolute;inset:0;display:none}
+.pane.on{display:flex}
+
+#speedbox{background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
+  box-shadow:inset 0 1px 0 var(--stroke-top);display:flex;flex-direction:column;justify-content:center}
+#speedrow{display:flex;align-items:baseline;gap:7px}
+#speedmeta{display:flex;flex-direction:column;gap:1px}
+#speedunit{font-size:14px;color:var(--text2)}
+#vmaxrow{font-size:11px;color:var(--text3)}
+#speedtrack{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+#speedbar{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+
+#battrack{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+#batbar{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+/* app.js zet hier card / card low / card empty op — geen ander vlak, wel een
+   ander cijfer: kleur op het getal valt eerder op dan kleur op de rand. */
+#batcard.low .n,#rangecard.low .n{color:var(--warn)}
+#batcard.empty .n,#rangecard.empty .n{color:var(--crit)}
+#batcard.low #batbar{background:var(--warn-fill)}
+#batcard.empty #batbar{background:var(--crit-fill)}
+
+.v.big.warn{color:var(--warn)}
+.v.big.crit{color:var(--crit)}
+#bat2.warn{color:var(--warn)}
+#bat2.crit{color:var(--crit)}
+/* Dertien blokjes: net zoveel als er cellen in het pak zitten. */
+#cells{display:flex;gap:3px}
+#cells i{flex:1;border-radius:1px;background:var(--track)}
+#cells i.on{background:var(--accent)}
+#cells i.warn{background:var(--warn-fill)}
+#cells i.crit{background:var(--crit-fill)}
+/* De brede balk die app.js vult tekenen we niet; de blokjes zeggen hetzelfde. */
+#bat2bar{display:none}
+/* Het toerental staat nergens op het scherm — op een step kijk je daar niet
+   naar. Het element blijft bestaan omdat app.js ernaar schrijft. */
+#rpmhold{display:none}
+
+/* ── tabstrip met accentpil ───────────────────────────────────────────────── */
+#dots{flex:none;display:flex;align-items:stretch;
+  border-top:1px solid var(--stroke);background:var(--card)}
+#dots span{flex:1;position:relative;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--text2)}
+#dots span.on{color:var(--text);font-weight:600}
+#dots span.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
+  bottom:2px;width:22px;height:3px;border-radius:2px;background:var(--accent)}
+
+/* ── overlays ──────────────────────────────────────────────────────────────
+   7  temperatuuralarm
+   6  aan/uit
+   5  schermtoetsenbord
+   4  systeem en instellingen
+   3  meldingen
+   2  verbindingen
+   1  laden                                                                 */
+.sheet{position:absolute;display:none;flex-direction:column;gap:8px;background:var(--mica)}
+.sheet.on{display:flex}
+#net{z-index:2}
+#notices{z-index:3}
+#sys,#settings{z-index:4}
+.sheethead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
+.sheettitle{font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sheetnav{display:flex;align-items:center;gap:5px;flex:none}
+.xbtn{flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+.xbtn.off{opacity:.35}
+.xbtn.hit,#netseg .xbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.scroller{flex:1;position:relative;display:flex;flex-direction:column;gap:5px;overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:none}
+.scroller::-webkit-scrollbar{width:0;height:0}
+
+/* systeem */
+.inforows{display:flex;flex-direction:column;gap:5px;flex:none}
+.inforow{min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 13px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+.inforow .lbl{flex:none;font-size:13px;font-weight:400;color:var(--text)}
+.inforow .val{font-size:13px;color:var(--text2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sysbtns{margin-top:auto;display:flex;gap:6px;flex:none}
+.pbtn{flex:1;height:42px;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-bottom-width:2px;border-radius:var(--r-ctl);font-size:13px}
+.pbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+/* instellingen */
+.setrow{min-height:44px;flex:none;display:flex;align-items:center;gap:6px;padding:0 13px;
+  background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
+.setrow .lbl{flex:1;min-width:0;font-size:13px;font-weight:400;color:var(--text);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setrow.stack{flex-direction:column;align-items:stretch;justify-content:center;gap:6px;padding:8px 13px}
+.setrow.stack .lbl{flex:none}
+.setrow.stack .line{display:flex;align-items:center;gap:6px}
+.seg{flex:none;width:58px;height:30px;background:var(--card2);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:12px}
+.seg.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.seg.lay{width:76px}
+.step{flex:none;width:34px;height:30px;background:var(--card2);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:16px}
+.setval{flex:none;width:48px;text-align:center;font-size:13px;color:var(--text2)}
+.setval.wide{width:56px}
+.setstat{flex:1;min-width:0;font-size:12px;color:var(--text2);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.setstat.new{color:var(--accent)}
+.setstat.bad{color:var(--crit)}
+.rowbtn{flex:none;height:30px;padding:0 14px;background:var(--card2);color:var(--text);
+  border:1px solid var(--stroke);border-bottom-width:2px;border-radius:var(--r-ctl);font-size:12px}
+.rowbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.rowbtn[disabled]{opacity:.4}
+
+/* meldingen — dezelfde InfoBar als in de balk */
+#noticelist .row{flex:none;display:flex;align-items:center;gap:10px;min-height:46px;
+  padding:8px 12px;background:var(--card);border:1px solid var(--stroke);
+  border-left:4px solid var(--warn-fill);border-radius:var(--r-ctl)}
+#noticelist .row.crit{border-left-color:var(--crit-fill)}
+#noticelist .row.info{border-left-color:var(--accent)}
+#noticelist .row svg{flex:none;width:16px;height:16px;color:var(--warn-fill)}
+#noticelist .row.crit svg{color:var(--crit-fill)}
+#noticelist .row.info svg{color:var(--accent)}
+#noticelist .msg{flex:1;font-size:13.5px;line-height:1.25}
+#noticelist .lv{flex:none;font-size:11px;color:var(--text2)}
+/* Een melding die ergens heen brengt in plaats van alleen iets meldt. */
+#noticelist .row.act{border-color:var(--accent)}
+#noticelist .row.act .lv{color:var(--accent)}
+
+/* verbindingen */
+#netseg{display:flex;gap:5px;flex:none}
+#netseg button{flex:1;min-width:0;height:32px;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:12.5px}
+#netseg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#netseg .xbtn{flex:none;width:38px;height:32px}
+#netclose{flex:none!important;width:38px;height:32px;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+#netlist button{min-height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 13px;background:var(--card);border:1px solid var(--stroke);
+  border-radius:var(--r-ctl);color:var(--text);font-size:13.5px;text-align:left}
+#netlist button.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+#netlist .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#netlist .st{flex:none;font-size:11px;color:var(--text2)}
+#netlist button.sel .st{color:var(--accent)}
+#netlist button.scanrow{min-height:40px;border-style:dashed;color:var(--accent);font-size:12.5px}
+#netlist button.scanrow.busy{color:var(--text2);border-color:var(--stroke)}
+#netlist button.scanrow .st{color:inherit;opacity:.75}
+#netempty{font-size:13px;color:var(--text2);padding:12px 2px}
+
+/* laden */
+#charge{position:absolute;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;background:var(--mica);z-index:1}
+#charge.on{display:flex}
+#chargehead{display:flex;align-items:center;gap:6px;color:var(--accent);font-size:12px;font-weight:600}
+#chargepct{font-weight:600;line-height:.9;letter-spacing:-.04em}
+#chargepct span+span{font-weight:400;color:var(--text2);margin-left:4px}
+#chargetrack{height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+#chargebar{display:block;height:100%;width:0%;border-radius:2px;background:var(--accent)}
+#chargeeta{font-size:15px}
+#chargesub{font-size:11.5px;color:var(--text2)}
+
+/* schermtoetsenbord */
+#kbd{position:absolute;inset:0;display:none;flex-direction:column;gap:5px;
+  background:var(--mica);z-index:5}
+#kbd.on{display:flex}
+#kbdhead{display:flex;align-items:center;gap:8px;flex:none;height:24px}
+#kbdtitle{flex:1;min-width:0;font-size:12px;color:var(--text2);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#kbdclose{width:40px;height:24px;flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+#kbdfield{flex:none;display:flex;align-items:center;gap:5px;height:38px}
+#kbdval{flex:1;min-width:0;height:38px;display:flex;align-items:center;padding:0 11px;
+  background:var(--card2);border:1px solid var(--stroke);border-bottom:2px solid var(--accent);
+  border-radius:var(--r-ctl);font-size:16px;overflow:hidden;white-space:nowrap}
+#kbdval.empty{color:var(--text3)}
+#kbdeye{width:44px;height:38px;flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-radius:var(--r-ctl);
+  display:flex;align-items:center;justify-content:center}
+#kbdeye.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#kbdkeys{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px}
+.krow{flex:1;display:flex;justify-content:center;gap:4px}
+.key{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+  background:var(--card);color:var(--text);border:1px solid var(--stroke);
+  border-bottom-width:2px;border-radius:var(--r-ctl);font-size:17px;line-height:1;padding:0}
+.key.space{flex:1}
+.key.go{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-size:12.5px}
+.key.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+/* Tikfeedback: kort oplichten, geen transitie — de SPI-display is traag. */
+.key.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+/* aan/uit */
+#power{position:absolute;inset:0;display:none;flex-direction:column;gap:8px;
+  background:var(--mica);z-index:6}
+#power.on{display:flex}
+#powerhead{display:flex;align-items:center;gap:6px;flex:none;font-size:12px;font-weight:600;color:var(--text2)}
+#powerbtns{flex:1;display:flex;gap:8px;min-height:0}
+.powbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:var(--card);color:var(--text);border:1px solid var(--stroke);
+  border-bottom-width:2px;border-radius:var(--r-card)}
+.powbtn.crit{border-color:var(--crit-fill);color:var(--crit)}
+.powbtn.hit{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.powbtn[disabled]{opacity:.4}
+.powname{font-size:19px;font-weight:600}
+.powsub{font-size:11.5px;color:var(--text2)}
+#powermsg{flex:none;min-height:14px;font-size:12px;text-align:center;color:var(--text2)}
+#powermsg.bad{color:var(--crit)}
+#powerclose{flex:none;background:var(--card);color:var(--text);
+  border:1px solid var(--stroke);border-bottom-width:2px;border-radius:var(--r-ctl);font-size:13px}
+
+/* temperatuuralarm — het enige scherm dat het hele vlak inneemt. Het staat
+   bovenaan: een te warme motor moet je onderbreken terwijl je een wachtwoord
+   intypt of iets aan het afsluiten bent, niet andersom. */
+#alarm{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;gap:13px;z-index:7}
+#alarm.on{display:flex}
+#alarmhead{display:flex;align-items:center;gap:12px}
+#alarmtitle{font-weight:600;line-height:1}
+#alarmmsg{line-height:1.3;white-space:pre-line}
+#alarmclose{margin-top:2px;background:rgba(255,255,255,.16);
+  border:1px solid currentColor;border-radius:var(--r-ctl)}
