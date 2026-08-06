@@ -18,6 +18,8 @@ src/config.js       config.json en de opgeslagen staat
 src/update.js       versie vergelijken met GitHub
 src/server.js       de HTTP-server
 install/step-update het script dat als root bijwerkt
+tools/design.js     designomgeving: de UI met nagemaakte hardware
+tools/concepts/     ontwerpen die nog geen productie zijn
 tools/vesc-probe.js kijken wat je VESC vertelt
 tools/selftest.js   tests, zonder hardware
 ```
@@ -213,6 +215,41 @@ Staand is 320 px breed, en dat dwingt een paar dingen af:
 - **"max 41"** staat op dezelfde basislijn als de grote cijfers via
   `align-items: last baseline`. Een vast aantal pixels klopt niet meer zodra
   Inter wel of juist niet geïnstalleerd is.
+
+## Concepten
+
+`tools/concepts/` is waar een ontwerp begint. Het zijn losse pagina's die het
+echte `public/app.js` laden — dezelfde element-id's, hetzelfde gedrag — met
+alleen een andere opmaak eromheen. Je klikt er dus doorheen als door een
+werkende UI, niet door een plaatje. Ze staan bewust níet in `public/`: tot een
+concept goedgekeurd is hoort het niet in de app.
+
+De designomgeving vindt ze vanzelf. Elk `.html`-bestand in die map verschijnt
+als knop onder het frame; de server serveert ze op `/concept/<naam>`.
+
+Wat een nieuwe opmaak moet naleven:
+
+- **elk id dat `app.js` aanraakt moet bestaan** — anders valt de tekenlus om.
+  Op te halen met een regex uit `app.js`; de bouwer van de staande versie doet
+  dat ook.
+- **elementen waar `cls()` op werkt houden hun basisklassen**, want die functie
+  overschrijft `className` in z'n geheel (`#tm` is `v big`, `#batcard` is
+  `card`).
+- **de kleurnamen die `app.js` rechtstreeks in style-attributen schrijft moeten
+  bestaan**: `--color-crit-fill`, `--color-warn-fill`, `--color-warn`,
+  `--color-accent`, `--color-neutral-800`, `--color-neutral-500` en
+  `--color-text`. Vergeet je die, dan verliest het temperatuuralarm zijn
+  achtergrond en blijven de boogjes van het wifi-icoon grijs. In een concept
+  met een eigen palet laat je ze doorwijzen naar je eigen namen.
+
+Wat `app.js` níet kan is tekenen: hij zet tekst en breedtes, meer niet. Een
+concept dat ringen of segmenten wil, leest daarvoor zelf `window.last` uit in
+een eigen scriptblok. Dat botst nergens mee, want app.js beheert alleen zijn
+eigen id's.
+
+Eén valkuil bij het testen: `window.last` overschrijven doet niets, want
+`poll()` haalt elke 150 ms opnieuw op. Wil je een waarde vastzetten om naar te
+kijken, onderschep dan `/data` zelf.
 
 ## De pagina draait zichzelf
 
