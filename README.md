@@ -54,6 +54,10 @@ scooter is often out of range and it should just work.
 - 3.5" SPI touchscreen, 480 × 320 — portrait works too, see Layout below
 - Optional: a 5G dongle, for the signal bars in the top bar
 
+The interface follows the Windows 11 design language: mica as the ground,
+cards with a 1 px stroke plus a lighter line along the top edge, 8 px corners,
+and an accent bar under the active tab instead of a filled block.
+
 The display is slow, so the UI repaints about 6 times a second and only touches
 the pixels that actually changed. No animations, no transitions.
 
@@ -294,6 +298,10 @@ step staat vaak buiten bereik en dan moet het gewoon werken.
 - VESC-controller via USB — bij mij een Flipsky Mini MK5
 - 3,5" SPI-touchscreen, 480 × 320 — staand kan ook, zie Indeling hieronder
 - Optioneel: 5G-dongle, voor de bereikbalkjes in de topbalk
+
+De interface volgt de vormtaal van Windows 11: mica als ondergrond, kaarten met
+een rand van 1 px plus een lichtere lijn langs de bovenkant, hoeken van 8 px, en
+een accentbalkje onder de actieve tab in plaats van een gevuld vlak.
 
 Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
 de pixels aan die echt veranderen. Geen animaties, geen transities.
