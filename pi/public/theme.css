@@ -98,34 +98,43 @@ svg{display:block}
 .fill-crit{background:var(--crit-fill)!important}
 
 /* ── titelbalk ────────────────────────────────────────────────────────────── */
+/* De balk drijft op de ondergrond; alleen een haarlijn eronder. De tekst
+   staat in kapitalen met lucht ertussen — dat is wat de balk rustig houdt
+   naast de grote cijfers eronder. */
 #top{flex:none;display:flex;align-items:center;justify-content:space-between;
-  background:var(--card);border-bottom:1px solid var(--stroke);font-size:12px}
+  background:transparent;border-bottom:1px solid var(--stroke);
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
 #topleft{display:flex;align-items:center;min-width:0}
-#outside{display:flex;align-items:center;gap:5px;color:var(--text2)}
-#outside svg{flex:none;width:12px;height:12px}
-#outtemp{font-size:12px;color:var(--text)}
-#status{display:flex;align-items:center;gap:9px;flex:none;color:var(--text2)}
+#outside{display:flex;align-items:center;gap:5px;color:var(--text2);text-transform:none}
+#outside svg{flex:none;width:15px;height:15px}
+#outtemp{font-size:14px;color:var(--text);letter-spacing:0}
+#status{display:flex;align-items:center;gap:11px;flex:none;color:var(--text2)}
+#status>*{flex:none}
 #wifiico,#btico{display:none;flex:none}
 /* Het mobiele stukje staat er alleen als er een modem in zit. */
 #cellgrp{display:none;align-items:center;gap:5px;flex:none}
 #cellgrp.on{display:flex}
-#sig{display:flex;align-items:flex-end;gap:2px;height:10px}
-#sig span{width:2px;background:var(--track)}
-#sig span:nth-child(1){height:3px}
-#sig span:nth-child(2){height:5px}
-#sig span:nth-child(3){height:7px}
-#sig span:nth-child(4){height:8px}
-#sig span:nth-child(5){height:10px}
+#sig{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+#sig span{width:3px;border-radius:1px;background:var(--track)}
+#sig span:nth-child(1){height:4px}
+#sig span:nth-child(2){height:6px}
+#sig span:nth-child(3){height:8px}
+#sig span:nth-child(4){height:11px}
+#sig span:nth-child(5){height:14px}
 #sig span.on{background:var(--accent)}
 #sig span.weak{background:var(--warn)}
-#tech{font-size:10px}
-#clock{font-size:12px;color:var(--text)}
-#statusbtn{display:flex;align-items:center;gap:5px;padding:0;background:transparent;border:0}
-#dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+#tech{font-size:11px;color:var(--text)}
+#clock{font-size:15px;letter-spacing:.02em;color:var(--text)}
+#statusbtn{display:flex;align-items:center;gap:6px;padding:0 0 0 6px;
+  background:transparent;border:0;font:inherit;font-size:12px;
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+#dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none}
 #dot.demo{background:var(--warn)}
 #dot.off{background:var(--crit)}
-/* De verbindingstekst staat in het systeemvenster; in de balk is de stip
-   genoeg. */
+/* Het origineel zette de verbindingstekst naast de stip. Toen stond de melding
+   nog ín de balk; nu heeft die zijn eigen regel eronder, en dan zegt "GEEN
+   VESC" naast de klok hetzelfde als "Geen VESC-verbinding" een regel lager.
+   De stip is genoeg — de tekst staat in het systeemvenster. */
 #stxt{display:none}
 
 /* ── InfoBar ──────────────────────────────────────────────────────────────── */
@@ -181,14 +190,16 @@ svg{display:block}
    naar. Het element blijft bestaan omdat app.js ernaar schrijft. */
 #rpmhold{display:none}
 
-/* ── tabstrip met accentpil ───────────────────────────────────────────────── */
-#dots{flex:none;display:flex;align-items:stretch;
-  border-top:1px solid var(--stroke);background:var(--card)}
-#dots span{flex:1;position:relative;display:flex;align-items:center;justify-content:center;
-  font-size:12px;color:var(--text2)}
-#dots span.on{color:var(--text);font-weight:600}
-#dots span.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
-  bottom:2px;width:22px;height:3px;border-radius:2px;background:var(--accent)}
+/* ── puntjes ───────────────────────────────────────────────────────────────
+   Waar het scherm zijn naam aan dankt: drie stipjes, gecentreerd. De opmaak
+   zet er "Rit / Motor / Accu" in omdat een tabstrip die tekst nodig had; hier
+   is de tekst overbodig, dus die valt weg op lettergrootte nul. Het element
+   blijft staan — app.js zet de klasse `on` erop. */
+#dots{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;
+  background:transparent}
+#dots span{flex:none;width:6px;height:6px;border-radius:50%;
+  background:var(--stroke);font-size:0;color:transparent}
+#dots span.on{background:var(--accent)}
 
 /* ── overlays ──────────────────────────────────────────────────────────────
    7  temperatuuralarm
@@ -365,18 +376,19 @@ svg{display:block}
 
 /* ═══ maatvoering · liggend, 480 × 320 ═════════════════════════════════════ */
 body[data-layout="Liggend"] #root{width:480px;height:320px}
-body[data-layout="Liggend"] #top{height:26px;gap:10px;padding:0 12px}
-body[data-layout="Liggend"] #statusbtn{height:26px}
-body[data-layout="Liggend"] #notice{height:28px;margin:6px 12px 0;padding:0 11px}
+body[data-layout="Liggend"] #top{height:34px;gap:11px;padding:0 11px}
+body[data-layout="Liggend"] #status{height:34px}
+body[data-layout="Liggend"] #statusbtn{height:34px}
+body[data-layout="Liggend"] #notice{height:28px;margin:6px 11px 0;padding:0 11px}
 
-body[data-layout="Liggend"] .pane{gap:8px;padding:8px 12px}
+body[data-layout="Liggend"] .pane{gap:8px;padding:8px 11px}
 
 /* 1 · RIT — snelheid links, accu en bereik in een kolom ernaast. */
 body[data-layout="Liggend"] #p0{gap:8px}
 body[data-layout="Liggend"] #speedbox{flex:1;min-width:0;padding:10px 16px 12px;gap:8px}
-body[data-layout="Liggend"] #speed{font-size:100px;font-weight:600;line-height:.9;letter-spacing:-.035em}
+body[data-layout="Liggend"] #speed{font-size:118px;font-weight:600;line-height:.86;letter-spacing:-.04em}
 body[data-layout="Liggend"] #speedmeta{padding-bottom:9px}
-body[data-layout="Liggend"] #side{width:150px;flex:none;display:flex;flex-direction:column;gap:8px}
+body[data-layout="Liggend"] #side{width:168px;flex:none;display:flex;flex-direction:column;gap:8px}
 body[data-layout="Liggend"] #side .card{flex:1}
 body[data-layout="Liggend"] #side .val{display:flex;align-items:baseline;gap:4px}
 body[data-layout="Liggend"] #side .n{font-size:38px;font-weight:600;line-height:1;letter-spacing:-.03em}
@@ -411,12 +423,12 @@ body[data-layout="Liggend"] #packlist .row{flex:1;display:flex;align-items:cente
 body[data-layout="Liggend"] #packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
 body[data-layout="Liggend"] #packlist .u{font-size:11px;color:var(--text2)}
 
-body[data-layout="Liggend"] #dots{height:28px;padding:0 12px 4px}
+body[data-layout="Liggend"] #dots{height:16px;padding:0 0 3px}
 
-body[data-layout="Liggend"] .sheet{inset:26px 0 0;padding:8px 12px 10px}
+body[data-layout="Liggend"] .sheet{inset:34px 0 0;padding:8px 11px 10px}
 body[data-layout="Liggend"] .sheettitle{font-size:18px}
 body[data-layout="Liggend"] .xbtn{width:40px;height:32px}
-body[data-layout="Liggend"] #charge{inset:26px 0 0;padding:16px 24px}
+body[data-layout="Liggend"] #charge{inset:34px 0 0;padding:16px 24px}
 body[data-layout="Liggend"] #chargepct{font-size:88px}
 body[data-layout="Liggend"] #chargepct span+span{font-size:22px}
 body[data-layout="Liggend"] #chargetrack{width:300px}
@@ -437,8 +449,11 @@ body[data-layout="Liggend"] #alarmclose{height:42px;min-width:170px;padding:0 20
    staat gaat hier onder elkaar — ook de knoppenrijen, want met een duim mik
    je daar beter op. */
 body[data-layout="Staand"] #root{width:320px;height:480px}
-body[data-layout="Staand"] #top{height:26px;gap:8px;padding:0 10px}
-body[data-layout="Staand"] #statusbtn{height:26px}
+body[data-layout="Staand"] #top{height:30px;gap:8px;padding:0 10px}
+body[data-layout="Staand"] #status{height:30px;gap:9px}
+body[data-layout="Staand"] #statusbtn{height:30px}
+body[data-layout="Staand"] #outtemp{font-size:13px}
+body[data-layout="Staand"] #clock{font-size:14px}
 body[data-layout="Staand"] #notice{height:28px;margin:6px 10px 0;padding:0 10px;font-size:12px}
 
 body[data-layout="Staand"] .pane{flex-direction:column;gap:7px;padding:7px 10px}
@@ -446,7 +461,7 @@ body[data-layout="Staand"] .pane{flex-direction:column;gap:7px;padding:7px 10px}
 /* 1 · RIT — de snelheid krijgt de volle breedte. */
 body[data-layout="Staand"] #p0{gap:7px}
 body[data-layout="Staand"] #speedbox{flex:1;min-height:0;padding:12px 14px 14px;gap:10px}
-body[data-layout="Staand"] #speed{font-size:110px;font-weight:600;line-height:.88;letter-spacing:-.04em}
+body[data-layout="Staand"] #speed{font-size:132px;font-weight:600;line-height:.82;letter-spacing:-.055em}
 body[data-layout="Staand"] #speedmeta{padding-bottom:11px}
 body[data-layout="Staand"] #speedunit{font-size:15px}
 body[data-layout="Staand"] #side{flex:none;display:flex;flex-direction:column;gap:7px}
@@ -489,9 +504,13 @@ body[data-layout="Staand"] #packlist .row{flex:1;display:flex;align-items:center
 body[data-layout="Staand"] #packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
 body[data-layout="Staand"] #packlist .u{font-size:11px;color:var(--text2)}
 
-body[data-layout="Staand"] #dots{height:30px;padding:0 10px 4px}
+/* Staand is er ruimte voor het detail uit het origineel: de actieve stip
+   rekt uit tot een streepje. */
+body[data-layout="Staand"] #dots{height:20px;padding:0 0 4px;gap:6px}
+body[data-layout="Staand"] #dots span{border-radius:3px}
+body[data-layout="Staand"] #dots span.on{width:18px}
 
-body[data-layout="Staand"] .sheet{inset:26px 0 0;padding:8px 10px 10px}
+body[data-layout="Staand"] .sheet{inset:30px 0 0;padding:8px 10px 10px}
 body[data-layout="Staand"] .sheettitle{font-size:17px}
 body[data-layout="Staand"] .xbtn{width:40px;height:32px}
 /* Drie knoppen naast elkaar passen niet met leesbare labels. */
@@ -512,7 +531,7 @@ body[data-layout="Staand"] .seg.lay{width:70px}
 body[data-layout="Staand"] .step{width:32px}
 body[data-layout="Staand"] .setval{width:44px}
 body[data-layout="Staand"] .setval.wide{width:52px}
-body[data-layout="Staand"] #charge{inset:26px 0 0;padding:16px 20px}
+body[data-layout="Staand"] #charge{inset:30px 0 0;padding:16px 20px}
 body[data-layout="Staand"] #chargepct{font-size:92px}
 body[data-layout="Staand"] #chargepct span+span{font-size:20px}
 body[data-layout="Staand"] #chargetrack{width:100%}
@@ -535,18 +554,6 @@ body[data-layout="Staand"] #alarmmsg{font-size:18px}
 body[data-layout="Staand"] #alarmclose{height:46px;min-width:180px;padding:0 20px;font-size:14px}
 
 /* ═══ waar Nocturne afwijkt van een plat kaartenspel ═══════════════════════ */
-/* De titelbalk drijft op de ondergrond; alleen een haarlijn eronder. */
-#top{background:transparent}
-#dots{background:transparent}
-
-/* Puntjes in plaats van een accentpil: dat is waar het scherm zijn naam aan
-   dankt. Ze staan gecentreerd, niet over de breedte verdeeld. */
-#dots{justify-content:center;gap:6px;align-items:center}
-#dots span{flex:none;width:6px;height:6px;border-radius:50%;
-  background:var(--stroke);font-size:0;color:transparent}
-#dots span.on{background:var(--accent)}
-#dots span.on::after{display:none}
-
 /* Knoppen markeren met een rand, niet met een vlak. */
 .seg.on,.key.go,.key.on,.key.hit,.rowbtn.hit,.pbtn.hit,.xbtn.hit,.powbtn.hit,
 #netseg button.on{background:transparent;color:var(--accent);border-color:var(--accent)}
