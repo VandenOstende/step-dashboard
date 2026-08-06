@@ -5,6 +5,10 @@ a VESC controller over USB.
 
 **[English](#english)** · **[Nederlands](#nederlands)**
 
+> *TRANSLATED WITH CLAUDE, UI MADE BY CLAUDE DESIGNER*
+>
+> *VERTAALD MET CLAUDE, UI GEMAAKT DOOR CLAUDE DESIGNER*
+
 ---
 
 ## English
@@ -30,6 +34,10 @@ Beyond that:
   through them when there's more than one. Tapping opens the full list.
 - The theme follows the clock: light between 07:30 and 18:00, dark outside that.
 - Joining a Wi-Fi network needs no keyboard — there's one on screen (AZERTY).
+- Lists that don't fit — settings, connections, notifications — have a pair of
+  chevrons in their header that step through them a row at a time. Hold one down
+  and it keeps going. Dragging with a finger still works; the buttons are there
+  because on a 3.5" screen nothing tells you there's more below.
 - The Bluetooth tab searches for devices nearby, the same way the Wi-Fi tab
   scans — including while something is already connected.
 - Two layouts: landscape 480 × 320 and portrait 320 × 480. Settings → Layout
@@ -98,8 +106,8 @@ exactly 480 × 320 (or 320 × 480) and doesn't scroll.
 
 Settings → **Layout** switches between landscape (480 × 320) and portrait
 (320 × 480). Both show the same data; the portrait one stacks it in a single
-column, gives warnings a full-width band, and moves the keyboard to the bottom
-of the screen. The choice is stored on the Pi, so the kiosk comes back up in the
+column, puts the button rows underneath each other instead of side by side, and
+moves the keyboard to the bottom of the screen where your thumb already is. The choice is stored on the Pi, so the kiosk comes back up in the
 layout you left it in.
 
 The page rotates itself. Your screen is bolted to the handlebars in one
@@ -221,10 +229,11 @@ does happen automatically — that's `update.checkOnStart`.
 cd pi
 npm test     # 53 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
+npm run design   # http://127.0.0.1:8081/design — the UI with faked hardware
 ```
 
-Without a VESC attached, `/data` reports `connected: false` and the screen says
-"geen vesc" in the top right. Open `pi/public/index.html` directly in a browser
+Without a VESC attached, `/data` reports `connected: false`, the dot in the top
+bar turns red and the notification bar reads *Geen VESC-verbinding*. Open `pi/public/index.html` directly in a browser
 and there's no server at all — after three failed attempts the UI falls back to a
 simulated ride, which is handy for working on the looks without dragging the
 scooter along.
@@ -245,9 +254,14 @@ are still in `project/`. The working version lives in `pi/`.
 
 ### A note on language
 
-The interface is in Dutch, and so are the code comments — it's a personal
-project. The structure should be readable regardless: `pi/README.md` explains how
-the code fits together, also in Dutch. Ask if you'd like that translated.
+The interface is in Dutch, and so are the code comments and the commit messages —
+it's a personal project and that's the language I think in. Both READMEs are
+bilingual: this one and [`pi/README.md`](pi/README.md), which explains how the
+code fits together and why some of it is odd.
+
+The English is a translation, so the Dutch is the original where the two
+disagree. Element ids, settings keys and endpoint names are English throughout
+the code, so a Dutch comment above an English identifier is normal here.
 
 ---
 
@@ -277,6 +291,10 @@ Verder:
 - Twee indelingen: liggend 480 × 320 en staand 320 × 480. Instellingen →
   Indeling wisselt ertussen, en die keuze overleeft een herstart.
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
+- Lijsten die niet passen — instellingen, verbindingen, meldingen — hebben twee
+  chevrons in hun kop die er rij voor rij doorheen schuiven. Ingedrukt houden
+  loopt door. Slepen met je vinger kan gewoon nog; de knoppen zijn er omdat op
+  een 3,5"-scherm niets verraadt dat er meer onder staat.
 - Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
   wifi-tabblad scant — ook als er al iets verbonden is.
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
@@ -343,8 +361,8 @@ dat je scherm werkt vóór je de kiosk aanzet; de UI is precies op 480 × 320 (o
 
 Instellingen → **Indeling** wisselt tussen liggend (480 × 320) en staand
 (320 × 480). Allebei tonen ze dezelfde gegevens; de staande zet alles in één
-kolom, geeft waarschuwingen een band over de volle breedte en schuift het
-toetsenbord naar de onderkant van het scherm. De keuze staat op de Pi, dus de
+kolom, zet de knoppenrijen onder elkaar in plaats van naast elkaar, en schuift
+het toetsenbord naar de onderkant van het scherm, waar je duim toch al is. De keuze staat op de Pi, dus de
 kiosk komt terug in de indeling waarin je hem verliet.
 
 De pagina draait zichzelf. Je schermpje zit in één stand op het stuur
@@ -466,10 +484,11 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 cd pi
 npm test     # 53 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
+npm run design   # http://127.0.0.1:8081/design — de UI met nagemaakte hardware
 ```
 
-Zonder VESC eraan meldt `/data` `connected: false` en zegt het scherm
-rechtsboven "geen vesc". Open je `pi/public/index.html` los in een browser, dan
+Zonder VESC eraan meldt `/data` `connected: false`, kleurt de stip in de
+topbalk rood en zegt de meldingsbalk *Geen VESC-verbinding*. Open je `pi/public/index.html` los in een browser, dan
 is er helemaal geen server en valt de UI na drie mislukte pogingen terug op een
 gesimuleerde rit — handig om aan het uiterlijk te werken zonder de step erbij te
 halen.
@@ -486,3 +505,15 @@ halen.
 
 Het ontwerp is eerst als klikbaar prototype gemaakt in Claude Design; die
 bestanden staan nog in `project/`. De werkende versie staat in `pi/`.
+
+### Over de taal
+
+De interface is Nederlands, en de commentaren in de code en de commitberichten
+ook — het is een persoonlijk project en dat is de taal waarin ik denk. Beide
+README's zijn tweetalig: deze en [`pi/README.md`](pi/README.md), waarin staat
+hoe de code in elkaar zit en waarom sommige dingen zo raar zijn.
+
+Het Engels is een vertaling, dus waar de twee van elkaar afwijken is het
+Nederlands het origineel. Element-id's, instellingssleutels en endpointnamen
+zijn in de code overal Engels; een Nederlands commentaar boven een Engelse naam
+is hier dus normaal.

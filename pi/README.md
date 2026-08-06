@@ -1,4 +1,406 @@
-# Hoe het in elkaar zit
+# How it fits together · Hoe het in elkaar zit
+
+**[English](#english)** · **[Nederlands](#nederlands)**
+
+> *TRANSLATED WITH CLAUDE, UI MADE BY CLAUDE DESIGNER*
+>
+> *VERTAALD MET CLAUDE, UI GEMAAKT DOOR CLAUDE DESIGNER*
+
+---
+
+## English
+
+Installing and configuring is in the [README at the top of the repo](../README.md).
+This is more of a notebook to myself about how the code works and why some of it
+is odd.
+
+```
+tools/layout-body.html   the markup — one source for both layouts
+tools/build-layouts.js   assembles the two pages from it
+public/index.html    landscape, 480 × 320   ← output
+public/portrait.html portrait,  320 × 480   ← output
+public/theme.css     the design language and the sizing, shared by both
+public/app.js        the behaviour, shared by both
+src/serial.js        serial port without npm modules
+src/vesc.js          VESC protocol: framing, CRC16, packets
+src/telemetry.js     raw values → what the UI expects
+src/system.js        nmcli, bluetoothctl, mmcli, backlight
+src/weather.js       outside temperature
+src/charge.js        recognising that the battery is charging, and for how long
+src/config.js        config.json and the stored state
+src/update.js        comparing the version with GitHub
+src/server.js        the HTTP server
+install/step-update  the script that updates as root
+tools/design.js      design environment: the UI with faked hardware
+tools/vesc-probe.js  seeing what your VESC has to say
+tools/selftest.js    tests, no hardware needed
+```
+
+### Two layouts, one source
+
+No framework and no bundler. The Pi has no internet, so everything is local:
+`theme.css` for the design language, `app.js` for the behaviour, icons as inline
+SVG. Inter is used if you have it installed (`apt install fonts-inter`),
+otherwise it falls back to system-ui — the design leans on shape, not on one
+particular typeface.
+
+`index.html` is landscape, `portrait.html` is portrait, and both are **output**.
+The markup lives once in `tools/layout-body.html`, and the design language plus
+the sizing for both in `public/theme.css`; the `data-layout` attribute on the
+body picks which half applies. `tools/build-layouts.js` assembles the two pages:
+
+```bash
+node tools/build-layouts.js     # after every change to layout-body.html
+```
+
+Everything that can be shared really is shared — markup, design language,
+behaviour. Two hand-written pages drift apart at the first change, and then a
+button works in one layout and not in the other. That's exactly the kind of
+mistake you only find on the handlebars.
+
+The design language is Nocturne, the original design: dark blue ground, purple
+accent, flat cards with a 1 px border, dots at the bottom, and a battery that
+colours the whole card as it drains. There were four styles side by side for a
+while — Windows, Apple and Cyber as well, selectable in the settings. That was
+rolled back; if you want to see them, they're in commit `5c6acd5`.
+
+Which page you're looking at is on the body:
+
+```html
+<body data-layout="Liggend">     <!-- or "Staand" -->
+```
+
+`app.js` reads that as `PAGE_LAYOUT`. If the settings hold a different layout,
+the page redirects to the other one at startup — before the timers start. The
+kiosk needs to know nothing: it always opens `/` and ends up in the right place.
+
+Switching saves first and jumps afterwards (`saveSettingsNow`). With the normal
+save, which waits 400 ms, the POST dies with the reload and the other page sends
+you straight back.
+
+What a new layout has to honour: every id `app.js` touches must exist in the
+markup, and elements `cls()` writes to keep exactly the classes that script puts
+on them (`#tm` is `v big`, `#batcard` is `card`). Both are extractable from
+`app.js` with a regex and checkable — that saves hunting.
+
+Rendering happens ~6× a second and only touches the nodes that actually change —
+hence `cacheT` and `cacheS` in `paint()`. The little screen is slow; a normal
+redraw loop makes it unusably slow.
+
+There's a demo mode too. If `/data` is unreachable, the page simulates a ride
+itself after three failed attempts. So you can work on the looks by simply
+opening the HTML file.
+
+### The VESC protocol
+
+Framing is in `vesc.js`, taken from `bldc/comm/packet.c`:
+
+```
+0x02 len(1)  payload  crc16(2)  0x03      short packets
+0x03 len(2)  payload  crc16(2)  0x03      longer ones
+```
+
+CRC is CRC16-CCITT, poly 0x1021, init 0.
+
+What cost me an evening: **a start byte cannot be trusted.** A payload byte can
+look just like one, and a false start like that can declare a length that runs
+straight over the next, real packet. Then you're waiting for bytes that never
+come and you've lost a valid packet. So `_scan()` validates a candidate
+completely — start byte, expected command, CRC *and* the closing 0x03 — before
+accepting it, and when in doubt just keeps looking further in the buffer. There's
+a test for it with a deliberately mangled packet followed by a good one.
+
+We ask for two things: `COMM_GET_VALUES` for temperatures, currents and faults,
+and `COMM_GET_VALUES_SETUP` for speed, distance and battery level. If the
+firmware doesn't answer that second one, it gives up after a few rounds and
+`telemetry.js` works it out itself.
+
+### Serial without npm
+
+`serial.js` puts the port in raw mode with `stty` and then reads it with `fs`.
+That works because the VESC is a CDC-ACM device, where the baud rate has no
+meaning — so there's nothing to do about line parameters.
+
+One trap: do **not** use `fs.promises.open()`. It hands back a `FileHandle`, and
+as soon as that object is collected Node closes the underlying fd — in the middle
+of a running read. That produced an `EBADF` and a reconnect every few seconds.
+With the callback form of `fs.open()` you get a bare fd and the problem
+disappears.
+
+The read loop runs with `stty min 0 time 1`, so `read()` returns after 100 ms
+even when there's nothing. Otherwise a threadpool slot stays occupied forever.
+
+### Wi-Fi passwords
+
+The on-screen keyboard sends the password to `nmcli --ask` over **stdin**, not as
+an argument. Arguments show up in `ps` and `/proc` and are readable by any local
+user. If NetworkManager already knows the network with a wrong password, the
+profile is updated and reactivated. Old nmcli versions don't know `--ask`; then it
+falls back to the argument form.
+
+`wifiConnectPlan()` only builds the command and runs nothing, so the tests can
+check what *would* happen — including that the password really doesn't end up in
+the arguments.
+
+All system calls go through `execFile` with an argument list, never through a
+shell. An SSID with a semicolon in it must not become a command.
+
+### Bluetooth scanning
+
+`bluetoothctl scan on` doesn't do what you think. The scan is tied to the
+process: close it and the scan stops. And because `run()` always closes stdin —
+otherwise bluetoothctl sits waiting for input — that process is gone immediately.
+So you start a scan that lasts zero seconds.
+
+`--timeout N` fixes it: the process stays up for exactly N seconds and then stops
+by itself, so there's no background process to babysit. We don't wait for it. The
+server only remembers until when it's scanning and returns the list right away;
+the UI re-fetches every two seconds, because devices appear one at a time. If
+your bluez doesn't know `--timeout` (older than 5.55), that shows up as "search
+not supported" on the search row rather than nothing happening.
+
+`bluetoothctl devices` without a filter also returns what the scan just found, so
+nothing extra is needed for that. The list puts connected first, then paired,
+then whatever has a name. Nameless devices — just a mac address — go at the
+bottom and are not dropped: sometimes that odd address is exactly your headset.
+
+### Where the scooter is
+
+The outside temperature in the top left needs coordinates. They come from
+`config.json`, otherwise from the GPS of a 5G modem, and otherwise from a lookup
+on the IP address. That last one exists because most scooters have no modem and
+nobody feels like looking up coordinates by hand. Turn it off with
+`weather.ipFallback: false`.
+
+The top bar shows only the number. The place name still comes out of `/weather` —
+handy for checking where it thinks it is — but on 480 px every word you don't
+need is one too many.
+
+Ride out of Wi-Fi range and it holds the last known temperature for three hours.
+It doesn't suddenly get ten degrees colder outside, and an old number is more
+useful than an empty box.
+
+Mobile signal works the other way round: `modem()` returns `present`, and if
+there's no dongle the bars disappear from the top bar entirely. Reporting "no
+signal" about hardware that isn't there is not information. Appearing may be
+immediate, disappearing only after three rounds of nothing — ModemManager goes
+quiet for a moment when it restarts, and the top bar shouldn't blink for that.
+
+### Updating itself
+
+Two pieces. `src/update.js` fetches the latest commit through the public GitHub
+API and compares it with `version.json`, which `install.sh` writes on every
+install. Installing is done by `step-update`, a separate script that runs as
+root.
+
+That script has to start **detached**, because at the end it restarts the very
+service the call came from — without `systemd-run` it cuts itself off halfway.
+That's also why progress comes from a status file in `/var/lib/step-dashboard/`
+and not from the process: the UI keeps reading that while the server restarts
+under its hands.
+
+The script lives in `/usr/local/sbin/` and not in `/opt/step-dashboard`, because
+that directory belongs to the service user. A script you can edit yourself *and*
+are allowed to run with sudo is a back door to root. For the same reason there
+are no wildcards in the sudoers rule: `step-update` reads the repository and the
+branch from `config.json` itself, so nothing has to pass through sudo.
+
+It always fetches a fresh clone instead of pulling in the directory where you
+once ran `git clone` — that one may have been moved or thrown away.
+
+### Power
+
+`systemctl reboot` and `poweroff` are normally allowed without root, but through
+logind — and that wants a session. The service runs as a system daemon without
+one, so polkit refuses. Hence sudo, with two spelled-out rules.
+
+What the UI sends never reaches the command: `powerCommand()` looks up
+`"reboot"` or `"shutdown"` in a table and returns `null` for anything else. So
+there is no string that runs from the browser all the way to sudo.
+
+The screen is the confirmation. Another "are you sure" on a touchscreen only
+makes it more annoying, not safer — and you're two taps away from it starting on
+the ride screen.
+
+### What's different in portrait
+
+Portrait is 320 px wide, and that forces a few things:
+
+- **Button rows** (system, power) no longer fit side by side with readable
+  labels, so they stack. Watch out for `flex:none` there: the shared `.pbtn` has
+  `flex:1`, and in a column that doesn't grow itself that means a basis of zero —
+  the buttons then shrink to the height of their own text. They were 20 px tall
+  like that, and you don't hit that with a thumb. They're a fixed 64 px now, and
+  `margin-top:auto` keeps them at the bottom where your thumb already is.
+- **The keyboard** has ten keys per row, so 27 px wide. That's narrow, but
+  there's height to spare: the keys are 59 px tall and stuck to the bottom.
+  Stretching them over the full height gave 91 px keys, and you don't aim better
+  for that.
+- **The speed unit** sits on the baseline of the big digits through
+  `align-items: baseline` on `#speedrow`, with a bit of `padding-bottom` on
+  `#speedmeta` to line up "max 41" underneath it. A fixed number of pixels stops
+  being right the moment Inter is or isn't installed.
+
+### The design environment
+
+```bash
+npm run design      # http://127.0.0.1:8081/design
+```
+
+`tools/design.js` serves `public/` exactly as the real server does, but every
+endpoint is faked. Next to the frame sit sliders and switches for speed,
+battery, temperatures, charging, Wi-Fi, Bluetooth, modem and weather, plus
+ready-made situations (riding, motor hot, low battery, charging, no VESC) so you
+can reach every screen in one click. The frame reloads by itself when a file in
+`public/` changes.
+
+Three buttons pick the layout: landscape, portrait, and **Staand op 480 × 320** —
+the portrait page in a landscape frame, exactly like on the scooter, so you see
+a wrong rotation here instead of on the handlebars.
+
+`install.sh` deletes `tools/design.js` and `tools/design.html` after copying.
+The design environment is for the computer, not for the Pi.
+
+### Concepts
+
+`tools/concepts/` is empty — there are no designs sitting next to the app any
+more. What used to be there (nocturne, wijzerplaat, cyber, apple, windows) is in
+the history: `git show ab1a694:pi/tools/concepts/` shows them.
+
+The mechanism is still there. Drop an `.html` into `tools/concepts/` and it shows
+up by itself as a button under the frame of the design environment, served on
+`/concept/<name>`. Such pages load the real `public/app.js` — same element ids,
+same behaviour — with only different markup around it, so you click through a
+working UI and not a picture. They deliberately don't belong in `public/`: until
+a design is approved it doesn't belong in the app.
+
+What a new set of markup has to honour:
+
+- **every id `app.js` touches must exist** — otherwise the render loop falls
+  over. Extractable with a regex from `app.js`; the builder of the portrait
+  version does exactly that.
+- **elements `cls()` writes to keep their base classes**, because that function
+  overwrites `className` wholesale (`#tm` is `v big`, `#batcard` is `card`).
+- **the colour names `app.js` writes straight into style attributes must exist**:
+  `--color-crit-fill`, `--color-warn-fill`, `--color-warn`, `--color-accent`,
+  `--color-neutral-800`, `--color-neutral-500` and `--color-text`. Forget those
+  and the temperature alarm loses its background and the arcs of the Wi-Fi icon
+  stay grey. If your design has its own palette, point them at your own names.
+
+What `app.js` cannot do is draw: it sets text and widths, nothing more. A design
+that wants rings or segments reads `window.last` itself in its own script block.
+That collides with nothing, because app.js only manages its own ids.
+
+One trap while testing: overwriting `window.last` does nothing, because `poll()`
+fetches again every 150 ms. To pin a value down and look at it, intercept
+`/data` itself.
+
+### The page rotates itself
+
+The panel on the handlebars is 480 × 320 and stays that way, even if you pick the
+portrait layout. So `fitRotation()` compares what the page was drawn for
+(`DESIGN`) with what it got (`innerWidth/innerHeight`), and puts a quarter turn
+on it when those don't match. The body fills the panel, `#root` keeps the design
+size and is rotated about its own centre.
+
+Why not at OS level: `display_rotate` in `config.txt` only works with certain
+drivers, fbtft wants a module parameter, and under Wayland it's `wlr-randr`
+again. One wrong attempt and your screen stays black while you can no longer get
+at it. This is one line of CSS that does the same thing everywhere.
+
+Touch didn't need converting: the browser hit-tests straight through the
+transform. Tested with a real `touchscreen.tap()` on the Settings button in the
+rotated system window.
+
+Which way round is in `cfg.rotate` (90 or 270) — how you hang the screen decides
+which of the two is right.
+
+The design environment has a **Staand op 480 × 320** button for this: it loads
+the portrait page in a landscape frame, exactly like on the scooter. Without that
+button you only see a wrong rotation once it's on the handlebars.
+
+### Notifications that go somewhere
+
+Most notifications tell you something: too hot, battery low, VESC gone. For those
+the list is the end of the line. The update notification is different — it's
+about a button somewhere else. A notification that says "see Settings" is a
+notification that gives you work.
+
+So a notification like that gets an `act` in `notices()`. Tap the bar while that
+one is showing and it goes straight to that screen instead of to the list; and in
+the list, that row is tappable itself, with an accent border and "openen" instead
+of "info" beside it. The rest of the notifications behave unchanged.
+
+Moving is not a tap, same as in the network list: scrolling through the
+notifications opens nothing.
+
+### Buttons for the lists
+
+The settings list is eleven rows, 564 px of content in a space of 228 px, so you
+see about four of them. There is no scrollbar — that's hidden on purpose — so
+nothing tells you there's more underneath, and dragging over a row full of
+buttons feels risky.
+
+Hence two chevrons in the header of every scrollable list (settings, connections,
+notifications), in the same style as the close button. They're **hidden** when
+the list fits entirely and **dimmed** when you're already at the top or bottom,
+so they also say where you are. Jumping happens in one go, without
+`behavior:"smooth"` — the SPI display is slow and a 300 ms animated scroll is
+exactly what you don't want.
+
+Holding one down repeats: after 400 ms it keeps going at about eight rows a
+second, because the connections screen can show up to forty networks and that
+would otherwise be forty separate taps. Dragging with a finger keeps working; the
+buttons are an addition, not a replacement.
+
+### Layers on the screen
+
+The overlays sit at fixed z-index levels:
+
+```
+7  temperature alarm
+6  power
+5  on-screen keyboard
+4  system and settings
+3  notifications
+2  connections
+1  charging
+```
+
+The alarm is deliberately on top. An overheating motor has to interrupt you while
+you're typing a password or shutting something down, not the other way round.
+
+### Testing
+
+```bash
+npm test
+```
+
+53 tests, no hardware needed: CRC against the known test vector, framing,
+fragmented and mangled packets, the conversion from erpm to km/h and from
+tachometer to distance, zeroing the trip counter (including when the VESC
+restarts and resets its own counters), how the nmcli commands are built,
+comparing versions, recognising charging — including the slowest charger we still
+want to see — which location source wins for the weather, and that the power
+screen can never produce anything other than `systemctl reboot` or `systemctl
+poweroff`.
+
+For the UI I clicked through it with Playwright at 480 × 320 and 320 × 480, in
+both themes, over all ten screens. That isn't in the repo, but the approach is
+simple: start the server, intercept `/data` to pin the values down, `page.tap()`
+the buttons, and check two things — that `scrollWidth`/`scrollHeight` stay within
+the panel, so everything fits without scrolling, and that every visible button
+measures at least 28 px in both directions. That second check exists because the
+portrait system buttons were 20 px tall for a while and nothing noticed until I
+tried it on the handlebars.
+
+Without a VESC you can fake one with a PTY pair: `pty.openpty()`, listen for
+commands 4 and 47, and send answers back with the same framing. That makes the
+whole chain testable apart from the USB cable itself.
+
+---
+
+## Nederlands
 
 Installeren en instellen staat in de [README bovenin de repo](../README.md).
 Dit is meer een notitieblok voor mezelf over hoe de code werkt en waarom
@@ -7,36 +409,37 @@ sommige dingen zo raar zijn.
 ```
 tools/layout-body.html   de opmaak — één bron voor beide indelingen
 tools/build-layouts.js   zet daar de twee pagina's uit samen
-public/index.html   liggend, 480 × 320   ← uitvoer
+public/index.html    liggend, 480 × 320   ← uitvoer
 public/portrait.html staand,  320 × 480   ← uitvoer
-public/theme.css    de vormtaal en de maatvoering, gedeeld door allebei
-public/app.js       het gedrag, gedeeld door allebei
-src/serial.js       seriële poort zonder npm-modules
-src/vesc.js         VESC-protocol: framing, CRC16, pakketten
-src/telemetry.js    ruwe waarden → wat de UI verwacht
-src/system.js       nmcli, bluetoothctl, mmcli, backlight
-src/weather.js      buitentemperatuur
-src/charge.js       herkennen dat de accu laadt, en hoelang nog
-src/config.js       config.json en de opgeslagen staat
-src/update.js       versie vergelijken met GitHub
-src/server.js       de HTTP-server
-install/step-update het script dat als root bijwerkt
-tools/design.js     designomgeving: de UI met nagemaakte hardware
-tools/vesc-probe.js kijken wat je VESC vertelt
-tools/selftest.js   tests, zonder hardware
+public/theme.css     de vormtaal en de maatvoering, gedeeld door allebei
+public/app.js        het gedrag, gedeeld door allebei
+src/serial.js        seriële poort zonder npm-modules
+src/vesc.js          VESC-protocol: framing, CRC16, pakketten
+src/telemetry.js     ruwe waarden → wat de UI verwacht
+src/system.js        nmcli, bluetoothctl, mmcli, backlight
+src/weather.js       buitentemperatuur
+src/charge.js        herkennen dat de accu laadt, en hoelang nog
+src/config.js        config.json en de opgeslagen staat
+src/update.js        versie vergelijken met GitHub
+src/server.js        de HTTP-server
+install/step-update  het script dat als root bijwerkt
+tools/design.js      designomgeving: de UI met nagemaakte hardware
+tools/vesc-probe.js  kijken wat je VESC vertelt
+tools/selftest.js    tests, zonder hardware
 ```
 
-## Twee indelingen, één bron
+### Twee indelingen, één bron
 
 Geen framework en geen bundler. De Pi heeft geen internet, dus alles staat
 lokaal: `theme.css` voor de vormtaal, `app.js` voor het gedrag, iconen als
-inline SVG. Segoe UI wordt gebruikt als je hem hebt, anders valt hij terug op
-system-ui — het ontwerp leunt op vorm en niet op één specifiek lettertype.
+inline SVG. Inter wordt gebruikt als je hem geïnstalleerd hebt (`apt install
+fonts-inter`), anders valt hij terug op system-ui — het ontwerp leunt op vorm en
+niet op één specifiek lettertype.
 
-`index.html` is liggend, `portrait.html` staand, en ze zijn **allebei
-uitvoer**. De opmaak staat één keer in `tools/layout-body.html` en de
-vormtaal plus de maatvoering voor allebei in `public/theme.css`; het kenmerk
-`data-layout` op de body kiest welke helft telt. `tools/build-layouts.js` zet de twee pagina's
+`index.html` is liggend, `portrait.html` staand, en ze zijn **allebei uitvoer**.
+De opmaak staat één keer in `tools/layout-body.html` en de vormtaal plus de
+maatvoering voor allebei in `public/theme.css`; het kenmerk `data-layout` op de
+body kiest welke helft telt. `tools/build-layouts.js` zet de twee pagina's
 samen:
 
 ```bash
@@ -83,7 +486,7 @@ Er zit ook een demo-modus in. Is `/data` onbereikbaar, dan simuleert de pagina
 na drie mislukte pogingen zelf een rit. Zo kun je aan het uiterlijk werken door
 gewoon het HTML-bestand te openen.
 
-## Het VESC-protocol
+### Het VESC-protocol
 
 Framing zit in `vesc.js`, overgenomen uit `bldc/comm/packet.c`:
 
@@ -108,7 +511,7 @@ storingen, en `COMM_GET_VALUES_SETUP` voor snelheid, afstand en accuniveau.
 Beantwoordt de firmware die tweede niet, dan stopt hij er na een paar rondes
 mee en rekent `telemetry.js` het zelf uit.
 
-## Serieel zonder npm
+### Serieel zonder npm
 
 `serial.js` zet de poort met `stty` in raw-modus en leest hem daarna met `fs`.
 Dat kan omdat de VESC een CDC-ACM-apparaat is, waar de baudrate geen betekenis
@@ -123,7 +526,7 @@ speelt dat niet.
 De leeslus draait met `stty min 0 time 1`, zodat `read()` na 100 ms terugkomt
 ook als er niets is. Anders blijft er permanent een threadpool-slot bezet.
 
-## Wifi-wachtwoorden
+### Wifi-wachtwoorden
 
 Het schermtoetsenbord stuurt het wachtwoord via **stdin** naar `nmcli --ask`,
 niet als argument. Argumenten staan in `ps` en `/proc` en zijn door elke lokale
@@ -138,7 +541,7 @@ in de argumenten belandt.
 Alle systeemaanroepen gaan via `execFile` met een argumentenlijst, nooit via een
 shell. Een SSID met een puntkomma erin mag geen commando worden.
 
-## Bluetooth zoeken
+### Bluetooth zoeken
 
 `bluetoothctl scan on` doet niet wat je denkt. De zoektocht hangt aan het
 proces: sluit dat af, dan stopt hij. En omdat `run()` stdin altijd dichtdoet —
@@ -158,7 +561,7 @@ heeft, dus daar hoeft niets extra's voor. De lijst zet verbonden bovenaan, dan
 gekoppeld, dan wat een naam heeft. Naamloze apparaten — enkel een mac-adres —
 staan onderaan en gaan er niet uit: soms is dat rare adres net je koptelefoon.
 
-## Waar de step staat
+### Waar de step staat
 
 De buitentemperatuur links boven heeft coördinaten nodig. Die komen uit
 `config.json`, anders uit de gps van een 5G-modem, en anders uit een opzoeking
@@ -180,7 +583,7 @@ melden over hardware die er niet is, is geen informatie. Verschijnen mag meteen,
 verdwijnen pas na drie keer op rij niks — ModemManager is even stil als hij
 herstart en dan hoort de topbalk niet te knipperen.
 
-## Zichzelf bijwerken
+### Zichzelf bijwerken
 
 Twee stukken. `src/update.js` vraagt de laatste commit op via de publieke
 GitHub-API en vergelijkt die met `version.json`, dat `install.sh` bij elke
@@ -202,7 +605,7 @@ uit `config.json`, zodat er niks door sudo heen hoeft.
 Het haalt altijd een verse kloon op in plaats van te pullen in de map waar je
 ooit `git clone` deed — die kan verplaatst of weggegooid zijn.
 
-## Aan/uit
+### Aan/uit
 
 `systemctl reboot` en `poweroff` mogen normaal ook zonder root, maar dan wel
 via logind — en dat vraagt een sessie. De service draait als systeemdaemon
@@ -217,24 +620,46 @@ Het scherm is zelf de bevestiging. Nog een "weet je het zeker" erbij maakt het
 op een aanraakscherm alleen maar irritanter, niet veiliger — en je bent er pas
 na twee tikken vanaf het rijscherm.
 
-## Wat er staand anders is
+### Wat er staand anders is
 
 Staand is 320 px breed, en dat dwingt een paar dingen af:
 
-- **Meldingen** krijgen een eigen band over de volle breedte. Liggend deelt de
-  meldingsbalk zijn plek met de buitentemperatuur; op 320 px blijft daar zo
-  weinig van over dat je de helft van de tekst moet raden.
-- **Drie knoppen naast elkaar** (systeem, aan/uit) passen niet meer met leesbare
-  labels, dus die staan onder elkaar. Met een duim mik je daar toch beter op.
+- **Knoppenrijen** (systeem, aan/uit) passen niet meer naast elkaar met leesbare
+  labels, dus die staan onder elkaar. Let daar op `flex:none`: de gedeelde
+  `.pbtn` heeft `flex:1`, en in een kolom die zelf niet meegroeit betekent dat
+  een basis van nul — dan krimpen de knoppen tot de hoogte van hun eigen tekst.
+  Ze waren zo 20 px hoog, en daar mik je met een duim niet op. Nu vast 64 px, en
+  `margin-top:auto` houdt ze onderaan waar je duim toch al is.
 - **Het toetsenbord** heeft tien toetsen per rij, dus 27 px breed. Dat is smal,
-  maar er is hoogte zat: de toetsen zijn 64 px hoog en staan onderaan geplakt.
+  maar er is hoogte zat: de toetsen zijn 59 px hoog en staan onderaan geplakt.
   Uitrekken over de hele hoogte gaf toetsen van 91 px, en daar mik je niet beter
   door.
-- **"max 41"** staat op dezelfde basislijn als de grote cijfers via
-  `align-items: last baseline`. Een vast aantal pixels klopt niet meer zodra
-  Inter wel of juist niet geïnstalleerd is.
+- **De eenheid bij de snelheid** staat op de basislijn van de grote cijfers via
+  `align-items: baseline` op `#speedrow`, met wat `padding-bottom` op
+  `#speedmeta` om "max 41" eronder uit te lijnen. Een vast aantal pixels klopt
+  niet meer zodra Inter wel of juist niet geïnstalleerd is.
 
-## Concepten
+### De designomgeving
+
+```bash
+npm run design      # http://127.0.0.1:8081/design
+```
+
+`tools/design.js` serveert `public/` precies zoals de echte server dat doet,
+maar alle endpoints zijn nagemaakt. Naast het frame staan schuiven en schakelaars
+voor snelheid, accu, temperaturen, laden, wifi, bluetooth, modem en weer, plus
+kant-en-klare situaties (rijden, motor heet, lage accu, laden, geen vesc) zodat
+je elk scherm in één klik te pakken hebt. Het frame herlaadt vanzelf zodra er
+een bestand in `public/` verandert.
+
+Drie knoppen kiezen de indeling: liggend, staand, en **Staand op 480 × 320** —
+de staande pagina in een liggend frame, precies zoals op de step, zodat je een
+verkeerde draaiing hier ziet en niet op het stuur.
+
+`install.sh` gooit `tools/design.js` en `tools/design.html` weg na het kopiëren.
+De designomgeving is voor op de computer, niet voor op de Pi.
+
+### Concepten
 
 De map `tools/concepts/` is leeg — er staan geen ontwerpen meer naast de app.
 Wat er stond (nocturne, wijzerplaat, cyber, apple, windows) zit in de
@@ -272,7 +697,7 @@ Eén valkuil bij het testen: `window.last` overschrijven doet niets, want
 `poll()` haalt elke 150 ms opnieuw op. Wil je een waarde vastzetten om naar te
 kijken, onderschep dan `/data` zelf.
 
-## De pagina draait zichzelf
+### De pagina draait zichzelf
 
 Het paneel op het stuur is 480 × 320 en blijft dat, ook als je de staande
 indeling kiest. `fitRotation()` vergelijkt daarom waar de pagina voor getekend
@@ -296,7 +721,7 @@ In de designomgeving zit er een knop **Staand op 480 × 320** voor: die laadt de
 staande pagina in een liggend frame, precies zoals op de step. Zonder die knop
 zie je een verkeerde draaiing pas op het stuur staan.
 
-## Meldingen die ergens heen gaan
+### Meldingen die ergens heen gaan
 
 De meeste meldingen vertellen je iets: te warm, accu laag, VESC weg. Daar is de
 lijst het eindstation. De update-melding is anders — die gaat over een knop die
@@ -312,7 +737,26 @@ onveranderd.
 Bewegen is geen tik, net als bij de netwerklijst: scrollen door de meldingen
 opent niets.
 
-## Lagen op het scherm
+### Knoppen voor de lijsten
+
+Het instellingenscherm is elf rijen, 564 px inhoud in een vlak van 228 px, dus
+je ziet er een stuk of vier. Een scrollbalk is er niet — die is bewust verborgen
+— dus niets verraadt dat er meer onder staat, en slepen over een rij vol knoppen
+voelt riskant.
+
+Vandaar twee chevrons in de kop van elke scrollbare lijst (instellingen,
+verbindingen, meldingen), in dezelfde stijl als de sluitknop. Ze zijn
+**verborgen** als de lijst helemaal past en **gedimd** als je al boven- of
+onderaan bent, zodat ze ook vertellen waar je zit. Springen gebeurt in één keer,
+zonder `behavior:"smooth"` — de SPI-display is traag en een geanimeerde scroll
+van 300 ms is precies wat je niet wilt.
+
+Ingedrukt houden herhaalt: na 400 ms schuift hij door met zo'n acht rijen per
+seconde, want het verbindingsscherm kan tot veertig netwerken tonen en dat
+zouden anders veertig losse tikken zijn. Slepen met je vinger blijft werken; de
+knoppen zijn een aanvulling, geen vervanging.
+
+### Lagen op het scherm
 
 De overlays zitten op vaste z-index-niveaus:
 
@@ -323,12 +767,13 @@ De overlays zitten op vaste z-index-niveaus:
 4  systeem en instellingen
 3  meldingen
 2  verbindingen
+1  laden
 ```
 
 Het alarm staat bewust bovenaan. Een te warme motor moet je onderbreken terwijl
 je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
 
-## Testen
+### Testen
 
 ```bash
 npm test
@@ -343,10 +788,14 @@ die we nog willen zien — welke locatiebron voorgaat bij het weer, en dat er ui
 het aan/uit-scherm nooit iets anders komt dan `systemctl reboot` of
 `systemctl poweroff`.
 
-Voor de UI heb ik met Playwright op 480 × 320 doorgeklikt. Dat zit niet in de
-repo, maar de aanpak is simpel: server starten, `page.tap()` op de knoppen, en
-controleren dat `scrollWidth`/`scrollHeight` 480 × 320 blijven — alles moet
-passen zonder scrollen.
+Voor de UI heb ik met Playwright doorgeklikt op 480 × 320 en 320 × 480, in beide
+thema's, over alle tien de schermen. Dat zit niet in de repo, maar de aanpak is
+simpel: server starten, `/data` onderscheppen om de waarden vast te zetten,
+`page.tap()` op de knoppen, en twee dingen controleren — dat
+`scrollWidth`/`scrollHeight` binnen het paneel blijven, dus dat alles past zonder
+scrollen, en dat elke zichtbare knop minstens 28 px haalt in beide richtingen.
+Die tweede controle bestaat omdat de staande systeemknoppen een tijd 20 px hoog
+zijn geweest en niets het merkte tot ik het op het stuur probeerde.
 
 Zonder VESC kun je er ook een nadoen met een PTY-paar: `pty.openpty()`, luisteren
 op commando 4 en 47, en antwoorden terugsturen met dezelfde framing. Zo is de
