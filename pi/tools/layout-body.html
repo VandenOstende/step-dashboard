@@ -1,7 +1,7 @@
 <!-- De opmaak van het dashboard: één bron voor beide indelingen.
      tools/build-layouts.js zet hier public/index.html (liggend) en
      public/portrait.html (staand) uit samen, elk met hun eigen
-     maatvoering. De vormtaal staat in public/theme.css, het gedrag in
+     maatvoering. De vormtaal staat in public/styles/, het gedrag in
      public/app.js. Pas dit bestand aan, niet de twee gegenereerde. -->
 <div id="root">
 
@@ -210,6 +210,14 @@
         <button class="seg" data-theme="Auto">Auto</button>
         <button class="seg" data-theme="Licht">Licht</button>
         <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow stack"><span class="lbl">Stijl</span>
+        <div class="line">
+          <button class="seg sty" data-sty="Windows">Windows</button>
+          <button class="seg sty" data-sty="Nocturne">Nocturne</button>
+          <button class="seg sty" data-sty="Apple">Apple</button>
+          <button class="seg sty" data-sty="Cyber">Cyber</button>
+        </div>
       </div>
       <div class="setrow"><span class="lbl">Indeling</span>
         <button class="seg lay" data-lay="Liggend">Liggend</button>

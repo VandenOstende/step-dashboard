@@ -4,103 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=320,height=480,initial-scale=1,user-scalable=no">
 <title>Step Dashboard</title>
-<link rel="stylesheet" href="theme.css">
-<style>
-/* Maatvoering voor het staande schermpje. Staand is er meer hoogte dan
-   breedte, dus alles wat liggend naast elkaar staat gaat hier onder elkaar —
-   ook de knoppenrijen, want met een duim mik je daar beter op. */
-#root{width:320px;height:480px}
-#top{height:26px;gap:8px;padding:0 10px}
-#statusbtn{height:26px}
-#notice{height:28px;margin:6px 10px 0;padding:0 10px;font-size:12px}
-
-.pane{flex-direction:column;gap:7px;padding:7px 10px}
-
-/* 1 · RIT — de snelheid krijgt de volle breedte. */
-#p0{gap:7px}
-#speedbox{flex:1;min-height:0;padding:12px 14px 14px;gap:10px}
-#speed{font-size:110px;font-weight:600;line-height:.88;letter-spacing:-.04em}
-#speedmeta{padding-bottom:11px}
-#speedunit{font-size:15px}
-#side{flex:none;display:flex;flex-direction:column;gap:7px}
-#side .card{padding:9px 13px}
-#side .val{display:flex;align-items:baseline;gap:4px}
-#side .n{font-size:34px;font-weight:600;line-height:1;letter-spacing:-.03em}
-#side .u{font-size:13px;color:var(--text2)}
-#batcard{gap:7px}
-#rangecard{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
-
-/* 2 · MOTOR — temperaturen onder elkaar, de drie kleine waarden in een rij. */
-#p1{gap:7px}
-#temps{flex:1;min-height:0;display:flex;flex-direction:column;gap:7px}
-#temps .card{flex:1}
-#temps .val{display:flex;align-items:baseline;gap:4px}
-#p1 .v.big{font-size:42px;font-weight:600;line-height:1;letter-spacing:-.03em}
-#temps .u{font-size:13px;color:var(--text2)}
-#motorrow{flex:none;display:flex;gap:7px}
-#motorrow .card{flex:1;gap:5px;padding:8px 9px;min-width:0}
-#motorrow .k{font-size:9.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-#motorrow .val{display:flex;align-items:baseline;gap:3px}
-#motorrow .n{font-size:19px;font-weight:600;line-height:1}
-#motorrow .u{font-size:10px;color:var(--text2)}
-
-/* 3 · ACCU — percentage boven, de lijst eronder. */
-#p2{gap:7px}
-/* packtop moet de hoogte pakken, anders heeft de lijst erin niets om over te
-   verdelen en kruipen de rijen bovenin. */
-#packtop{flex:1;min-height:0;display:flex;flex-direction:column;gap:7px}
-#packbig{flex:none;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-card);
-  box-shadow:inset 0 1px 0 var(--stroke-top);padding:11px 14px;
-  display:flex;flex-direction:column;gap:9px}
-#packnum{display:flex;align-items:baseline;gap:4px}
-#bat2{font-size:60px;font-weight:600;line-height:1;letter-spacing:-.035em}
-#packpct{font-size:17px;color:var(--text2)}
-#cells{height:15px}
-#packlist{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px}
-#packlist .row{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding:0 12px;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r-ctl)}
-#packlist .v{display:flex;align-items:baseline;gap:3px;font-size:17px;font-weight:600}
-#packlist .u{font-size:11px;color:var(--text2)}
-
-#dots{height:30px;padding:0 10px 4px}
-
-.sheet{inset:26px 0 0;padding:8px 10px 10px}
-.sheettitle{font-size:17px}
-.xbtn{width:40px;height:32px}
-/* Drie knoppen naast elkaar passen niet met leesbare labels. */
-.sysbtns{flex-direction:column;gap:6px}
-.pbtn{height:46px}
-/* Krap gemeten: "Temp waarschuwing" heeft de ruimte nodig die de smallere
-   knoppen vrijmaken. */
-.setrow{padding:0 11px;gap:5px}
-.setrow .lbl{font-size:12px}
-.seg{width:52px;height:30px;font-size:11.5px}
-.seg.lay{width:70px}
-.step{width:32px}
-.setval{width:44px}
-.setval.wide{width:52px}
-#charge{inset:26px 0 0;padding:16px 20px}
-#chargepct{font-size:92px}
-#chargepct span+span{font-size:20px}
-#chargetrack{width:100%}
-/* Tien toetsen op 320 px geeft ~27 px breed. Smal, maar er is hoogte zat: de
-   toetsen worden 58 px hoog en staan onderaan, waar je duim al is. */
-#kbd{padding:8px}
-#kbdkeys{flex:none;height:246px;margin-top:auto}
-.key{font-size:16px}
-.key.wide{flex:0 0 42px}
-.key.mode{flex:0 0 48px;font-size:11px}
-.key.go{flex:0 0 82px;font-size:11px}
-#power{padding:10px}
-#powerbtns{flex-direction:column;gap:8px}
-#powerclose{height:44px}
-#alarm{padding:18px 22px}
-#alarmhead{flex-direction:column;gap:10px}
-#alarmhead svg{width:40px;height:40px}
-#alarmtitle{font-size:30px}
-#alarmmsg{font-size:18px}
-#alarmclose{height:46px;min-width:180px;padding:0 20px;font-size:14px}
-</style>
+<link rel="stylesheet" href="layout.css">
+<link id="stylecss" rel="stylesheet" href="styles/windows.css">
 </head>
 <body data-layout="Staand">
 <div id="root">
@@ -310,6 +215,14 @@
         <button class="seg" data-theme="Auto">Auto</button>
         <button class="seg" data-theme="Licht">Licht</button>
         <button class="seg" data-theme="Donker">Donker</button>
+      </div>
+      <div class="setrow stack"><span class="lbl">Stijl</span>
+        <div class="line">
+          <button class="seg sty" data-sty="Windows">Windows</button>
+          <button class="seg sty" data-sty="Nocturne">Nocturne</button>
+          <button class="seg sty" data-sty="Apple">Apple</button>
+          <button class="seg sty" data-sty="Cyber">Cyber</button>
+        </div>
       </div>
       <div class="setrow"><span class="lbl">Indeling</span>
         <button class="seg lay" data-lay="Liggend">Liggend</button>

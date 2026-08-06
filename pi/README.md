@@ -9,7 +9,8 @@ tools/layout-body.html   de opmaak — één bron voor beide indelingen
 tools/build-layouts.js   zet daar de twee pagina's uit samen
 public/index.html   liggend, 480 × 320   ← uitvoer
 public/portrait.html staand,  320 × 480   ← uitvoer
-public/theme.css    de vormtaal, gedeeld door allebei
+public/layout.css   de maatvoering voor beide indelingen
+public/styles/      de vormtalen — één bestand per stijl
 public/app.js       het gedrag, gedeeld door allebei
 src/serial.js       seriële poort zonder npm-modules
 src/vesc.js         VESC-protocol: framing, CRC16, pakketten
@@ -30,14 +31,15 @@ tools/selftest.js   tests, zonder hardware
 ## Twee indelingen, één bron
 
 Geen framework en geen bundler. De Pi heeft geen internet, dus alles staat
-lokaal: `theme.css` voor de vormtaal, `app.js` voor het gedrag, iconen als
-inline SVG. Segoe UI wordt gebruikt als je hem hebt, anders valt hij terug op
+lokaal: `layout.css` voor de maatvoering, `styles/<stijl>.css` voor de
+vormtaal, `app.js` voor het gedrag, iconen als inline SVG. Segoe UI wordt gebruikt als je hem hebt, anders valt hij terug op
 system-ui — het ontwerp leunt op vorm en niet op één specifiek lettertype.
 
 `index.html` is liggend, `portrait.html` staand, en ze zijn **allebei
-uitvoer**. De opmaak staat één keer in `tools/layout-body.html`; wat per
-indeling verschilt is alleen maatvoering, en die staat in een `<style>`-blok
-dat `tools/build-layouts.js` erbij zet:
+uitvoer**. De opmaak staat één keer in `tools/layout-body.html` en de
+maatvoering voor allebei in `public/layout.css`; het kenmerk `data-layout` op
+de body kiest welke helft telt. `tools/build-layouts.js` zet de twee pagina's
+samen:
 
 ```bash
 node tools/build-layouts.js     # na elke wijziging in layout-body.html
@@ -48,10 +50,37 @@ Twee handgeschreven pagina's lopen bij de eerste wijziging al uit elkaar, en
 dan werkt een knop in de ene indeling wel en in de andere niet. Dat is precies
 het soort fout dat je pas op het stuur ziet.
 
-De vormtaal is die van Windows 11: mica als ondergrond, kaarten met een rand
-van 1 px plus een lichtere lijn langs de bovenkant, hoeken van 8 px, en een
-accentbalkje onder de actieve tab in plaats van een gevuld vlak. Er zijn drie
-andere ontwerpen geweest; die staan nog in `tools/concepts/`.
+## Vier stijlen, één opmaak
+
+`layout.css` zegt wát waar staat en hoe groot het is, en is helemaal in tokens
+geschreven: `var(--card)`, `var(--accent)`, `var(--r-card)`. Een bestand in
+`public/styles/` vult die tokens in en zet er zijn eigen vormregels achteraan.
+Er zijn er vier:
+
+| stijl | vormtaal |
+|---|---|
+| **Windows** | Fluent: mica, kaarten met een rand van 1 px plus een lichtere lijn erboven, hoeken van 8 px, een accentbalkje onder de actieve tab |
+| **Nocturne** | het oorspronkelijke ontwerp: donkerblauw, paars accent, puntjes onderaan, knoppen die met een rand markeren |
+| **Apple** | iOS: eilanden zonder rand met een radius van 18 px, systeemkleuren, een segmented control onderaan |
+| **Cyber** | Night City bij daglicht: geknipte hoeken, mono-labels, segmentbalken en de snelheid in een hazard-geel blok |
+
+Je kiest ze in **Instellingen → Stijl**. Dat verwisselt één `<link>`
+(`applyStyle()` in `app.js`); er wordt niets herladen en de indeling
+verschuift niet — dat is precies waarom de maatvoering apart staat.
+
+De namen staan op vier plekken: de knoppen in `layout-body.html`, `STIJLEN` in
+`app.js`, de whitelist in `server.js` en de bestanden in `public/styles/`.
+`npm test` controleert dat die vier het met elkaar eens zijn, en dat elk
+stijlblad alle tokens invult die `layout.css` gebruikt — een stijl die er één
+vergeet levert een half onzichtbare UI op.
+
+Eén valkuil: schrijf een stijl níét met een aparte `body.light`-regel voor
+knoppen. `body.light .seg` weegt zwaarder dan `.seg.on`, en dan is niet meer te
+zien welke knop aan staat. Zet het verschil in een token (zie `--btn` in
+`apple.css`).
+
+Ontwerpen die geen stijl zijn geworden — de wijzerplaat bijvoorbeeld, die zijn
+eigen DOM nodig heeft — staan in `tools/concepts/`.
 
 Welke pagina je voor je hebt staat op de body:
 

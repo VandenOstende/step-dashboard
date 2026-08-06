@@ -49,6 +49,7 @@ function base() {
     charging: false,
     chargeEta: 95,
     theme: "Auto",
+    style: "Windows",       // welke vormtaal uit public/styles/
     layout: "Liggend",      // welke pagina het frame toont
 
     wifi: { connected: true, ssid: "Huisnet", level: 3 },
@@ -218,10 +219,14 @@ function merge(dst, src) {
   return dst;
 }
 
-function mtime() {
+function mtime(dir) {
   let newest = 0;
-  for (const f of fs.readdirSync(PUBLIC)) {
-    try { newest = Math.max(newest, fs.statSync(path.join(PUBLIC, f)).mtimeMs); } catch { /* weg */ }
+  for (const f of fs.readdirSync(dir || PUBLIC, { withFileTypes: true })) {
+    const abs = path.join(dir || PUBLIC, f.name);
+    /* Ook een map eronder telt mee: de stijlbladen staan in public/styles/ en
+       een wijziging daar moet het frame net zo goed laten herladen. */
+    try { newest = Math.max(newest, f.isDirectory() ? mtime(abs) : fs.statSync(abs).mtimeMs); }
+    catch { /* weg */ }
   }
   return Math.round(newest);
 }
@@ -266,7 +271,7 @@ const server = http.createServer(async (req, res) => {
   if (p === "/data") return send(res, 200, data());
   if (p === "/settings" && m === "GET") {
     return send(res, 200, {
-      layout: S.layout, theme: S.theme, tempWarn: 70, tempCrit: 90,
+      layout: S.layout, theme: S.theme, style: S.style, tempWarn: 70, tempCrit: 90,
       packWh: 1147, whPerKm: 18, speedMax: 35, bright: 80, start: 0,
       topSpeed: 41.2, pollMs: 150
     });
@@ -274,6 +279,7 @@ const server = http.createServer(async (req, res) => {
   if (p === "/settings" && m === "POST") {
     const b = await body(req);
     if (b.theme) S.theme = b.theme;
+    if (b.style) S.style = b.style;
     // Wisselt de UI zelf van indeling, dan volgt het paneel mee.
     if (b.layout === "Liggend" || b.layout === "Staand") S.layout = b.layout;
     note("instellingen: " + JSON.stringify(b));

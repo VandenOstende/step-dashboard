@@ -276,6 +276,8 @@ Verder:
 - Het thema volgt de klok: licht tussen 07:30 en 18:00, daarbuiten donker.
 - Twee indelingen: liggend 480 × 320 en staand 320 × 480. Instellingen →
   Indeling wisselt ertussen, en die keuze overleeft een herstart.
+- Vier stijlen: Windows, Nocturne, Apple en Cyber. Instellingen → **Stijl**
+  wisselt ertussen zonder te herladen; de indeling blijft precies staan.
 - Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
 - Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
   wifi-tabblad scant — ook als er al iets verbonden is.
@@ -299,9 +301,10 @@ step staat vaak buiten bereik en dan moet het gewoon werken.
 - 3,5" SPI-touchscreen, 480 × 320 — staand kan ook, zie Indeling hieronder
 - Optioneel: 5G-dongle, voor de bereikbalkjes in de topbalk
 
-De interface volgt de vormtaal van Windows 11: mica als ondergrond, kaarten met
-een rand van 1 px plus een lichtere lijn langs de bovenkant, hoeken van 8 px, en
-een accentbalkje onder de actieve tab in plaats van een gevuld vlak.
+De interface staat standaard in de vormtaal van Windows 11: mica als ondergrond,
+kaarten met een rand van 1 px plus een lichtere lijn langs de bovenkant, hoeken
+van 8 px, en een accentbalkje onder de actieve tab in plaats van een gevuld vlak.
+Er zijn er nog drie — zie Stijl hieronder.
 
 Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
 de pixels aan die echt veranderen. Geen animaties, geen transities.
@@ -338,6 +341,23 @@ toch niet toe. Zo is de hele installatie offline te doen.
 De SPI-driver van het schermpje valt hierbuiten, die verschilt per merk. Zorg
 dat je scherm werkt vóór je de kiosk aanzet; de UI is precies op 480 × 320 (of
 320 × 480) gemaakt en scrollt niet.
+
+### Stijl
+
+Instellingen → **Stijl** kiest de vormtaal. Alle vier tonen dezelfde gegevens
+op dezelfde plek; wat verandert is kleur, vorm en lettertype.
+
+| stijl | waar het op lijkt |
+|---|---|
+| **Windows** | Windows 11 · Fluent — de standaard |
+| **Nocturne** | het oorspronkelijke ontwerp: donkerblauw met een paars accent |
+| **Apple** | iOS: witte eilanden met ronde hoeken, systeemkleuren |
+| **Cyber** | Cyberpunk 2077 bij daglicht: geknipte hoeken, hazard-geel, mono-labels |
+
+Wisselen gaat meteen — er wordt niets herladen, de indeling verschuift niet en
+de keuze staat op de Pi, dus hij overleeft een herstart. Elke stijl heeft zijn
+eigen licht- en donkerversie, dus **Thema** (Auto / Licht / Donker) blijft
+gewoon werken zoals hij deed.
 
 ### Indeling
 
