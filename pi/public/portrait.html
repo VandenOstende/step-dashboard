@@ -216,6 +216,13 @@
           <button id="stepbtn" class="rowbtn">Instellen</button>
         </div>
       </div>
+      <!-- De modusknoppen komen uit config.json; app.js vult deze doos. Staan
+           er geen rijmodi aan, dan verdwijnt de hele rij. Zet je ergens anders
+           in de opmaak een <button class="seg mode" data-mode="ECO">, dan doet
+           die net zo goed mee — de afhandeling is gedelegeerd. -->
+      <div class="setrow" id="moderow" hidden><span class="lbl">Rijmodus</span>
+        <div id="modes" class="line"></div>
+      </div>
       <div class="setrow"><span class="lbl">Thema</span>
         <button class="seg" data-theme="Auto">Auto</button>
         <button class="seg" data-theme="Licht">Licht</button>

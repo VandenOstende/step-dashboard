@@ -248,6 +248,9 @@ svg{display:block}
 .setrow.stack{flex-direction:column;align-items:stretch;justify-content:center;gap:6px;padding:8px 13px}
 .setrow.stack .lbl{flex:none}
 .setrow.stack .line{display:flex;align-items:center;gap:6px}
+/* De modusknoppen staan in een doos die app.js vult; zonder deze regel zouden
+   ze links uitlijnen in plaats van rechts zoals alle andere segmentknoppen. */
+#modes{display:flex;align-items:center;gap:6px;flex:none}
 .seg{flex:none;width:58px;height:30px;background:var(--card2);color:var(--text);
   border:1px solid var(--stroke);border-radius:var(--r-ctl);font-size:12px}
 .seg.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}

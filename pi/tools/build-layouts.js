@@ -81,8 +81,9 @@ for (const r of [/\$\("([^"]+)"\)/g, /getElementById\("([^"]+)"\)/g,
 }
 const have = new Set([...body.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
 /* Deze staan niet in layout-body.html: btscan en netempty maakt app.js zelf
-   aan, en root komt uit de opmaak hierboven. */
-const DYNAMIC = new Set(["btscan", "netempty", "root"]);
+   aan, root komt uit de opmaak hierboven, en modes is optioneel — een ontwerp
+   dat de modusknoppen zelf tekent heeft die doos niet nodig. */
+const DYNAMIC = new Set(["btscan", "netempty", "root", "modes"]);
 const missing = [...ids].filter((i) => !have.has(i) && !DYNAMIC.has(i));
 console.log("ids die app.js aanraakt:", ids.size);
 console.log("ontbreekt in de opmaak:", missing.length ? missing.join(", ") : "niets");

@@ -703,5 +703,145 @@ await atest("status meldt dat er een installatie loopt", async () => {
     fs3.rmSync(dir, { recursive: true, force: true });
   });
 
+  /* ── rijmodi ────────────────────────────────────────────────────────────
+     Deze bytes gaan naar een motorcontroller. Er staat dus meer op het spel
+     dan bij een verkeerd getekend vakje: één verkeerd veld en de step trekt
+     niet meer op, of erger, hij schrijft naar flash. Vandaar byte voor byte. */
+  console.log("\nrijmodi");
+
+  const md = require("../src/modes");
+
+  /* buffer_append_float32_auto uit bldc/util/buffer.c, letterlijk nagebouwd.
+     De bewering is dat dit hetzelfde oplevert als IEEE-754 big endian; als dat
+     ooit niet meer klopt, valt deze test om en niet de step. */
+  function float32Auto(x) {
+    if (Math.abs(x) < 1.5e-38) x = 0;
+    let e = 0;
+    if (x !== 0) { e = Math.ceil(Math.log2(Math.abs(x))); }
+    /* frexp: sig in [0.5,1) met x = sig * 2^e */
+    let sig = x === 0 ? 0 : x / Math.pow(2, e);
+    while (Math.abs(sig) >= 1) { sig /= 2; e += 1; }
+    while (sig !== 0 && Math.abs(sig) < 0.5) { sig *= 2; e -= 1; }
+    const sigAbs = Math.abs(sig);
+    let sigI = 0;
+    if (sigAbs >= 0.5) { sigI = Math.floor((sigAbs - 0.5) * 2 * 8388608); e += 126; }
+    else { e = 0; }
+    let res = (((e & 0xff) << 23) | (sigI & 0x7fffff)) >>> 0;
+    if (sig < 0) res = (res | 0x80000000) >>> 0;
+    const b = Buffer.alloc(4);
+    b.writeUInt32BE(res, 0);
+    return b;
+  }
+
+  const cfgModes = (over) => ({
+    step: { polePairs: 15, wheelDiameterM: 0.254, gearRatio: 1 },
+    modes: Object.assign({
+      enabled: true,
+      list: [
+        { name: "ECO", currentMaxScale: 0.55, currentMinScale: 0.8,
+          speedMaxKmh: 20, dutyMax: 0.9, wattMax: 700, inCurrentMax: 20 },
+        { name: "SPORT", currentMaxScale: 1, currentMinScale: 1,
+          speedMaxKmh: null, dutyMax: 0.95, wattMax: null, inCurrentMax: null }
+      ]
+    }, over)
+  });
+
+  test("float32_auto van de firmware is gewoon IEEE-754 big endian", () => {
+    for (const v of [0, 0.05, 0.55, -0.55, 1, 0.95, -0.95, 20, 5.5556, 700, -700, 1500, 1e6]) {
+      const eigen = Buffer.alloc(4);
+      eigen.writeFloatBE(Math.fround(v), 0);
+      assert.deepStrictEqual(float32Auto(Math.fround(v)), eigen, "wijkt af bij " + v);
+    }
+  });
+
+  /* Eén plek waar ze wél verschillen, en de reden dat writeFloatBE mag: de
+     firmware zet subnormale getallen op nul ("as they are not handled properly
+     using this method"). Zolang wij er nooit een sturen maakt het niet uit —
+     en dat is precies wat de tweede helft hier vastlegt. */
+  test("subnormale getallen zijn het enige verschil, en die sturen we nooit", () => {
+    const eigen = Buffer.alloc(4);
+    eigen.writeFloatBE(Math.fround(1e-39), 0);
+    assert.notDeepStrictEqual(float32Auto(1e-39), eigen);
+    assert.deepStrictEqual(float32Auto(1e-39), Buffer.alloc(4));   // de firmware: nul
+
+    const pak = md.buildProfilePacket(cfgModes(), "ECO", true);
+    for (let i = 0; i < 10; i++) {
+      const v = Math.abs(pak.extra.readFloatBE(4 + i * 4));
+      assert.ok(v === 0 || v >= 1.5e-38, "veld " + i + " is subnormaal: " + v);
+    }
+  });
+
+
+  test("ECO levert het pakket dat de firmware verwacht, veld voor veld", () => {
+    const pak = md.buildProfilePacket(cfgModes(), "ECO", true);
+    assert.strictEqual(pak.cmd, md.COMM_SET_MCCONF_TEMP_SETUP);
+    assert.strictEqual(pak.extra.length, 4 + 10 * 4);
+    assert.strictEqual(pak.extra[0], 0, "store moet nul blijven — nooit naar flash");
+    assert.strictEqual(pak.extra[1], 0, "forward_can");
+    assert.strictEqual(pak.extra[2], 1, "ack");
+    assert.strictEqual(pak.extra[3], 0, "divide_by_controllers");
+    const f = (i) => pak.extra.readFloatBE(4 + i * 4);
+    assert.ok(Math.abs(f(0) - 0.8) < 1e-6, "current_min_scale");
+    assert.ok(Math.abs(f(1) - 0.55) < 1e-6, "current_max_scale");
+    assert.ok(Math.abs(f(3) - 20 / 3.6) < 1e-4, "max in m/s");
+    assert.ok(Math.abs(f(2) + 20 / 3.6) < 1e-4, "min is de negatieve max");
+    assert.ok(Math.abs(f(5) - 0.9) < 1e-6, "duty max");
+    assert.ok(Math.abs(f(7) - 700) < 1e-3, "watt max");
+    assert.ok(Math.abs(f(9) - 20) < 1e-3, "accustroom max");
+  });
+
+  test("de bytes zijn precies wat float32_auto zou maken", () => {
+    const pak = md.buildProfilePacket(cfgModes(), "ECO", true);
+    const verwacht = [0.8, 0.55, -(20 / 3.6), 20 / 3.6, -0.9, 0.9, -700, 700, -20, 20];
+    verwacht.forEach((v, i) => {
+      assert.deepStrictEqual(pak.extra.subarray(4 + i * 4, 8 + i * 4),
+        float32Auto(Math.fround(v)), "veld " + i);
+    });
+  });
+
+  test("zonder setup-wizard gaat het in erpm, met commando 48", () => {
+    const pak = md.buildProfilePacket(cfgModes(), "ECO", false);
+    assert.strictEqual(pak.cmd, md.COMM_SET_MCCONF_TEMP);
+    /* 20 km/u op een 10"-wiel met 15 poolparen */
+    const verwacht = 20 / 3.6 / (0.254 * Math.PI) * 60 * 15;
+    assert.ok(Math.abs(pak.extra.readFloatBE(4 + 3 * 4) - verwacht) < 1,
+      "erpm werd " + pak.extra.readFloatBE(4 + 3 * 4) + ", verwacht " + verwacht);
+  });
+
+  test("een schaal boven 1 wordt afgeklemd, want zo werkt de firmware ook", () => {
+    const c = cfgModes();
+    c.modes.list[0].currentMaxScale = 2;
+    c.modes.list[0].dutyMax = -3;
+    const pak = md.buildProfilePacket(c, "ECO", true);
+    assert.strictEqual(pak.extra.readFloatBE(4 + 1 * 4), 1);
+    assert.ok(pak.extra.readFloatBE(4 + 5 * 4) > 0, "duty mag nooit negatief worden");
+  });
+
+  test("een vergeten veld betekent 'niet begrenzen', niet 'nul'", () => {
+    const c = cfgModes();
+    c.modes.list[0] = { name: "ECO", currentMaxScale: 0.5 };
+    const pak = md.buildProfilePacket(c, "ECO", true);
+    assert.ok(pak.extra.readFloatBE(4 + 3 * 4) > 100, "snelheid onbegrensd");
+    assert.ok(pak.extra.readFloatBE(4 + 7 * 4) > 1e5, "watt onbegrensd");
+    assert.ok(Math.abs(pak.extra.readFloatBE(4 + 5 * 4) - md.DUTY_MAX) < 1e-6);
+  });
+
+  test("uitgeschakeld levert nooit een pakket op", () => {
+    assert.strictEqual(md.buildProfilePacket(cfgModes({ enabled: false }), "ECO", true), null);
+  });
+
+  test("een onbekende modus levert nooit een pakket op", () => {
+    assert.strictEqual(md.buildProfilePacket(cfgModes(), "TURBO", true), null);
+    assert.strictEqual(md.buildProfilePacket(cfgModes(), "", true), null);
+  });
+
+  test("dubbele en naamloze regels vallen uit de lijst", () => {
+    const c = cfgModes();
+    c.modes.list.push({ name: "ECO", currentMaxScale: 0.1 }, { currentMaxScale: 0.2 });
+    assert.deepStrictEqual(md.profiles(c).map((p) => p.name), ["ECO", "SPORT"]);
+    assert.ok(Math.abs(md.findProfile(c, "ECO").currentMaxScale - 0.55) < 1e-6,
+      "de eerste ECO telt, niet de latere");
+  });
+
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();

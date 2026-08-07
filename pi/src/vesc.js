@@ -27,9 +27,16 @@ const { SerialPort, findPort } = require("./serial");
 const COMM_FW_VERSION = 0;
 const COMM_GET_VALUES = 4;
 const COMM_GET_VALUES_SETUP = 47;
+/* Het instellen van een rijmodus; de VESC bevestigt met alleen dit ene byte.
+   Zie src/modes.js voor de payload. */
+const COMM_SET_MCCONF_TEMP = 48;
+const COMM_SET_MCCONF_TEMP_SETUP = 49;
 
-/* De enige antwoorden die we vragen — gebruikt om valse startbytes te herkennen. */
-const EXPECTED = new Set([COMM_FW_VERSION, COMM_GET_VALUES, COMM_GET_VALUES_SETUP]);
+/* De enige antwoorden die we verwachten — gebruikt om valse startbytes te
+   herkennen. De twee mcconf-commando's staan erbij omdat de bevestiging
+   hetzelfde nummer draagt. */
+const EXPECTED = new Set([COMM_FW_VERSION, COMM_GET_VALUES, COMM_GET_VALUES_SETUP,
+                          COMM_SET_MCCONF_TEMP, COMM_SET_MCCONF_TEMP_SETUP]);
 const MAX_PAYLOAD = 512;   // ruim boven het grootste antwoord dat we vragen
 
 /* ── CRC16-CCITT ────────────────────────────────────────────────────────── */
@@ -233,6 +240,17 @@ class Vesc extends EventEmitter {
     });
   }
 
+  /**
+   * Een rijmodus naar de VESC sturen. Het pakket komt uit modes.js; hier
+   * gebeurt niets anders dan versturen, zodat de bytes daar te controleren
+   * zijn zonder poort. Geeft terug of er iets de deur uit ging.
+   */
+  setProfile(pak) {
+    if (!this.port || !pak) return false;
+    this._send(pak.cmd, pak.extra);
+    return true;
+  }
+
   _poll() {
     if (!this.port) return;
     this._send(COMM_GET_VALUES);
@@ -332,6 +350,13 @@ class Vesc extends EventEmitter {
       case COMM_GET_VALUES_SETUP: {
         const v = parseValuesSetup(p);
         if (v) { this.setup = v; this.setupMisses = 0; this._setConnected(true); }
+        break;
+      }
+      /* De bevestiging op een rijmodus: één byte, het commandonummer terug.
+         Meer staat er niet in — het zegt alleen "aangekomen en toegepast". */
+      case COMM_SET_MCCONF_TEMP:
+      case COMM_SET_MCCONF_TEMP_SETUP: {
+        this.emit("profile-ack", p[0]);
         break;
       }
       default:
