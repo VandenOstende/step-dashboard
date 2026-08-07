@@ -1,7 +1,7 @@
 [Unit]
 Description=Step Dashboard — VESC-uitlezer en webservice
 Documentation=file:/opt/step-dashboard/README.md
-After=network.target
+After=basic.target
 Wants=ModemManager.service NetworkManager.service
 
 [Service]
