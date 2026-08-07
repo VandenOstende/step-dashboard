@@ -50,8 +50,13 @@ set -- \
 if command -v cage >/dev/null 2>&1 && [ -n "${XDG_RUNTIME_DIR:-}" ]; then
   exec cage -d -- "$CHROME" --ozone-platform=wayland "$@"
 elif command -v xinit >/dev/null 2>&1; then
+  # vt1 -keeptty: zonder expliciete VT zoekt Xorg hem via /dev/tty0 (alleen
+  # root, mode 0600) en faalt hij onder een systemd-service met
+  # "parse_vt_settings: Cannot open /dev/tty0".
+  # Het SPI-schermpje meldt zich als fb1; met alleen HDMI blijft fb0 gelden.
+  [ -e /dev/fb1 ] && export FRAMEBUFFER=/dev/fb1
   # -nocursor: geen muispijl op een aanraakscherm
-  exec xinit /usr/bin/env "$CHROME" "$@" -- :0 -nocursor
+  exec xinit /usr/bin/env "$CHROME" "$@" -- :0 vt1 -keeptty -nocursor
 else
   exec "$CHROME" "$@"
 fi
