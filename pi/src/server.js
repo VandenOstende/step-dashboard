@@ -11,6 +11,8 @@
  *   POST /reset-top     topsnelheid op nul
  *   POST /backlight     {level: 20..100}
  *   POST /power        {action: "reboot"|"shutdown"}
+ *   GET  /setup         weet de VESC hoe de step in elkaar zit?
+ *   POST /setup         de stepgegevens zelf invullen
  *   GET  /wifi          {connected, ssid, level}
  *   GET  /bt            {connected, name, mac}
  *   GET  /modem         {bars, tech}
@@ -23,12 +25,13 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const { loadConfig, loadState, ROOT } = require("./config");
+const { loadConfig, loadState, saveConfigStep, ROOT } = require("./config");
 const { Vesc } = require("./vesc");
 const { Telemetry } = require("./telemetry");
 const { Weather } = require("./weather");
 const { Updater } = require("./update");
 const { Charge } = require("./charge");
+const { SetupWatch } = require("./setup");
 const sys = require("./system");
 
 const cfg = loadConfig();
@@ -37,6 +40,7 @@ const telemetry = new Telemetry(cfg, state);
 const weather = new Weather(cfg);
 const updater = new Updater(cfg);
 const charge = new Charge();
+const setup = new SetupWatch(cfg);
 
 const log = (...a) => console.log("[step]", ...a);
 
@@ -105,6 +109,37 @@ function readJson(req, limit) {
 
 const url_force = (req) => /[?&]check=1/.test(req.url || "");
 
+/* Alleen wat de UI mag zien; __file en de rest van cfg horen daar niet bij. */
+const stepUit = () => ({
+  batteryCells: cfg.step.batteryCells,
+  polePairs: cfg.step.polePairs,
+  wheelDiameterM: cfg.step.wheelDiameterM,
+  gearRatio: cfg.step.gearRatio,
+  source: cfg.step.source,
+  learnedAt: cfg.step.learnedAt
+});
+
+/* Weet de VESC het zelf, dan schrijven we het op — één keer, en nooit over een
+   waarde heen die jij met de hand hebt gezet. */
+let leerFout = false;
+function leerVanVesc() {
+  if (cfg.step.source === "hand" || leerFout) return;
+  const patch = setup.patch();
+  if (!patch) return;
+  patch.source = "vesc";
+  patch.learnedAt = Date.now();
+  try {
+    saveConfigStep(cfg, patch);
+    telemetry.cells = cfg.step.batteryCells;
+    log("stepgegevens van de VESC overgenomen:", JSON.stringify(patch));
+  } catch (err) {
+    /* Staat config.json op alleen-lezen, dan is dat geen reden om het elke
+       150 ms opnieuw te proberen. */
+    leerFout = true;
+    log("kon config.json niet bijwerken: " + err.message);
+  }
+}
+
 const num = (v, lo, hi, fallback) => {
   const n = Number(v);
   return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
@@ -114,6 +149,10 @@ const num = (v, lo, hi, fallback) => {
 const routes = {
   "GET /data": (req, res) => {
     const snap = vesc.connected ? vesc.snapshot() : null;
+    /* Meekijken of de VESC zelf weet hoe de step in elkaar zit. Dat is alleen
+       te zien terwijl de motor draait, dus het moet in de lus mee. */
+    setup.observe(snap);
+    leerVanVesc();
     const data = telemetry.build(snap);
     if (data.connected && data.speed_kmh > state.data.topSpeed) {
       state.patch({ topSpeed: data.speed_kmh });
@@ -127,6 +166,41 @@ const routes = {
     data.charge_full = ch.full;
     data.charge_session = ch.session;
     send(res, 200, data);
+  },
+
+  "GET /setup": (req, res) => {
+    send(res, 200, {
+      status: setup.status,
+      step: stepUit(),
+      derived: setup.derived()
+    });
+  },
+
+  /* Zelf invullen. Wat hier binnenkomt gaat naar config.json en wordt met
+     source "hand" gemarkeerd, zodat een VESC die het later alsnog weet er niet
+     overheen schrijft. */
+  "POST /setup": async (req, res) => {
+    const body = await readJson(req);
+    const s = cfg.step;
+    const patch = {
+      polePairs: Math.round(num(body.polePairs, 1, 40, s.polePairs)),
+      wheelDiameterM: Math.round(num(body.wheelDiameterM, 0.08, 0.8, s.wheelDiameterM) * 10000) / 10000,
+      gearRatio: Math.round(num(body.gearRatio, 0.5, 30, s.gearRatio) * 100) / 100,
+      source: "hand",
+      learnedAt: Date.now()
+    };
+    /* batteryCells mag uitdrukkelijk null zijn: dan raadt telemetry.js het uit
+       de pakspanning, en dat is meestal beter dan een fout getal. */
+    patch.batteryCells = body.batteryCells === null || body.batteryCells === "auto"
+      ? null : Math.round(num(body.batteryCells, 3, 30, s.batteryCells || 13));
+    try {
+      saveConfigStep(cfg, patch);
+      telemetry.cells = patch.batteryCells;      // meteen opnieuw laten raden
+      log("stepgegevens met de hand ingesteld:", JSON.stringify(patch));
+      send(res, 200, { ok: true, step: stepUit() });
+    } catch (err) {
+      send(res, 500, { ok: false, error: String(err.message || err) });
+    }
   },
 
   "GET /settings": (req, res) => {

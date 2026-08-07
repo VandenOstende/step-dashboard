@@ -28,6 +28,7 @@ src/system.js        nmcli, bluetoothctl, mmcli, backlight
 src/weather.js       outside temperature
 src/charge.js        recognising that the battery is charging, and for how long
 src/config.js        config.json and the stored state
+src/setup.js         does the VESC know how the scooter is put together?
 src/update.js        comparing the version with GitHub
 src/server.js        the HTTP server
 install/step-update  the script that updates as root
@@ -114,6 +115,40 @@ We ask for two things: `COMM_GET_VALUES` for temperatures, currents and faults,
 and `COMM_GET_VALUES_SETUP` for speed, distance and battery level. If the
 firmware doesn't answer that second one, it gives up after a few rounds and
 `telemetry.js` works it out itself.
+
+### Knowing whether the VESC knows
+
+`COMM_GET_VALUES_SETUP` gives speed, distance and battery level ready-made — but
+only if the setup wizard in VESC Tool has been run. If it hasn't, that packet
+comes back full of zeroes and `telemetry.js` computes it from the `step` block in
+`config.json`. So the difference matters, and `setup.js` watches for it.
+
+The catch: **standing still, both look identical.** A configured and an
+unconfigured VESC both report zero when the wheel isn't turning. So the check
+only counts above 500 erpm, and until then the status stays `"unknown"` — which
+the UI says out loud rather than guessing.
+
+If the VESC does know, there's something to learn from it. It computes
+
+```
+speed = erpm / polePairs / gearRatio / 60 × circumference
+```
+
+and we see only the left- and right-hand sides. Pole pairs, gearing and wheel
+size can't be separated out of that — their combination can. So the two from
+`config.json` stay put and the wheel size is solved for. Right first two, right
+wheel size; wrong ones, and it's a stand-in that yields the same speed. For
+computing km/h that makes no difference, and that's what it's for.
+
+A median over twelve samples, not one: erpm and speed come from two different
+packets and don't line up while accelerating. Below a 2% difference nothing is
+written, otherwise `config.json` gets touched every ride for half a millimetre.
+
+Writing is the one exception to "config.json is yours, we only read it". It's
+read-merge-write so anything else in the file survives, and via a temp file plus
+rename so a power cut halfway doesn't leave a broken config behind. It never
+writes over `source: "hand"` — what you set yourself stays set. And if the write
+fails (read-only filesystem), it gives up rather than retrying every 150 ms.
 
 ### Serial without npm
 
@@ -360,7 +395,7 @@ The overlays sit at fixed z-index levels:
 ```
 7  temperature alarm
 6  power
-5  on-screen keyboard
+5  on-screen keyboard, and setting the scooter up
 4  system and settings
 3  notifications
 2  connections
@@ -376,14 +411,16 @@ you're typing a password or shutting something down, not the other way round.
 npm test
 ```
 
-53 tests, no hardware needed: CRC against the known test vector, framing,
+61 tests, no hardware needed: CRC against the known test vector, framing,
 fragmented and mangled packets, the conversion from erpm to km/h and from
 tachometer to distance, zeroing the trip counter (including when the VESC
 restarts and resets its own counters), how the nmcli commands are built,
 comparing versions, recognising charging — including the slowest charger we still
-want to see — which location source wins for the weather, and that the power
+want to see — which location source wins for the weather, that the power
 screen can never produce anything other than `systemctl reboot` or `systemctl
-poweroff`.
+poweroff`, and how the VESC's setup state is recognised — including that a
+single outlier doesn't skew the derived wheel size and that writing to
+`config.json` leaves the rest of the file alone.
 
 For the UI I clicked through it with Playwright at 480 × 320 and 320 × 480, in
 both themes, over all ten screens. That isn't in the repo, but the approach is
@@ -420,6 +457,7 @@ src/system.js        nmcli, bluetoothctl, mmcli, backlight
 src/weather.js       buitentemperatuur
 src/charge.js        herkennen dat de accu laadt, en hoelang nog
 src/config.js        config.json en de opgeslagen staat
+src/setup.js         weet de VESC hoe de step in elkaar zit?
 src/update.js        versie vergelijken met GitHub
 src/server.js        de HTTP-server
 install/step-update  het script dat als root bijwerkt
@@ -510,6 +548,44 @@ We vragen twee dingen op: `COMM_GET_VALUES` voor temperaturen, stromen en
 storingen, en `COMM_GET_VALUES_SETUP` voor snelheid, afstand en accuniveau.
 Beantwoordt de firmware die tweede niet, dan stopt hij er na een paar rondes
 mee en rekent `telemetry.js` het zelf uit.
+
+### Weten of de VESC het weet
+
+`COMM_GET_VALUES_SETUP` geeft snelheid, afstand en accuniveau kant-en-klaar —
+maar alleen als de setup-wizard van VESC Tool gedraaid heeft. Zo niet, dan komt
+dat pakket vol nullen terug en rekent `telemetry.js` het uit met het blok `step`
+in `config.json`. Het verschil doet er dus toe, en `setup.js` kijkt ernaar.
+
+Het addertje: **stilstaand zien de twee er hetzelfde uit.** Een ingestelde en een
+niet-ingestelde VESC melden allebei nul zolang het wiel niet draait. De controle
+telt daarom pas boven 500 erpm, en tot die tijd blijft de status `"unknown"` —
+wat de UI ook gewoon zo zegt in plaats van te gokken.
+
+Weet de VESC het wél, dan valt er iets van hem af te kijken. Hij rekent
+
+```
+snelheid = erpm / poolparen / overbrenging / 60 × omtrek
+```
+
+en wij zien alleen de linker- en de rechterkant. Poolparen, overbrenging en
+wielmaat zijn daar niet uit los te trekken — hun combinatie wel. Die eerste twee
+blijven dus op wat er in `config.json` staat en de wielmaat wordt opgelost.
+Kloppen die twee, dan klopt de wielmaat ook; kloppen ze niet, dan is het een
+vervangende waarde die dezelfde snelheid oplevert. Voor het uitrekenen van km/u
+maakt dat niets uit, en daarvoor is het.
+
+Een mediaan over twaalf metingen, niet één: erpm en snelheid komen uit twee
+verschillende pakketten en lopen bij het optrekken niet gelijk. Onder de 2%
+verschil wordt er niets weggeschreven, anders wordt `config.json` elke rit
+aangeraakt voor een halve millimeter.
+
+Schrijven is de ene uitzondering op "config.json is van jou, wij lezen alleen".
+Het gaat lezen-samenvoegen-schrijven zodat de rest van het bestand blijft staan,
+en via een tijdelijk bestand plus hernoemen zodat een stroomstoring halverwege
+geen kapotte config achterlaat. Over `source: "hand"` schrijft hij nooit heen —
+wat jij zelf zet, blijft staan. En mislukt het schrijven (alleen-lezen
+bestandssysteem), dan geeft hij het op in plaats van het elke 150 ms opnieuw te
+proberen.
 
 ### Serieel zonder npm
 
@@ -763,7 +839,7 @@ De overlays zitten op vaste z-index-niveaus:
 ```
 7  temperatuuralarm
 6  aan/uit
-5  schermtoetsenbord
+5  schermtoetsenbord en step instellen
 4  systeem en instellingen
 3  meldingen
 2  verbindingen
@@ -779,14 +855,16 @@ je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
 npm test
 ```
 
-53 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+61 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
 opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het
 vergelijken van versies, het herkennen van laden — inclusief de traagste lader
 die we nog willen zien — welke locatiebron voorgaat bij het weer, en dat er uit
 het aan/uit-scherm nooit iets anders komt dan `systemctl reboot` of
-`systemctl poweroff`.
+`systemctl poweroff`, en hoe de setup-staat van de VESC herkend wordt —
+inclusief dat één uitschieter de afgeleide wielmaat niet scheeftrekt en dat
+schrijven naar `config.json` de rest van het bestand met rust laat.
 
 Voor de UI heb ik met Playwright doorgeklikt op 480 × 320 en 320 × 480, in beide
 thema's, over alle tien de schermen. Dat zit niet in de repo, maar de aanpak is

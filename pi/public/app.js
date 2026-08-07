@@ -157,6 +157,12 @@ function notices(d) {
      komt daar meteen, in plaats van in een lijst die je vertelt waar je moet
      zijn. `act` markeert dat. */
   if (upd.available) out.push({ lv: 0, act: "settings", t: "Nieuwe versie beschikbaar" });
+  /* Weet de VESC niet hoe de step in elkaar zit, dan klopt de snelheid alleen
+     als de waarden in config.json kloppen. Dat is iets om te doen, geen iets
+     om te weten — dus met een `act` erop. */
+  if (stp.status === "missing") {
+    out.push({ lv: 1, act: "setup", t: "Step niet ingesteld — vul de gegevens in" });
+  }
   out.sort(function (a, b) { return b.lv - a.lv; });
   return out;
 }
@@ -209,6 +215,7 @@ $("notice").addEventListener("pointerdown", function (e) {
   if (!noticeList.length) return;
   var cur = noticeList[ni % noticeList.length];
   if (cur.act === "settings") return openSettings();
+  if (cur.act === "setup") return openSetup();
   renderNotices();
   $("notices").classList.add("on");
   syncNav("noticelist");
@@ -225,6 +232,7 @@ $("noticelist").addEventListener("pointerup", function (e) {
   var d = nod; nod = null;
   if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
   if (d.act === "settings") openSettings();
+  else if (d.act === "setup") openSetup();
 });
 $("noticelist").addEventListener("pointercancel", function () { nod = null; });
 $("noticesclose").addEventListener("pointerdown", function (e) {
@@ -385,7 +393,7 @@ $("status").addEventListener("pointerdown", function (e) { e.preventDefault(); o
 $("sysclose").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); });
 $("sysnet").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); openNet("wifi"); });
 function openSettings() {
-  ["sys", "notices", "net"].forEach(function (id) { $(id).classList.remove("on"); });
+  ["sys", "notices", "net", "setup"].forEach(function (id) { $(id).classList.remove("on"); });
   renderSettings();
   $("settings").classList.add("on");
   syncNav("setlist");            // pas meten als het scherm zichtbaar is
@@ -652,6 +660,133 @@ $("charge").addEventListener("pointerdown", function (e) {
   cacheT = {}; cacheS = {};
   paint();
 });
+
+/* ── de step instellen ─────────────────────────────────────────────────────
+   Heeft de setup-wizard van VESC Tool gedraaid, dan levert de VESC snelheid,
+   afstand en accuniveau zelf en hoeft hier niets ingevuld te worden — de
+   server kijkt dat af en zet het in config.json. Heeft hij níet gedraaid, dan
+   rekent de Pi het uit met deze constanten, en dan moet je ze wel kloppend
+   krijgen. Vandaar dit scherm, plus een melding die ernaartoe brengt. */
+
+var stp = {
+  status: "unknown",
+  step: { batteryCells: null, polePairs: 15, wheelDiameterM: 0.254, gearRatio: 1,
+          source: null, learnedAt: null },
+  vuil: false,          // er staat iets in het scherm dat nog niet bewaard is
+  bezig: false
+};
+
+var STAP = {
+  wheel: { min: 0.10, max: 0.60, d: 0.0127 },   // een halve inch per tik
+  poles: { min: 1, max: 40, d: 1 },
+  gear:  { min: 1, max: 20, d: 0.5 },
+  cells: { min: 2, max: 30, d: 1 }              // 2 betekent hier "auto"
+};
+
+/* Kort voor de rij in de instellingen, lang voor het scherm zelf — daar is
+   ruimte, en daar wil je weten wat je eraan hebt. */
+function stapTekst() {
+  if (stp.status === "ok") {
+    return { t: "De VESC weet het zelf", c: "",
+             lang: "De VESC weet het zelf. Deze waarden komen van hem en worden "
+                 + "alleen gebruikt als hij ze een keer niet meer levert." };
+  }
+  if (stp.status === "missing") {
+    return { t: "Niet ingesteld", c: "bad",
+             lang: "De VESC weet het niet — vul het hier in, anders klopt de "
+                 + "snelheid niet. Of draai de setup-wizard in VESC Tool." };
+  }
+  return { t: "Nog niet te zien", c: "",
+           lang: "Nog niet te zien. Rijd een stukje; zodra de motor draait "
+               + "kijkt de app mee of de VESC het zelf weet." };
+}
+
+function toon(v, n) { return v.toFixed(n).replace(".", ","); }
+
+function paintSetup() {
+  var st = $("setstep");
+  if (!st) return;
+  var m = stapTekst();
+  st.textContent = m.t;
+  st.className = "setstat" + (m.c ? " " + m.c : "");
+  var s2 = $("setupstat");
+  if (s2) { s2.textContent = m.lang; s2.className = "setstat wrap" + (m.c ? " " + m.c : ""); }
+
+  var b = $("stepsave");
+  if (b) {
+    b.textContent = stp.bezig ? "Bezig…" : (stp.vuil ? "Bewaren" : "Bewaard");
+    b.style.opacity = stp.bezig || !stp.vuil ? "0.45" : "1";
+  }
+  var d = stp.step;
+  $("stwheel").textContent = toon(d.wheelDiameterM / 0.0254, 1) + "\u2033";
+  $("stpoles").textContent = String(d.polePairs);
+  $("stgear").textContent = toon(d.gearRatio, 1) + "\u00d7";
+  $("stcells").textContent = d.batteryCells ? String(d.batteryCells) : "auto";
+}
+
+function fetchSetup() {
+  return fetch("/setup", { cache: "no-store" }).then(function (r) { return r.json(); })
+    .then(function (j) {
+      stp.status = j.status || "unknown";
+      /* Wat je zelf staat in te typen niet onder je handen wegtrekken. */
+      if (!stp.vuil && j.step) stp.step = j.step;
+      paintSetup();
+    })["catch"](function () {});
+}
+
+function openSetup() {
+  ["sys", "notices", "net", "settings"].forEach(function (id) { $(id).classList.remove("on"); });
+  paintSetup();
+  $("setup").classList.add("on");
+  syncNav("setuplist");
+}
+
+function bumpStep(key, dir) {
+  var g = STAP[key], d = stp.step;
+  if (key === "wheel") {
+    d.wheelDiameterM = Math.max(g.min, Math.min(g.max,
+      Math.round((d.wheelDiameterM + dir * g.d) * 10000) / 10000));
+  } else if (key === "poles") {
+    d.polePairs = Math.max(g.min, Math.min(g.max, d.polePairs + dir));
+  } else if (key === "gear") {
+    d.gearRatio = Math.max(g.min, Math.min(g.max,
+      Math.round((d.gearRatio + dir * g.d) * 100) / 100));
+  } else {
+    /* Onder de ondergrens staat "auto": dan raadt de Pi het uit de spanning,
+       en dat is beter dan een getal waarvan je niet zeker bent. */
+    var n = (d.batteryCells || g.min) + dir;
+    d.batteryCells = n <= g.min ? null : Math.min(g.max, n);
+  }
+  stp.vuil = true;
+  paintSetup();
+}
+
+function saveSetup() {
+  if (stp.bezig || !stp.vuil) return;
+  stp.bezig = true;
+  paintSetup();
+  fetch("/setup", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(stp.step)
+  }).then(function (r) { return r.json(); }).then(function (j) {
+    if (j && j.step) stp.step = j.step;
+    stp.vuil = false;
+  })["catch"](function () {})["then"](function () {
+    stp.bezig = false;
+    paintSetup();
+  });
+}
+
+$("setuplist").addEventListener("pointerdown", function (e) {
+  var s = e.target.closest(".step[data-s]");
+  if (s) { e.preventDefault(); bumpStep(s.dataset.s, +s.dataset.d); return; }
+  var b = e.target.closest("#stepsave");
+  if (b) { e.preventDefault(); saveSetup(); }
+});
+$("setupclose").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); $("setup").classList.remove("on"); openSettings();
+});
+$("stepbtn").addEventListener("pointerdown", function (e) { e.preventDefault(); openSetup(); });
 
 /* ── bijwerken ─────────────────────────────────────────────────────────────
    De service kijkt bij het opstarten of er een nieuwe versie op GitHub staat.
@@ -1325,6 +1460,12 @@ function boot(saved) {
   paintUpdate();
   fetchUpdate(false);
   setInterval(function () { fetchUpdate(false); }, 3600000);
+
+  /* Iets vaker dan de update-controle: de status slaat pas om terwijl je rijdt,
+     en dan wil je de melding niet een uur later zien. */
+  paintSetup();
+  fetchSetup();
+  setInterval(fetchSetup, 20000);
 
   fetchWeather();
   setInterval(fetchWeather, 300000);

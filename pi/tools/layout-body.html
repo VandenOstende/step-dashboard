@@ -206,6 +206,12 @@
           <button id="updbtn" class="rowbtn">Zoeken</button>
         </div>
       </div>
+      <div class="setrow stack"><span class="lbl">Step</span>
+        <div class="line">
+          <span class="setstat" id="setstep">kijken…</span>
+          <button id="stepbtn" class="rowbtn">Instellen</button>
+        </div>
+      </div>
       <div class="setrow"><span class="lbl">Thema</span>
         <button class="seg" data-theme="Auto">Auto</button>
         <button class="seg" data-theme="Licht">Licht</button>
@@ -247,6 +253,49 @@
       </div>
       <div class="setrow stack"><span class="lbl">Versie</span>
         <span class="setstat" id="setver">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- step instellen -->
+  <div class="sheet" id="setup">
+    <div class="sheethead">
+      <span class="sheettitle">Step instellen</span>
+      <div class="sheetnav">
+        <button class="xbtn" data-scroll="setuplist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button class="xbtn" data-scroll="setuplist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+        <button id="setupclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      </div>
+    </div>
+    <div class="scroller" id="setuplist">
+      <div class="setrow stack"><span class="lbl">Wat de VESC weet</span>
+        <span class="setstat wrap" id="setupstat">kijken…</span>
+      </div>
+      <div class="setrow"><span class="lbl">Wielmaat</span>
+        <button class="step" data-s="wheel" data-d="-1">&minus;</button>
+        <span class="setval wide" id="stwheel">10,0&quot;</span>
+        <button class="step" data-s="wheel" data-d="1">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Poolparen</span>
+        <button class="step" data-s="poles" data-d="-1">&minus;</button>
+        <span class="setval" id="stpoles">15</span>
+        <button class="step" data-s="poles" data-d="1">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Overbrenging</span>
+        <button class="step" data-s="gear" data-d="-1">&minus;</button>
+        <span class="setval wide" id="stgear">1,0&times;</span>
+        <button class="step" data-s="gear" data-d="1">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Accucellen</span>
+        <button class="step" data-s="cells" data-d="-1">&minus;</button>
+        <span class="setval wide" id="stcells">auto</span>
+        <button class="step" data-s="cells" data-d="1">+</button>
+      </div>
+      <div class="setrow"><span class="lbl">Opslaan in config.json</span>
+        <button id="stepsave" class="rowbtn">Bewaren</button>
+      </div>
+      <div class="setrow stack"><span class="lbl">Uitleg</span>
+        <span class="setstat wrap" id="setuphelp">Alleen nodig als de setup-wizard van VESC Tool nooit gedraaid heeft. Weet de VESC het zelf, dan vult de app dit tijdens het rijden in.</span>
       </div>
     </div>
   </div>

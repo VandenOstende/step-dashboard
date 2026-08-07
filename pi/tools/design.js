@@ -55,6 +55,10 @@ function base() {
     bt: { connected: true, name: "Sena 50S" },
     modem: { present: false, bars: 3, tech: "5G" },
     weather: { ok: true, temp_c: 14 },
+    /* known: false zet /setup op "missing", zodat de melding en het scherm
+       Step instellen te zien zijn zonder een VESC zonder wizard te hebben. */
+    setup: { known: true, batteryCells: null, polePairs: 15,
+             wheelDiameterM: 0.254, gearRatio: 1, source: "vesc" },
     update: { available: false, message: "Bluetooth zoekt nu naar apparaten" }
   };
 }
@@ -267,6 +271,26 @@ const server = http.createServer(async (req, res) => {
 
   /* de endpoints die de UI verwacht */
   if (p === "/data") return send(res, 200, data());
+  if (p === "/setup" && m === "GET") {
+    return send(res, 200, {
+      status: S.setup.known ? "ok" : "missing",
+      step: {
+        batteryCells: S.setup.batteryCells, polePairs: S.setup.polePairs,
+        wheelDiameterM: S.setup.wheelDiameterM, gearRatio: S.setup.gearRatio,
+        source: S.setup.known ? "vesc" : S.setup.source, learnedAt: null
+      },
+      derived: {}
+    });
+  }
+  if (p === "/setup" && m === "POST") {
+    const b = await body(req);
+    ["batteryCells", "polePairs", "wheelDiameterM", "gearRatio"].forEach((k) => {
+      if (b[k] !== undefined) S.setup[k] = b[k];
+    });
+    S.setup.source = "hand";
+    note("stepgegevens ingesteld: " + JSON.stringify(b));
+    return send(res, 200, { ok: true, step: Object.assign({}, S.setup, { learnedAt: null }) });
+  }
   if (p === "/settings" && m === "GET") {
     return send(res, 200, {
       layout: S.layout, theme: S.theme, tempWarn: 70, tempCrit: 90,

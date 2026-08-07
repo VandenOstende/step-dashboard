@@ -620,5 +620,88 @@ await atest("status meldt dat er een installatie loopt", async () => {
     assert.strictEqual(await w._location(), null);   // geen modem in de testomgeving
   });
 
+  /* ── de step herkennen ──────────────────────────────────────────────────
+     Weet de VESC hoe de step in elkaar zit, dan hoeft er niets in config.json
+     te staan. Weet hij het niet, dan moet de app dat merken — en het verschil
+     is alleen te zien terwijl de motor draait. */
+  console.log("\nstep herkennen");
+
+  const { SetupWatch } = require("../src/setup");
+  const { saveConfigStep } = require("../src/config");
+  const fs3 = require("fs");
+  const os3 = require("os");
+  const path3 = require("path");
+
+  const basis = () => ({
+    step: { batteryCells: null, packWh: 1147, polePairs: 15,
+            wheelDiameterM: 0.254, gearRatio: 1, source: null, learnedAt: null }
+  });
+  /* Een VESC die de wizard gedraaid heeft: snelheid volgens 10-inch wielen. */
+  const rijdt = (erpm, wiel) => ({
+    erpm: erpm, vIn: 50.4,
+    speedMs: erpm / 15 / 60 * (wiel * Math.PI)
+  });
+
+  test("stilstaand valt er niets te zeggen", () => {
+    const w = new SetupWatch(basis());
+    w.observe({ erpm: 0, vIn: 50.4, speedMs: 0 });
+    assert.strictEqual(w.status, "unknown");
+  });
+
+  test("snelheid nul terwijl de motor draait = wizard niet gedraaid", () => {
+    const w = new SetupWatch(basis());
+    w.observe({ erpm: 8100, vIn: 50.4, speedMs: 0 });
+    assert.strictEqual(w.status, "missing");
+  });
+
+  test("geen setup-antwoord telt ook als niet ingesteld", () => {
+    const w = new SetupWatch(basis());
+    w.observe({ erpm: 0, vIn: 50.4 });          // speedMs ontbreekt
+    assert.strictEqual(w.status, "missing");
+  });
+
+  test("een ingestelde VESC herkent hij, en leidt de wielmaat af", () => {
+    const w = new SetupWatch(basis());
+    for (let i = 0; i < 20; i++) w.observe(rijdt(6000 + i * 100, 0.2032));   // 8 inch
+    assert.strictEqual(w.status, "ok");
+    assert.ok(Math.abs(w.derived().wheelDiameterM - 0.2032) < 0.001,
+      "wielmaat werd " + w.derived().wheelDiameterM);
+  });
+
+  test("één uitschieter trekt de wielmaat niet scheef", () => {
+    const w = new SetupWatch(basis());
+    for (let i = 0; i < 20; i++) w.observe(rijdt(6000 + i * 100, 0.2032));
+    w.observe({ erpm: 6000, vIn: 50.4, speedMs: 30 });     // onmogelijk snel
+    assert.ok(Math.abs(w.derived().wheelDiameterM - 0.2032) < 0.001);
+  });
+
+  test("klopt de wielmaat al, dan valt er niets te schrijven", () => {
+    const cfg = basis();
+    const w = new SetupWatch(cfg);
+    for (let i = 0; i < 20; i++) w.observe(rijdt(6000 + i * 100, 0.254));
+    cfg.step.batteryCells = 13;                  // anders wil hij die nog zetten
+    assert.strictEqual(w.patch(), null);
+  });
+
+  test("een VESC die het niet weet levert nooit een patch", () => {
+    const w = new SetupWatch(basis());
+    w.observe({ erpm: 8100, vIn: 50.4, speedMs: 0 });
+    assert.strictEqual(w.patch(), null);
+  });
+
+  test("saveConfigStep laat de rest van config.json met rust", () => {
+    const dir = fs3.mkdtempSync(path3.join(os3.tmpdir(), "step-"));
+    const file = path3.join(dir, "config.json");
+    fs3.writeFileSync(file, JSON.stringify({ port: 9999, step: { polePairs: 15 } }, null, 2));
+    const cfg = Object.assign(basis(), { __file: file });
+    saveConfigStep(cfg, { wheelDiameterM: 0.2032, source: "vesc" });
+    const na = JSON.parse(fs3.readFileSync(file, "utf8"));
+    assert.strictEqual(na.port, 9999);              // niet aangeraakt
+    assert.strictEqual(na.step.polePairs, 15);      // niet weggegooid
+    assert.strictEqual(na.step.wheelDiameterM, 0.2032);
+    assert.strictEqual(cfg.step.source, "vesc");    // en de draaiende server mee
+    fs3.rmSync(dir, { recursive: true, force: true });
+  });
+
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();
