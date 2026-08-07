@@ -44,6 +44,10 @@ Beyond that:
   switches between them and the choice survives a reboot.
 - Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
+- **ECO and SPORT.** With `modes.enabled` on in `config.json`, a row of buttons
+  appears that sets the VESC's limits — current, speed, duty, watts. It goes to
+  the controller's working memory, never to flash, and the scale can only go
+  down, never up.
 - If the VESC doesn't know how the scooter is put together, the notification
   bar says so and takes you to **Settings → Step**, where you can fill in wheel
   size, pole pairs, gearing and cell count yourself. Does it know? Then the app
@@ -155,6 +159,8 @@ works it out from the erpm and the tachometer.
 | --- | --- |
 | `vesc.port` | `/dev/ttyACM0` or `/dev/vesc`; `null` = find it automatically |
 | `step.packWh` | pack capacity, for the range estimate |
+| `modes.enabled` | riding modes on or off — **off by default**, because this sends commands to your motor controller |
+| `modes.list` | the modes themselves: name, current scale, speed cap, duty, watts, battery current |
 | `step.*` | wheel size, pole pairs, gearing, cell count — only needed if the VESC doesn't supply them. The app fills these in itself when it can; see [The scooter's own numbers](#the-scooters-own-numbers) |
 | `update.*` | repository, branch, and whether to check or install on boot |
 | `weather.*` | coordinates for the outside temperature; empty = look them up by IP |
@@ -176,6 +182,7 @@ The page talks to a handful of endpoints on the same origin:
 | `POST /backlight` | screen brightness |
 | `POST /power` | reboot or shut down |
 | `GET/POST /setup` | does the VESC know the scooter, and filling it in yourself |
+| `GET /modes`, `POST /mode` | the riding modes, and switching between them |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | outside temperature |
 | `GET/POST /net` | list networks and devices, search, and connect |
@@ -234,6 +241,35 @@ see the two sides. So pole pairs and gearing stay at whatever is in
 the wheel size is right; if not, it's a stand-in that produces the same speed —
 which is all it's used for.
 
+### Riding modes
+
+Settings → **Rijmodus**, once you've turned `modes.enabled` on in
+`config.json`. Tapping a mode sends the VESC a set of limits: a scale on the
+motor current, a speed cap, a duty ceiling, a watt limit and a battery-current
+limit.
+
+Three things make this safe enough to sit on a handlebar:
+
+- It goes to the controller's **working memory, not flash**. Nothing in your
+  VESC is overwritten, and a wrong profile is gone the moment the scooter loses
+  power. The app never asks for a flash write.
+- **`currentMaxScale` runs from 0 to 1** on what VESC Tool has in the
+  controller, and the firmware clamps it there itself. No setting in this app
+  can produce more power than you configured.
+- The choice **survives a restart**: it's stored on the Pi, and because the
+  limits live in RAM the app puts them back once the VESC reconnects.
+
+The catch, and it matters: the app **cannot read the current limits out of the
+VESC**. That would mean parsing the whole mcconf block, which differs per
+firmware version. So the `SPORT` row is not "no limit" — it is *your own
+numbers from VESC Tool*. Put them in wrong and SPORT is wrong. Start by making
+the ECO row identical to SPORT except for `currentMaxScale`, ride it, and go
+from there.
+
+Command 49 (`COMM_SET_MCCONF_TEMP_SETUP`) is used when the setup wizard has
+been run, so the VESC converts the speed cap itself. Otherwise it's command 48
+with the erpm computed from `step.*`.
+
 ### Updating
 
 Settings → top row. It shows which version is running; **Search** checks GitHub
@@ -261,7 +297,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 61 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 71 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — the UI with faked hardware
 ```
@@ -333,6 +369,10 @@ Verder:
   wifi-tabblad scant — ook als er al iets verbonden is.
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
+- **ECO en SPORT.** Staat `modes.enabled` aan in `config.json`, dan verschijnt
+  er een rij knoppen die de grenzen van de VESC zet — stroom, snelheid, duty,
+  vermogen. Het gaat naar het werkgeheugen van de controller, nooit naar flash,
+  en de schaal kan alleen omlaag, nooit omhoog.
 - Weet de VESC niet hoe de step in elkaar zit, dan zegt de meldingsbalk dat en
   brengt hij je naar **Instellingen → Step**, waar je wielmaat, poolparen,
   overbrenging en het aantal cellen zelf invult. Weet hij het wel, dan kijkt de
@@ -444,6 +484,8 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | --- | --- |
 | `vesc.port` | `/dev/ttyACM0` of `/dev/vesc`; `null` = zelf zoeken |
 | `step.packWh` | accucapaciteit, voor de bereikschatting |
+| `modes.enabled` | rijmodi aan of uit — **standaard uit**, want dit stuurt commando's naar je motorcontroller |
+| `modes.list` | de standen zelf: naam, stroomschaal, snelheidsplafond, duty, vermogen, accustroom |
 | `step.*` | wielmaat, poolparen, overbrenging, aantal cellen — alleen nodig als de VESC ze niet levert. De app vult ze zelf in als dat kan; zie [Wat de step zelf weet](#wat-de-step-zelf-weet) |
 | `update.*` | repository, tak, en of hij bij het opstarten controleert of installeert |
 | `weather.*` | coördinaten voor de buitentemperatuur; leeg = zelf opzoeken via het IP-adres |
@@ -465,6 +507,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `POST /backlight` | schermhelderheid |
 | `POST /power` | herstarten of afsluiten |
 | `GET/POST /setup` | weet de VESC hoe de step in elkaar zit, en zelf invullen |
+| `GET /modes`, `POST /mode` | de rijmodi, en ertussen wisselen |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
 | `GET/POST /net` | netwerken en apparaten tonen, zoeken en verbinden |
@@ -525,6 +568,35 @@ eerste twee, dan klopt de wielmaat ook; kloppen ze niet, dan is het een
 vervangende waarde die dezelfde snelheid oplevert — en daar wordt hij voor
 gebruikt.
 
+### Rijmodi
+
+Instellingen → **Rijmodus**, zodra je `modes.enabled` aan hebt gezet in
+`config.json`. Een tik stuurt de VESC een set grenzen: een schaal op de
+motorstroom, een snelheidsplafond, een duty-plafond, een wattlimiet en een
+grens op de accustroom.
+
+Drie dingen maken dit veilig genoeg voor op een stuur:
+
+- Het gaat naar het **werkgeheugen van de controller, niet naar flash**. Er
+  wordt niets in je VESC overschreven, en een verkeerd profiel is weg zodra de
+  step stroom verliest. De app vraagt nooit om een schrijfactie naar flash.
+- **`currentMaxScale` loopt van 0 tot 1** op wat er via VESC Tool in de
+  controller staat, en de firmware klemt hem daar zelf ook op af. Geen enkele
+  instelling in deze app kan meer vermogen opleveren dan jij hebt ingesteld.
+- De keuze **overleeft een herstart**: hij staat op de Pi, en omdat de grenzen
+  in RAM leven zet de app ze terug zodra de VESC opnieuw verbonden is.
+
+Het addertje, en het is een echte: de app **kan de huidige grenzen niet uit de
+VESC lezen**. Daarvoor zou het hele mcconf-blok ontleed moeten worden, en dat
+verschilt per firmwareversie. De regel `SPORT` is dus niet "geen grens" maar
+*jouw eigen getallen uit VESC Tool*. Vul je die verkeerd in, dan is SPORT
+verkeerd. Begin daarom met een ECO-regel die gelijk is aan SPORT op
+`currentMaxScale` na, rijd ermee, en werk van daaruit verder.
+
+Commando 49 (`COMM_SET_MCCONF_TEMP_SETUP`) wordt gebruikt als de setup-wizard
+gedraaid heeft; dan rekent de VESC het snelheidsplafond zelf om. Anders is het
+commando 48, met de erpm die wij uitrekenen uit `step.*`.
+
 ### Bijwerken
 
 Instellingen → bovenste rij. Daar staat welke versie draait; **Zoeken** kijkt bij
@@ -552,7 +624,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 61 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 71 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — de UI met nagemaakte hardware
 ```

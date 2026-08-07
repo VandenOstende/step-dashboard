@@ -29,6 +29,7 @@ src/weather.js       outside temperature
 src/charge.js        recognising that the battery is charging, and for how long
 src/config.js        config.json and the stored state
 src/setup.js         does the VESC know how the scooter is put together?
+src/modes.js         riding modes: the limits packet for the VESC
 src/update.js        comparing the version with GitHub
 src/server.js        the HTTP server
 install/step-update  the script that updates as root
@@ -149,6 +150,62 @@ read-merge-write so anything else in the file survives, and via a temp file plus
 rename so a power cut halfway doesn't leave a broken config behind. It never
 writes over `source: "hand"` — what you set yourself stays set. And if the write
 fails (read-only filesystem), it gives up rather than retrying every 150 ms.
+
+### Riding modes
+
+`COMM_SET_MCCONF_TEMP` (48) and `COMM_SET_MCCONF_TEMP_SETUP` (49) exist for
+exactly this. Payload, from `bldc/comm/commands.c`:
+
+```
+u8   store, forward_can, ack, divide_by_controllers
+f32  l_current_min_scale, l_current_max_scale      0..1
+f32  min, max speed        (m/s on 49, erpm on 48)
+f32  l_min_duty, l_max_duty
+f32  l_watt_min, l_watt_max
+f32  l_in_current_min, l_in_current_max            optional, backwards compatible
+```
+
+**`store` stays zero. Always.** It goes to the controller's working memory;
+setting it to 1 writes to flash, which has a finite number of write cycles and
+where a half-finished write costs you your motor configuration. There's a test
+on the wire bytes that fails if that byte is ever anything but zero.
+
+`buffer_append_float32_auto` in the firmware turns out to be plain IEEE-754 big
+endian — `frexp`, exponent + 126, mantissa `(sig − 0.5)·2·2²³`, which is exactly
+what `writeFloatBE` produces. So no custom encoder, but there *is* a test that
+reimplements the C version and compares byte for byte, because that claim is
+the kind that quietly stops being true. The one difference is subnormals, which
+the firmware flushes to zero; a second test pins that down and asserts we never
+send one.
+
+Which command depends on `setup.js`: with the wizard run, 49 with the speed in
+m/s and the VESC converting it with the wheel size it knows; without, 48 with
+the erpm computed from `step.*`. That way the speed cap never depends on a
+wizard that may not have run.
+
+We set `ack = 1`, so the VESC replies with a single byte: the command number.
+That number had to go into `EXPECTED` in `vesc.js`, otherwise `_scan()` throws
+the reply away as a false start byte.
+
+The packet is built in `modes.js` and nowhere else; `vesc.js` only sends it. So
+the bytes can be checked without a serial port, the same way `wifiConnectPlan()`
+works for nmcli.
+
+A profile is a set of absolute values from `config.json`, not a delta — the app
+can't read the current limits out of the controller without parsing the whole
+mcconf block, which is firmware-version specific. `currentMaxScale` is the one
+field that's inherently safe: 0..1 of what's in the controller, clamped by the
+firmware itself.
+
+The buttons come from the markup: anything with `class="seg mode"` and a
+`data-mode` joins in, wherever it sits, because the handler is delegated. An
+empty `<div id="modes">` gets filled from `config.json` — that container is
+owned by `app.js` and rebuilt when the list differs; buttons elsewhere are the
+design's and only get their `.on` or `hidden`.
+
+One fix came along with it: the tap listener on `#panes` now ignores taps that
+start on a `button`. Without that, a mode button on the ride screen would
+switch the mode *and* move to the next screen.
 
 ### Serial without npm
 
@@ -411,7 +468,7 @@ you're typing a password or shutting something down, not the other way round.
 npm test
 ```
 
-61 tests, no hardware needed: CRC against the known test vector, framing,
+71 tests, no hardware needed: CRC against the known test vector, framing,
 fragmented and mangled packets, the conversion from erpm to km/h and from
 tachometer to distance, zeroing the trip counter (including when the VESC
 restarts and resets its own counters), how the nmcli commands are built,
@@ -420,7 +477,8 @@ want to see — which location source wins for the weather, that the power
 screen can never produce anything other than `systemctl reboot` or `systemctl
 poweroff`, and how the VESC's setup state is recognised — including that a
 single outlier doesn't skew the derived wheel size and that writing to
-`config.json` leaves the rest of the file alone.
+`config.json` leaves the rest of the file alone — and the riding-mode packet,
+byte for byte, including that `store` is never anything but zero.
 
 For the UI I clicked through it with Playwright at 480 × 320 and 320 × 480, in
 both themes, over all ten screens. That isn't in the repo, but the approach is
@@ -458,6 +516,7 @@ src/weather.js       buitentemperatuur
 src/charge.js        herkennen dat de accu laadt, en hoelang nog
 src/config.js        config.json en de opgeslagen staat
 src/setup.js         weet de VESC hoe de step in elkaar zit?
+src/modes.js         rijmodi: het grenzenpakket voor de VESC
 src/update.js        versie vergelijken met GitHub
 src/server.js        de HTTP-server
 install/step-update  het script dat als root bijwerkt
@@ -586,6 +645,63 @@ geen kapotte config achterlaat. Over `source: "hand"` schrijft hij nooit heen �
 wat jij zelf zet, blijft staan. En mislukt het schrijven (alleen-lezen
 bestandssysteem), dan geeft hij het op in plaats van het elke 150 ms opnieuw te
 proberen.
+
+### Rijmodi
+
+`COMM_SET_MCCONF_TEMP` (48) en `COMM_SET_MCCONF_TEMP_SETUP` (49) bestaan hier
+precies voor. Payload, uit `bldc/comm/commands.c`:
+
+```
+u8   store, forward_can, ack, divide_by_controllers
+f32  l_current_min_scale, l_current_max_scale      0..1
+f32  min, max snelheid     (m/s bij 49, erpm bij 48)
+f32  l_min_duty, l_max_duty
+f32  l_watt_min, l_watt_max
+f32  l_in_current_min, l_in_current_max            optioneel, achterwaarts compatibel
+```
+
+**`store` blijft nul. Altijd.** Het gaat naar het werkgeheugen van de
+controller; op 1 zetten schrijft naar flash, dat een eindig aantal
+schrijfrondes heeft en waar een halve schrijfactie je motorconfiguratie kost.
+Er staat een test op de bytes over de kabel die omvalt zodra die byte iets
+anders is dan nul.
+
+`buffer_append_float32_auto` in de firmware blijkt gewoon IEEE-754 big endian —
+`frexp`, exponent + 126, mantisse `(sig − 0,5)·2·2²³`, en dat is precies wat
+`writeFloatBE` oplevert. Dus geen eigen encoder, maar wél een test die de
+C-versie nabouwt en byte voor byte vergelijkt, want dat soort beweringen houdt
+stilletjes op te kloppen. Het enige verschil zijn subnormale getallen, die de
+firmware op nul zet; een tweede test legt dat vast en controleert dat wij er
+nooit een sturen.
+
+Welk commando het wordt hangt aan `setup.js`: is de wizard gedraaid, dan 49 met
+de snelheid in m/s en rekent de VESC hem zelf om met de wielmaat die híj kent;
+zo niet, dan 48 met de erpm die wij uitrekenen uit `step.*`. Zo hangt de
+snelheidsgrens nooit aan een wizard die misschien niet gedraaid is.
+
+We zetten `ack = 1`, dus de VESC antwoordt met één byte: het commandonummer.
+Dat nummer moest in `EXPECTED` in `vesc.js`, anders gooit `_scan()` het antwoord
+weg als valse startbyte.
+
+Het pakket wordt in `modes.js` gebouwd en nergens anders; `vesc.js` stuurt het
+alleen. Zo zijn de bytes te controleren zonder seriële poort, net zoals
+`wifiConnectPlan()` dat voor nmcli doet.
+
+Een profiel is een set absolute waarden uit `config.json`, geen verschil — de
+app kan de huidige grenzen niet uit de controller lezen zonder het hele
+mcconf-blok te ontleden, en dat verschilt per firmwareversie. `currentMaxScale`
+is het enige veld dat uit zichzelf veilig is: 0..1 van wat er in de controller
+staat, en de firmware klemt hem daar zelf op af.
+
+De knoppen komen uit de opmaak: alles met `class="seg mode"` en een `data-mode`
+doet mee, waar het ook staat, want de afhandeling is gedelegeerd. Een lege
+`<div id="modes">` wordt gevuld uit `config.json` — die doos is van `app.js` en
+wordt opnieuw opgebouwd zodra de lijst afwijkt; knoppen elders zijn van het
+ontwerp en krijgen alleen hun `.on` of `hidden`.
+
+Er ging één reparatie mee: de tik-luisteraar op `#panes` negeert nu tikken die
+op een `button` beginnen. Zonder dat zou een modusknop op het rijscherm én van
+stand wisselen én naar het volgende scherm springen.
 
 ### Serieel zonder npm
 
@@ -855,7 +971,7 @@ je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
 npm test
 ```
 
-61 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+71 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
 opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het
@@ -864,7 +980,9 @@ die we nog willen zien — welke locatiebron voorgaat bij het weer, en dat er ui
 het aan/uit-scherm nooit iets anders komt dan `systemctl reboot` of
 `systemctl poweroff`, en hoe de setup-staat van de VESC herkend wordt —
 inclusief dat één uitschieter de afgeleide wielmaat niet scheeftrekt en dat
-schrijven naar `config.json` de rest van het bestand met rust laat.
+schrijven naar `config.json` de rest van het bestand met rust laat — en het
+rijmoduspakket, byte voor byte, inclusief dat `store` nooit iets anders is dan
+nul.
 
 Voor de UI heb ik met Playwright doorgeklikt op 480 × 320 en 320 × 480, in beide
 thema's, over alle tien de schermen. Dat zit niet in de repo, maar de aanpak is

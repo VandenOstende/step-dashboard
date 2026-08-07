@@ -69,7 +69,12 @@ function show(i) {
 /* Een tik op de pagina gaat naar het volgende scherm; bewegen is geen tik. */
 var tp = null;
 var pn = $("panes");
-pn.addEventListener("pointerdown", function (e) { tp = { x: e.clientX, y: e.clientY }; });
+pn.addEventListener("pointerdown", function (e) {
+  /* Een knop op een paneel is een knop, geen paneeltik. Zonder dit schakelt
+     hij én de knop én naar het volgende scherm. */
+  if (e.target.closest("button")) { tp = null; return; }
+  tp = { x: e.clientX, y: e.clientY };
+});
 pn.addEventListener("pointerup", function (e) {
   var t = tp; tp = null;
   if (!t || Math.abs(e.clientX - t.x) > 12 || Math.abs(e.clientY - t.y) > 12) return;
@@ -659,6 +664,87 @@ $("charge").addEventListener("pointerdown", function (e) {
   $("charge").classList.remove("on");
   cacheT = {}; cacheS = {};
   paint();
+});
+
+/* ── rijmodi ───────────────────────────────────────────────────────────────
+   ECO, SPORT, of wat er in config.json staat. De knoppen komen uit de opmaak:
+   alles met class "seg mode" en een data-mode doet mee, waar het ook staat.
+   Staat er een leeg #modes, dan bouwt deze code de knoppen daar zelf in — dan
+   bepaalt config.json het aantal standen en niet de opmaak.
+
+   Wat de VESC ermee doet staat in src/modes.js. Kort: het gaat naar zijn
+   werkgeheugen, niet naar flash, en er kan nooit méér vermogen uit komen dan
+   er in de controller staat. */
+
+var mds = { enabled: false, list: [], active: null, bezig: false };
+
+function modeKnoppen() {
+  return [].slice.call(document.querySelectorAll(".seg.mode"));
+}
+
+function renderModes() {
+  /* De doos #modes is van deze code: staat er iets anders in dan de standen uit
+     config.json, dan wordt hij opnieuw opgebouwd. Knoppen die het ontwerp
+     ergens ánders neerzet blijven onaangeroerd — die krijgen alleen hun
+     markering. */
+  var doos = $("modes");
+  if (doos && [].map.call(doos.children, function (c) { return c.dataset.mode; })
+      .join("\u0000") !== mds.list.join("\u0000")) {
+    doos.innerHTML = "";
+    mds.list.forEach(function (naam) {
+      var b = document.createElement("button");
+      b.className = "seg mode";
+      b.dataset.mode = naam;
+      b.textContent = naam;
+      doos.appendChild(b);
+    });
+  }
+  var rij = $("moderow");
+  if (rij) rij.hidden = !(mds.enabled && mds.list.length);
+  modeKnoppen().forEach(function (b) {
+    /* Een stand die niet in config.json staat kan de opmaak wel tekenen, maar
+       er valt niets te kiezen — dan is hem weglaten eerlijker dan een knop die
+       een foutmelding oplevert. */
+    var kent = mds.enabled && mds.list.indexOf(b.dataset.mode) >= 0;
+    b.hidden = !kent;
+    b.classList.toggle("on", kent && b.dataset.mode === mds.active);
+    b.style.opacity = mds.bezig ? "0.45" : "";
+  });
+}
+
+function fetchModes() {
+  return fetch("/modes", { cache: "no-store" }).then(function (r) { return r.json(); })
+    .then(function (j) {
+      mds.enabled = !!j.enabled;
+      mds.list = j.list || [];
+      if (!mds.bezig) mds.active = j.active;
+      renderModes();
+    })["catch"](function () {});
+}
+
+function setMode(naam) {
+  if (mds.bezig || naam === mds.active) return;
+  var vorige = mds.active;
+  mds.active = naam;              // meteen laten zien; de step reageert traag
+  mds.bezig = true;
+  renderModes();
+  fetch("/mode", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: naam })
+  }).then(function (r) { return r.json()["catch"](function () { return {}; })
+      .then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (a) { if (!a.ok) mds.active = vorige; })
+    ["catch"](function () { mds.active = vorige; })
+    ["then"](function () { mds.bezig = false; renderModes(); });
+}
+
+/* Gedelegeerd, want de knoppen kunnen overal staan — ook in een scherm dat pas
+   later getekend wordt. */
+document.addEventListener("pointerdown", function (e) {
+  var b = e.target.closest(".seg.mode");
+  if (!b || b.hidden) return;
+  e.preventDefault();
+  setMode(b.dataset.mode);
 });
 
 /* ── de step instellen ─────────────────────────────────────────────────────
@@ -1466,6 +1552,10 @@ function boot(saved) {
   paintSetup();
   fetchSetup();
   setInterval(fetchSetup, 20000);
+
+  renderModes();
+  fetchModes();
+  setInterval(fetchModes, 20000);
 
   fetchWeather();
   setInterval(fetchWeather, 300000);

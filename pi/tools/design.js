@@ -59,6 +59,9 @@ function base() {
        Step instellen te zien zijn zonder een VESC zonder wizard te hebben. */
     setup: { known: true, batteryCells: null, polePairs: 15,
              wheelDiameterM: 0.254, gearRatio: 1, source: "vesc" },
+    /* Rijmodi. In de echte app komen de standen uit config.json en gaan de
+       grenzen naar de VESC; hier is het een naam en een logregel. */
+    modes: { enabled: true, active: "SPORT" },
     update: { available: false, message: "Bluetooth zoekt nu naar apparaten" }
   };
 }
@@ -271,6 +274,22 @@ const server = http.createServer(async (req, res) => {
 
   /* de endpoints die de UI verwacht */
   if (p === "/data") return send(res, 200, data());
+  if (p === "/modes") {
+    return send(res, 200, {
+      enabled: S.modes.enabled,
+      list: S.modes.enabled ? ["ECO", "SPORT"] : [],
+      active: S.modes.active,
+      acked: true
+    });
+  }
+  if (p === "/mode" && m === "POST") {
+    const b = await body(req);
+    if (!S.modes.enabled) return send(res, 409, { ok: false, error: "rijmodi staan uit" });
+    if (["ECO", "SPORT"].indexOf(b.name) < 0) return send(res, 400, { ok: false, error: "onbekend" });
+    S.modes.active = b.name;
+    note("rijmodus " + b.name);
+    return send(res, 200, { ok: true, active: b.name });
+  }
   if (p === "/setup" && m === "GET") {
     return send(res, 200, {
       status: S.setup.known ? "ok" : "missing",

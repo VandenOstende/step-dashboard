@@ -36,6 +36,27 @@ const DEFAULT_CONFIG = {
     source: null,
     learnedAt: null          // tijdstip waarop dat gebeurde, in ms
   },
+  /* Rijmodi. Standaard uit: dit stuurt commando's naar je motorcontroller, en
+     dat hoort een bewuste zet te zijn en niet iets wat gebeurt omdat je je
+     dashboard hebt bijgewerkt.
+
+     Let op wat "SPORT" betekent. De app kan de huidige grenzen niet uit de
+     VESC lezen — dat zou het hele mcconf-blok vergen, dat per firmwareversie
+     verschilt. De regels hieronder zijn dus absolute waarden, en SPORT hoort
+     te staan op wat jij in VESC Tool hebt ingesteld. currentMaxScale is het
+     enige veld dat de firmware zelf op 0..1 afklemt: daarmee kan er nooit méér
+     vermogen uit komen dan er in de controller staat.
+
+     Weglaten of op null zetten betekent "niet begrenzen". */
+  modes: {
+    enabled: false,
+    list: [
+      { name: "ECO", currentMaxScale: 0.55, currentMinScale: 0.8,
+        speedMaxKmh: 20, dutyMax: 0.9, wattMax: 700, inCurrentMax: 20 },
+      { name: "SPORT", currentMaxScale: 1, currentMinScale: 1,
+        speedMaxKmh: null, dutyMax: 0.95, wattMax: null, inCurrentMax: null }
+    ]
+  },
   update: {
     // Waar de Pi zijn eigen updates vandaan haalt.
     repo: "https://github.com/VandenOstende/step-dashboard.git",
@@ -60,6 +81,7 @@ const DEFAULT_STATE = {
     layout: "Liggend",     // "Liggend" = index.html, "Staand" = portrait.html
     rotate: 90,            // kwartslag als de UI niet bij het paneel past
     theme: "Auto",
+    mode: null,            // gekozen rijmodus; null = niets gestuurd
     tempWarn: 70,
     tempCrit: 90,
     packWh: 1147,

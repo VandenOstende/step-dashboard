@@ -13,6 +13,8 @@
  *   POST /power        {action: "reboot"|"shutdown"}
  *   GET  /setup         weet de VESC hoe de step in elkaar zit?
  *   POST /setup         de stepgegevens zelf invullen
+ *   GET  /modes         welke rijmodi er zijn en welke aan staat
+ *   POST /mode          {name: "ECO"} — grenzen naar de VESC sturen
  *   GET  /wifi          {connected, ssid, level}
  *   GET  /bt            {connected, name, mac}
  *   GET  /modem         {bars, tech}
@@ -32,6 +34,7 @@ const { Weather } = require("./weather");
 const { Updater } = require("./update");
 const { Charge } = require("./charge");
 const { SetupWatch } = require("./setup");
+const modes = require("./modes");
 const sys = require("./system");
 
 const cfg = loadConfig();
@@ -47,8 +50,38 @@ const log = (...a) => console.log("[step]", ...a);
 /* ── VESC ───────────────────────────────────────────────────────────────── */
 const vesc = new Vesc(cfg.vesc);
 vesc.on("log", (m) => log(m));
-vesc.on("status", (up) => log(up ? "VESC verbonden" : "VESC weg"));
+vesc.on("status", (up) => {
+  log(up ? "VESC verbonden" : "VESC weg");
+  /* De rijmodus zit in het werkgeheugen van de VESC, dus na een stroom-
+     onderbreking is hij weg en staat de step weer op wat er in de controller
+     staat. Even wachten tot de verbinding echt staat, en dan terugzetten. */
+  if (up && state.settings.mode) setTimeout(() => pasModusToe(state.settings.mode), 600);
+});
+vesc.on("profile-ack", () => { modusBevestigd = true; });
 vesc.start();
+
+let modusBevestigd = false;
+
+/** Eén rijmodus naar de VESC sturen. Geeft terug wat er gebeurd is. */
+function pasModusToe(naam) {
+  const pak = modes.buildProfilePacket(cfg, naam, setup.status === "ok");
+  if (!pak) return { ok: false, error: "onbekende of uitgeschakelde modus" };
+  modusBevestigd = false;
+  if (!vesc.setProfile(pak)) return { ok: false, error: "geen VESC-verbinding" };
+  log("rijmodus " + naam + " gestuurd (commando " + pak.cmd + ")");
+  return { ok: true, cmd: pak.cmd };
+}
+
+/* Staat het aan met de standaardgetallen er nog in, dan is SPORT niet wat jij
+   in VESC Tool hebt staan maar wat hier toevallig ingevuld is. Eén keer zeggen
+   bij het opstarten is genoeg; het is geen reden om te weigeren. */
+if (cfg.modes && cfg.modes.enabled) {
+  const sport = modes.findProfile(cfg, "SPORT");
+  if (sport && sport.speedMaxKmh === null && sport.wattMax === null) {
+    log("let op: rijmodi staan aan, maar SPORT staat nog op 'niet begrenzen'. "
+      + "Zet daar de grenzen in die in VESC Tool staan.");
+  }
+}
 
 /* ── statische bestanden ────────────────────────────────────────────────── */
 const PUBLIC = path.join(ROOT, "public");
@@ -201,6 +234,30 @@ const routes = {
     } catch (err) {
       send(res, 500, { ok: false, error: String(err.message || err) });
     }
+  },
+
+  "GET /modes": (req, res) => {
+    send(res, 200, {
+      enabled: !!(cfg.modes && cfg.modes.enabled),
+      list: modes.profiles(cfg).map((p) => p.name),
+      active: state.settings.mode,
+      acked: modusBevestigd
+    });
+  },
+
+  "POST /mode": async (req, res) => {
+    const body = await readJson(req);
+    if (!cfg.modes || !cfg.modes.enabled) {
+      return send(res, 409, { ok: false, error: "rijmodi staan uit in config.json" });
+    }
+    if (!modes.findProfile(cfg, body.name)) {
+      return send(res, 400, { ok: false, error: "onbekende modus" });
+    }
+    const r = pasModusToe(body.name);
+    /* Ook bewaren als de VESC er even niet is: dan staat hij klaar en wordt
+       hij toegepast zodra de verbinding terug is. */
+    state.patch({ settings: { mode: body.name } });
+    send(res, r.ok ? 200 : 503, Object.assign({ active: body.name }, r));
   },
 
   "GET /settings": (req, res) => {
