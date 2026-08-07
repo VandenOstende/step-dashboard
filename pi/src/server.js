@@ -39,11 +39,12 @@ const sys = require("./system");
 
 const cfg = loadConfig();
 const state = loadState();
+function loadStateSeen() { return !!state.data.setupSeen; }
 const telemetry = new Telemetry(cfg, state);
 const weather = new Weather(cfg);
 const updater = new Updater(cfg);
 const charge = new Charge();
-const setup = new SetupWatch(cfg);
+const setup = new SetupWatch(cfg, loadStateSeen());
 
 const log = (...a) => console.log("[step]", ...a);
 
@@ -185,6 +186,10 @@ const routes = {
     /* Meekijken of de VESC zelf weet hoe de step in elkaar zit. Dat is alleen
        te zien terwijl de motor draait, dus het moet in de lus mee. */
     setup.observe(snap);
+    /* Eén keer rijdend gezien = onthouden, zodat de status een herstart
+       overleeft; ziet een latere rit "missing", dan wordt dat ook onthouden. */
+    if (setup.status === "ok" && !state.data.setupSeen) state.patch({ setupSeen: true });
+    else if (setup.status === "missing" && state.data.setupSeen) state.patch({ setupSeen: false });
     leerVanVesc();
     const data = telemetry.build(snap);
     if (data.connected && data.speed_kmh > state.data.topSpeed) {
@@ -276,6 +281,7 @@ const routes = {
       theme: ["Auto", "Licht", "Donker"].includes(body.theme) ? body.theme : s.theme,
       tempWarn: num(body.tempWarn, 40, 120, s.tempWarn),
       tempCrit: num(body.tempCrit, 50, 130, s.tempCrit),
+      motorTempWarn: typeof body.motorTempWarn === "boolean" ? body.motorTempWarn : s.motorTempWarn !== false,
       packWh: num(body.packWh, 200, 4000, s.packWh),
       whPerKm: num(body.whPerKm, 5, 100, s.whPerKm),
       speedMax: num(body.speedMax, 10, 120, s.speedMax),

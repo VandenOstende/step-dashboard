@@ -84,6 +84,7 @@ const DEFAULT_STATE = {
     mode: null,            // gekozen rijmodus; null = niets gestuurd
     tempWarn: 70,
     tempCrit: 90,
+    motorTempWarn: true,   // motortemperatuur-meldingen; uit bij een kapotte sensor
     packWh: 1147,
     whPerKm: 18,
     speedMax: 35,
@@ -91,6 +92,7 @@ const DEFAULT_STATE = {
     start: 0
   },
   topSpeed: 0,
+  setupSeen: false,        // één keer rijdend "ok" gezien — overleeft een herstart
   trip: { distanceM: 0, wattHours: 0, valid: false }
 };
 

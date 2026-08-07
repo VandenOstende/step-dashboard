@@ -152,8 +152,10 @@ function notices(d) {
   if (MODE === "off") out.push({ lv: 2, t: "Geen VESC-verbinding" });
   if (d.fault) out.push({ lv: 2, t: "VESC-storing — " + d.fault });
   var tm = d.temp_motor || 0, tf = d.temp_fet || 0, bp = d.battery_pct || 0;
-  if (tm >= cfg.tempCrit) out.push({ lv: 2, t: "Motor " + tm.toFixed(0) + "°C — stop en laat afkoelen" });
-  else if (tm >= cfg.tempWarn) out.push({ lv: 1, t: "Motor " + tm.toFixed(0) + "°C — verminder belasting" });
+  if (cfg.motorTempWarn !== false) {
+    if (tm >= cfg.tempCrit) out.push({ lv: 2, t: "Motor " + tm.toFixed(0) + "°C — stop en laat afkoelen" });
+    else if (tm >= cfg.tempWarn) out.push({ lv: 1, t: "Motor " + tm.toFixed(0) + "°C — verminder belasting" });
+  }
   if (tf >= cfg.tempCrit) out.push({ lv: 2, t: "FET " + tf.toFixed(0) + "°C — stop en laat afkoelen" });
   else if (tf >= cfg.tempWarn) out.push({ lv: 1, t: "FET " + tf.toFixed(0) + "°C — verminder belasting" });
   if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% — bijna leeg" });
@@ -252,7 +254,8 @@ var alarm = { level: null, acked: {} };
 var blink = null;
 
 function checkAlarm(d) {
-  var tm = d.temp_motor || 0, tf = d.temp_fet || 0, hot = Math.max(tm, tf);
+  var tm = cfg.motorTempWarn !== false ? (d.temp_motor || 0) : 0,
+      tf = d.temp_fet || 0, hot = Math.max(tm, tf);
   var level = hot >= cfg.tempCrit ? "crit" : (hot >= cfg.tempWarn ? "warn" : null);
   var el = $("alarm");
   if (!level) {
@@ -483,6 +486,9 @@ function renderSettings() {
   [].slice.call(document.querySelectorAll(".seg.rot")).forEach(function (b) {
     b.classList.toggle("on", +b.dataset.rot === cfg.rotate);
   });
+  [].slice.call(document.querySelectorAll(".seg.mt")).forEach(function (b) {
+    b.classList.toggle("on", (b.dataset.mt === "1") === (cfg.motorTempWarn !== false));
+  });
 }
 
 function bump(key, step) {
@@ -542,9 +548,16 @@ function fitRotation() {
     return;
   }
   root.style.position = "absolute";
-  root.style.left = "50%";
-  root.style.top = "50%";
-  root.style.transform = "translate(-50%, -50%) rotate(" + deg + "deg)";
+  /* Ankeren aan wat er echt te zien is, niet aan het venster: Chromium heeft
+     een minimumbreedte (~500 px) en zonder window manager doet fullscreen
+     niets, dus het venster kan breder zijn dan het paneel — dan schuift
+     50%-centrering de balk van het scherm af. Op een desktop is het venster
+     juist kleiner dan de monitor; vandaar de kleinste van de twee. */
+  var sw = Math.min(window.innerWidth, (window.screen && screen.width) || window.innerWidth);
+  var sh = Math.min(window.innerHeight, (window.screen && screen.height) || window.innerHeight);
+  root.style.left = Math.round((sw - DESIGN.w) / 2) + "px";
+  root.style.top = Math.round((sh - DESIGN.h) / 2) + "px";
+  root.style.transform = "rotate(" + deg + "deg)";
 }
 
 function gotoLayout(name) {
@@ -569,6 +582,14 @@ $("setlist").addEventListener("pointerdown", function (e) {
   if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
   var t = e.target.closest(".seg[data-theme]");
   if (t) { e.preventDefault(); cfg.theme = t.dataset.theme; applyTheme(true); renderSettings(); saveSettings(); return; }
+  var mt = e.target.closest(".seg.mt");
+  if (mt) {
+    e.preventDefault();
+    cfg.motorTempWarn = mt.dataset.mt === "1";
+    renderSettings();
+    saveSettings();
+    return;
+  }
   var rt = e.target.closest(".seg.rot");
   if (rt) {
     e.preventDefault();
