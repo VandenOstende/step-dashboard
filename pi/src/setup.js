@@ -53,9 +53,12 @@ function mediaan(xs) {
 }
 
 class SetupWatch {
-  constructor(cfg) {
+  constructor(cfg, bewaard) {
     this.cfg = cfg;
-    this.status = "unknown";
+    /* Is de status ooit rijdend op "ok" gezet, dan hoeft dat niet elke boot
+       opnieuw bewezen: hij start dan als "ok" en alleen een rit die het
+       tegendeel laat zien haalt hem er weer af. */
+    this.status = bewaard ? "ok" : "unknown";
     this.monsters = [];
     this.wheel = null;      // afgeleide wielmaat in meter
     this.cells = null;      // afgeleid aantal cellen in serie
