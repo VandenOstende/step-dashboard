@@ -29,7 +29,12 @@ const DEFAULT_CONFIG = {
     packWh: 1147,            // capaciteit voor de bereikschatting
     polePairs: 15,
     wheelDiameterM: 0.254,   // 10 inch
-    gearRatio: 1             // motoromwentelingen per wielomwenteling
+    gearRatio: 1,            // motoromwentelingen per wielomwenteling
+    /* Door wie ingevuld: null = de standaardwaarden hierboven, "vesc" = de
+       app heeft ze van de VESC afgekeken, "hand" = jij hebt ze ingevuld in het
+       scherm Step instellen. De app overschrijft "hand" niet. */
+    source: null,
+    learnedAt: null          // tijdstip waarop dat gebeurde, in ms
   },
   update: {
     // Waar de Pi zijn eigen updates vandaan haalt.
@@ -91,6 +96,32 @@ function loadConfig() {
   return cfg;
 }
 
+/**
+ * Het blok `step` in config.json bijwerken.
+ *
+ * config.json is verder van jou: we lezen het alleen. Dit is de uitzondering,
+ * en alleen voor dit ene blok — de app kan van een ingestelde VESC afkijken
+ * hoe de step in elkaar zit, en dan hoort dat ergens te blijven staan.
+ *
+ * Lezen-samenvoegen-schrijven, zodat alles wat er verder in het bestand staat
+ * blijft staan; en eerst naar een tijdelijk bestand, zodat een stroomstoring
+ * halverwege geen kapotte config.json achterlaat.
+ */
+function saveConfigStep(cfg, patch) {
+  const file = cfg.__file || path.join(ROOT, "config.json");
+  let raw = {};
+  try { raw = JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch (err) { if (err.code !== "ENOENT") throw err; }
+
+  raw.step = Object.assign({}, raw.step, patch);
+  const tmp = file + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(raw, null, 2) + "\n");
+  fs.renameSync(tmp, file);
+
+  Object.assign(cfg.step, patch);      // de draaiende server meteen mee
+  return cfg.step;
+}
+
 class State {
   constructor(file) {
     this.file = file;
@@ -142,4 +173,4 @@ function loadState() {
   return new State(file);
 }
 
-module.exports = { loadConfig, loadState, DEFAULT_CONFIG, DEFAULT_STATE, ROOT };
+module.exports = { loadConfig, loadState, saveConfigStep, DEFAULT_CONFIG, DEFAULT_STATE, ROOT };

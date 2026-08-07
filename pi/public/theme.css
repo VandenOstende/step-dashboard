@@ -204,7 +204,7 @@ svg{display:block}
 /* ── overlays ──────────────────────────────────────────────────────────────
    7  temperatuuralarm
    6  aan/uit
-   5  schermtoetsenbord
+   5  schermtoetsenbord en step instellen
    4  systeem en instellingen
    3  meldingen
    2  verbindingen
@@ -214,6 +214,9 @@ svg{display:block}
 #net{z-index:2}
 #notices{z-index:3}
 #sys,#settings{z-index:4}
+/* Step instellen ligt over de instellingen heen, want je komt er vandaan — of
+   rechtstreeks vanaf een melding. */
+#setup{z-index:5}
 .sheethead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
 .sheettitle{font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .sheetnav{display:flex;align-items:center;gap:5px;flex:none}
@@ -258,6 +261,8 @@ svg{display:block}
 .setval.wide{width:56px}
 .setstat{flex:1;min-width:0;font-size:12px;color:var(--text2);
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* Eén regel met puntjes werkt voor een status, niet voor een uitleg. */
+.setstat.wrap{white-space:normal;overflow:visible;line-height:1.35}
 .setstat.new{color:var(--accent)}
 .setstat.bad{color:var(--crit)}
 .rowbtn{flex:none;height:30px;padding:0 14px;background:var(--card2);color:var(--text);

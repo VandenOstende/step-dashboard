@@ -44,6 +44,10 @@ Beyond that:
   switches between them and the choice survives a reboot.
 - Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
+- If the VESC doesn't know how the scooter is put together, the notification
+  bar says so and takes you to **Settings → Step**, where you can fill in wheel
+  size, pole pairs, gearing and cell count yourself. Does it know? Then the app
+  copies the values off it while you ride and writes them into `config.json`.
 - On boot it checks whether a newer version is on GitHub. If there is, the
   notification bar says so — tap it and you land straight in the settings, on
   the row that installs it.
@@ -151,7 +155,7 @@ works it out from the erpm and the tachometer.
 | --- | --- |
 | `vesc.port` | `/dev/ttyACM0` or `/dev/vesc`; `null` = find it automatically |
 | `step.packWh` | pack capacity, for the range estimate |
-| `step.*` | wheel size and pole pairs — only needed if the VESC doesn't supply them |
+| `step.*` | wheel size, pole pairs, gearing, cell count — only needed if the VESC doesn't supply them. The app fills these in itself when it can; see [The scooter's own numbers](#the-scooters-own-numbers) |
 | `update.*` | repository, branch, and whether to check or install on boot |
 | `weather.*` | coordinates for the outside temperature; empty = look them up by IP |
 | `system.*` | the backlight path, if the automatic search doesn't find it |
@@ -171,6 +175,7 @@ The page talks to a handful of endpoints on the same origin:
 | `POST /reset-trip`, `/reset-top` | zero the counters |
 | `POST /backlight` | screen brightness |
 | `POST /power` | reboot or shut down |
+| `GET/POST /setup` | does the VESC know the scooter, and filling it in yourself |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | outside temperature |
 | `GET/POST /net` | list networks and devices, search, and connect |
@@ -200,6 +205,35 @@ The screen sits below all the panels, so you can still reach the settings past
 it, and below the temperature alarm. Tap it away and it returns on the next
 charging session.
 
+### The scooter's own numbers
+
+Speed, distance and battery level come out of the VESC ready-made — provided the
+setup wizard in VESC Tool has been run and the controller knows wheel size, pole
+pairs and gearing. If it hasn't, the VESC reports zeroes and the Pi computes it
+itself from the `step` block in `config.json`, which then has to be right.
+
+The app watches which of the two it is, but only while the motor is turning:
+standing still, a configured and an unconfigured VESC both report zero.
+
+- **It knows** → the app reads the values off it during the ride and writes them
+  into `config.json` (`step.source` becomes `"vesc"`). Nothing to do.
+- **It doesn't** → the notification bar says *Step niet ingesteld*. Tap it and
+  you land in **Step instellen**, with wheel size, pole pairs, gearing and cell
+  count. Saving writes them to `config.json` with `step.source` `"hand"`, and
+  the app never writes over that again.
+- **Not yet visible** → you haven't ridden since the last start. Nothing is
+  reported and nothing is written.
+
+Cell count may stay on **auto**; then the Pi derives it from the pack voltage,
+which is usually better than a number you're unsure of.
+
+One honest limitation: what can be read off is one number, not three. The VESC
+computes `speed = erpm / pole pairs / gearing / 60 × circumference`, and we only
+see the two sides. So pole pairs and gearing stay at whatever is in
+`config.json` and the wheel size is solved for. If those first two are right,
+the wheel size is right; if not, it's a stand-in that produces the same speed —
+which is all it's used for.
+
 ### Updating
 
 Settings → top row. It shows which version is running; **Search** checks GitHub
@@ -227,7 +261,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 53 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 61 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — the UI with faked hardware
 ```
@@ -299,6 +333,10 @@ Verder:
   wifi-tabblad scant — ook als er al iets verbonden is.
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
+- Weet de VESC niet hoe de step in elkaar zit, dan zegt de meldingsbalk dat en
+  brengt hij je naar **Instellingen → Step**, waar je wielmaat, poolparen,
+  overbrenging en het aantal cellen zelf invult. Weet hij het wel, dan kijkt de
+  app het tijdens het rijden van hem af en schrijft het in `config.json`.
 - Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
   er, dan zegt de meldingsbalk dat — tik erop en je staat meteen in de
   instellingen, op de rij die hem installeert.
@@ -406,7 +444,7 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | --- | --- |
 | `vesc.port` | `/dev/ttyACM0` of `/dev/vesc`; `null` = zelf zoeken |
 | `step.packWh` | accucapaciteit, voor de bereikschatting |
-| `step.*` | wielmaat en poolparen — alleen nodig als de VESC ze niet levert |
+| `step.*` | wielmaat, poolparen, overbrenging, aantal cellen — alleen nodig als de VESC ze niet levert. De app vult ze zelf in als dat kan; zie [Wat de step zelf weet](#wat-de-step-zelf-weet) |
 | `update.*` | repository, tak, en of hij bij het opstarten controleert of installeert |
 | `weather.*` | coördinaten voor de buitentemperatuur; leeg = zelf opzoeken via het IP-adres |
 | `system.*` | het backlight-pad, als hij het zelf niet vindt |
@@ -426,6 +464,7 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `POST /reset-trip`, `/reset-top` | tellers op nul |
 | `POST /backlight` | schermhelderheid |
 | `POST /power` | herstarten of afsluiten |
+| `GET/POST /setup` | weet de VESC hoe de step in elkaar zit, en zelf invullen |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
 | `GET /weather` | buitentemperatuur |
 | `GET/POST /net` | netwerken en apparaten tonen, zoeken en verbinden |
@@ -455,6 +494,37 @@ Het scherm staat onder alle vensters, zodat je er nog bij de instellingen langs
 kunt, en onder het temperatuuralarm. Wegtikken kan; bij de volgende laadbeurt
 komt het terug.
 
+### Wat de step zelf weet
+
+Snelheid, afstand en accuniveau komen kant-en-klaar uit de VESC — tenminste, als
+de setup-wizard van VESC Tool gedraaid heeft en de controller wielmaat,
+poolparen en overbrenging kent. Is dat niet gebeurd, dan meldt de VESC nullen en
+rekent de Pi het zelf uit met het blok `step` in `config.json`, dat dan wel moet
+kloppen.
+
+De app kijkt welke van de twee het is, maar alleen terwijl de motor draait:
+stilstaand melden een ingestelde en een niet-ingestelde VESC allebei nul.
+
+- **Hij weet het** → de app kijkt de waarden tijdens het rijden van hem af en
+  schrijft ze in `config.json` (`step.source` wordt `"vesc"`). Niets te doen.
+- **Hij weet het niet** → de meldingsbalk zegt *Step niet ingesteld*. Tik erop
+  en je staat in **Step instellen**, met wielmaat, poolparen, overbrenging en
+  het aantal cellen. Bewaren zet ze in `config.json` met `step.source` `"hand"`,
+  en daar schrijft de app nooit meer overheen.
+- **Nog niet te zien** → je hebt sinds de laatste start niet gereden. Er wordt
+  niets gemeld en niets weggeschreven.
+
+Het aantal cellen mag op **auto** blijven staan; dan leidt de Pi het af uit de
+pakspanning, en dat is meestal beter dan een getal waar je niet zeker van bent.
+
+Eén eerlijke beperking: wat er af te kijken valt is één getal, geen drie. De
+VESC rekent `snelheid = erpm / poolparen / overbrenging / 60 × omtrek`, en wij
+zien alleen de linker- en de rechterkant. Poolparen en overbrenging blijven dus
+op wat er in `config.json` staat en de wielmaat wordt opgelost. Kloppen die
+eerste twee, dan klopt de wielmaat ook; kloppen ze niet, dan is het een
+vervangende waarde die dezelfde snelheid oplevert — en daar wordt hij voor
+gebruikt.
+
 ### Bijwerken
 
 Instellingen → bovenste rij. Daar staat welke versie draait; **Zoeken** kijkt bij
@@ -482,7 +552,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 53 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 61 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — de UI met nagemaakte hardware
 ```
