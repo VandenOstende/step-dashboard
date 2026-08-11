@@ -65,7 +65,7 @@ The design language is Nocturne, the original design: dark blue ground, purple
 accent, flat cards with a 1 px border, dots at the bottom, and a battery that
 colours the whole card as it drains. There were four styles side by side for a
 while — Windows, Apple and Cyber as well, selectable in the settings. That was
-rolled back; if you want to see them, they're in commit `5c6acd5`.
+rolled back; if you want to see them, they're in commit `9f816b2`.
 
 Which page you're looking at is on the body:
 
@@ -407,7 +407,7 @@ The design environment is for the computer, not for the Pi.
 
 `tools/concepts/` is empty — there are no designs sitting next to the app any
 more. What used to be there (nocturne, wijzerplaat, cyber, apple, windows) is in
-the history: `git show ab1a694:pi/tools/concepts/` shows them.
+the history: `git show 9cc94c0:pi/tools/concepts/` shows them.
 
 The mechanism is still there. Drop an `.html` into `tools/concepts/` and it shows
 up by itself as a button under the frame of the design environment, served on
@@ -604,7 +604,7 @@ paars accent, platte kaarten met een rand van 1 px, puntjes onderaan en een
 accu die de hele kaart kleurt als hij leegloopt. Er zijn een tijdlang vier
 stijlen naast elkaar geweest — Windows, Apple en Cyber erbij, te kiezen in de
 instellingen. Dat is teruggedraaid; wie ze wil terugzien vindt ze in commit
-`5c6acd5`.
+`9f816b2`.
 
 Welke pagina je voor je hebt staat op de body:
 
@@ -956,7 +956,7 @@ De designomgeving is voor op de computer, niet voor op de Pi.
 
 De map `tools/concepts/` is leeg — er staan geen ontwerpen meer naast de app.
 Wat er stond (nocturne, wijzerplaat, cyber, apple, windows) zit in de
-geschiedenis: `git show ab1a694:pi/tools/concepts/` laat ze zien.
+geschiedenis: `git show 9cc94c0:pi/tools/concepts/` laat ze zien.
 
 Het mechanisme is er nog wél. Zet je een `.html` in `tools/concepts/`, dan
 verschijnt hij vanzelf als knop onder het frame van de designomgeving en
