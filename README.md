@@ -44,6 +44,10 @@ Beyond that:
   switches between them and the choice survives a reboot.
 - Settings for thresholds, brightness, start screen, and resetting the trip
   counter and top speed.
+- **Cruise control shows up on screen.** The VESC doesn't report it, so the Pi
+  infers it — throttle released while the motor keeps pulling and the speed
+  holds. Only works with an ADC throttle, and only ever claims it when it's
+  sure.
 - **ECO and SPORT.** With `modes.enabled` on in `config.json`, a row of buttons
   appears that sets the VESC's limits — current, speed, duty, watts. It goes to
   the controller's working memory, never to flash, and the scale can only go
@@ -159,6 +163,8 @@ works it out from the erpm and the tachometer.
 | --- | --- |
 | `vesc.port` | `/dev/ttyACM0` or `/dev/vesc`; `null` = find it automatically |
 | `step.packWh` | pack capacity, for the range estimate |
+| `cruise.enabled` | recognising cruise control on or off |
+| `cruise.minCurrentA` | above this the motor is pulling, below it you're coasting — the knob to tune |
 | `modes.enabled` | riding modes on or off — **off by default**, because this sends commands to your motor controller |
 | `modes.list` | the modes themselves: name, current scale, speed cap, duty, watts, battery current |
 | `step.*` | wheel size, pole pairs, gearing, cell count — only needed if the VESC doesn't supply them. The app fills these in itself when it can; see [The scooter's own numbers](#the-scooters-own-numbers) |
@@ -241,6 +247,36 @@ see the two sides. So pole pairs and gearing stay at whatever is in
 the wheel size is right; if not, it's a stand-in that produces the same speed —
 which is all it's used for.
 
+### Cruise control
+
+The VESC does not report whether cruise control is on. In `app_adc.c` it's a
+hardware pin (`cc_button`), and that pin never reaches the comms interface;
+`mc_interface_get_control_mode()` doesn't appear anywhere in `commands.c`
+either. There is no packet, no field, no bit.
+
+So the Pi infers it, from the one combination that occurs nowhere else:
+**throttle released, motor still pulling, speed holding.** Coasting is throttle
+zero with almost no current and a falling speed; braking is negative current;
+riding is throttle above zero. The throttle position comes from
+`COMM_GET_DECODED_ADC`, polled every other round.
+
+It is deliberately shy about it. Nothing is claimed until the throttle voltage
+has been seen above 0.2 V — without that there's no ADC throttle being read,
+and "throttle at zero" would be true forever. And the pattern has to hold for
+600 ms before it counts.
+
+Two fields appear in `/data`: `cruise` and `cruise_supported`. In the interface
+they become two hooks a design can use: `<body>` gets the class `cruise`, and
+anything with a `data-cruise` attribute gets `hidden` while it's off.
+
+This only works with an ADC throttle. `app_ppm.c` has no cruise control at all,
+and the nunchuk reports through a different packet.
+
+Run `node tools/vesc-probe.js` to see whether your throttle is being read at
+all, and what it reads at rest and wide open. `cruise.minCurrentA` in
+`config.json` is the knob: above your rolling resistance, below what cruise
+needs to hold speed.
+
 ### Riding modes
 
 Settings → **Rijmodus**, once you've turned `modes.enabled` on in
@@ -297,7 +333,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 71 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 85 tests: VESC protocol, CRC, framing, the conversions
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — the UI with faked hardware
 ```
@@ -369,6 +405,9 @@ Verder:
   wifi-tabblad scant — ook als er al iets verbonden is.
 - Instellingen voor drempels, helderheid, startscherm en het resetten van de
   ritteller en topsnelheid.
+- **Cruisecontrol komt op het scherm.** De VESC meldt het niet, dus de Pi leidt
+  het af: gas los terwijl de motor blijft trekken en de snelheid vlak blijft.
+  Werkt alleen met een ADC-gashendel, en beweert het alleen als het zeker is.
 - **ECO en SPORT.** Staat `modes.enabled` aan in `config.json`, dan verschijnt
   er een rij knoppen die de grenzen van de VESC zet — stroom, snelheid, duty,
   vermogen. Het gaat naar het werkgeheugen van de controller, nooit naar flash,
@@ -484,6 +523,8 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | --- | --- |
 | `vesc.port` | `/dev/ttyACM0` of `/dev/vesc`; `null` = zelf zoeken |
 | `step.packWh` | accucapaciteit, voor de bereikschatting |
+| `cruise.enabled` | cruisecontrol herkennen aan of uit |
+| `cruise.minCurrentA` | hierboven trekt de motor, hieronder rol je uit — dit is de afstelknop |
 | `modes.enabled` | rijmodi aan of uit — **standaard uit**, want dit stuurt commando's naar je motorcontroller |
 | `modes.list` | de standen zelf: naam, stroomschaal, snelheidsplafond, duty, vermogen, accustroom |
 | `step.*` | wielmaat, poolparen, overbrenging, aantal cellen — alleen nodig als de VESC ze niet levert. De app vult ze zelf in als dat kan; zie [Wat de step zelf weet](#wat-de-step-zelf-weet) |
@@ -568,6 +609,37 @@ eerste twee, dan klopt de wielmaat ook; kloppen ze niet, dan is het een
 vervangende waarde die dezelfde snelheid oplevert — en daar wordt hij voor
 gebruikt.
 
+### Cruisecontrol
+
+De VESC meldt niet of cruisecontrol aanstaat. In `app_adc.c` is het een
+hardwarepin (`cc_button`), en die pin komt nergens de comms in;
+`mc_interface_get_control_mode()` komt in heel `commands.c` niet voor. Er is
+geen pakket, geen veld, geen bit.
+
+De Pi leidt het dus af, uit de ene combinatie die verder nergens voorkomt:
+**gas los, motor trekt nog, snelheid blijft vlak.** Uitrollen is gas nul met
+vrijwel geen stroom en een zakkende snelheid, remmen is negatieve stroom,
+rijden is gas boven nul. De hendelstand komt uit `COMM_GET_DECODED_ADC`, om de
+andere ronde opgevraagd.
+
+Hij is er bewust terughoudend in. Er wordt niets beweerd zolang de
+hendelspanning niet boven 0,2 V is geweest — zonder dat wordt er geen
+ADC-hendel gelezen en zou "gas op nul" altijd waar zijn. En het patroon moet
+600 ms standhouden voordat het telt.
+
+In `/data` komen er twee velden bij: `cruise` en `cruise_supported`. In de
+interface worden dat twee haken voor een ontwerp: `<body>` krijgt de klasse
+`cruise`, en alles met een `data-cruise`-kenmerk krijgt `hidden` zolang het uit
+staat.
+
+Dit werkt alleen met een ADC-gashendel. In `app_ppm.c` zit helemaal geen
+cruisecontrol, en de nunchuk meldt via een ander pakket.
+
+Draai `node tools/vesc-probe.js` om te zien of je hendel überhaupt gelezen
+wordt, en wat hij in rust en vol open geeft. `cruise.minCurrentA` in
+`config.json` is de afstelknop: boven je rolweerstand, onder wat cruise nodig
+heeft om de snelheid te houden.
+
 ### Rijmodi
 
 Instellingen → **Rijmodus**, zodra je `modes.enabled` aan hebt gezet in
@@ -624,7 +696,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 71 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 85 tests: VESC-protocol, CRC, framing, de omrekeningen
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — de UI met nagemaakte hardware
 ```

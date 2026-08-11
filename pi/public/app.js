@@ -1471,6 +1471,30 @@ function tempCls(v) { return v >= cfg.tempCrit ? "crit" : (v >= cfg.tempWarn ? "
 function batCls(v) { return v < 10 ? "crit" : (v < 20 ? "warn" : ""); }
 function n(v, d) { return (typeof v === "number" && isFinite(v) ? v : 0).toFixed(d || 0); }
 
+/* ── cruisecontrol ─────────────────────────────────────────────────────────
+   De VESC meldt niet of hij aanstaat; de Pi leidt het af uit de hendelstand en
+   de motorstroom (src/cruise.js) en zet het in /data. Hier zijn er twee haken
+   voor de opmaak, zodat een ontwerp er zelf iets van kan maken zonder dat hier
+   vorm vastligt:
+
+     · body krijgt de klasse "cruise" zolang het aanstaat;
+     · elk element met data-cruise krijgt hidden als het uit staat.
+
+   Staat er niets met data-cruise in de opmaak, dan gebeurt er niets. */
+function paintCruise(d) {
+  var aan = !!d.cruise;
+  if (cacheS.cc !== aan) {
+    cacheS.cc = aan;
+    document.body.classList.toggle("cruise", aan);
+  }
+  /* Elke ronde langslopen in plaats van alleen bij een wisseling: dan klopt een
+     element ook als het later in de pagina komt. Er wordt alleen geschreven
+     als de stand echt anders is, dus het kost geen hertekening. */
+  [].slice.call(document.querySelectorAll("[data-cruise]")).forEach(function (e) {
+    if (e.hidden === aan) e.hidden = !aan;
+  });
+}
+
 function paint() {
   if (MODE === "demo") last = demoTick();
   var d = last;
@@ -1479,6 +1503,7 @@ function paint() {
   checkAlarm(d);
   paintNotice(d);
   paintCharge(d);
+  paintCruise(d);
   applyTheme(false);
 
   var nw = new Date();

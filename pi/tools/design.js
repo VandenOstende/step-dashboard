@@ -62,6 +62,7 @@ function base() {
     /* Rijmodi. In de echte app komen de standen uit config.json en gaan de
        grenzen naar de VESC; hier is het een naam en een logregel. */
     modes: { enabled: true, active: "SPORT" },
+    cruise: false,          // de app leidt dit normaal af; hier is het een knop
     update: { available: false, message: "Bluetooth zoekt nu naar apparaten" }
   };
 }
@@ -103,7 +104,8 @@ function data() {
       connected: false, speed_kmh: 0, rpm: 0, erpm: 0, duty: 0,
       battery_pct: 0, voltage: 0, cell_voltage: 0,
       motor_current: 0, battery_current: 0, power_w: 0,
-      temp_motor: 0, temp_fet: 0, wh_used: 0, trip_km: 0, fault: null
+      temp_motor: 0, temp_fet: 0, wh_used: 0, trip_km: 0, fault: null,
+      cruise: false, cruise_supported: false
     }, charge());
   }
 
@@ -117,6 +119,8 @@ function data() {
 
   return Object.assign({
     connected: true,
+    cruise: !!S.cruise && speed > 1,
+    cruise_supported: true,
     speed_kmh: speed,
     rpm: erpm / POLE_PAIRS,
     erpm: erpm,

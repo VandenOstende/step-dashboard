@@ -30,6 +30,7 @@ src/charge.js        recognising that the battery is charging, and for how long
 src/config.js        config.json and the stored state
 src/setup.js         does the VESC know how the scooter is put together?
 src/modes.js         riding modes: the limits packet for the VESC
+src/cruise.js        inferring whether cruise control is on
 src/update.js        comparing the version with GitHub
 src/server.js        the HTTP server
 install/step-update  the script that updates as root
@@ -150,6 +151,55 @@ read-merge-write so anything else in the file survives, and via a temp file plus
 rename so a power cut halfway doesn't leave a broken config behind. It never
 writes over `source: "hand"` — what you set yourself stays set. And if the write
 fails (read-only filesystem), it gives up rather than retrying every 150 ms.
+
+### Guessing at cruise control
+
+The VESC doesn't report it. `cc_button` in `app_adc.c` is a hardware pin off
+the UART-TX or ICU pad and never reaches the comms interface, and
+`mc_interface_get_control_mode()` — which flips to `CONTROL_MODE_SPEED` the
+moment cruise engages — appears nowhere in `commands.c`.
+
+What the firmware does do is this:
+
+```c
+if (current_mode && cc_button && fabsf(pwr) < 0.001) {
+    ...
+    mc_interface_set_pid_speed(pid_rpm);
+```
+
+Throttle at zero, motor still pulling, speed held. That combination occurs
+nowhere else, so `cruise.js` watches for it: throttle below 0.02, above 500
+erpm, motor current above `cruise.minCurrentA`, and the erpm inside 4 % over the
+last half second.
+
+**The important guard is `supported`.** It stays false until the throttle
+*voltage* has been seen above 0.2 V. Without an ADC throttle the decoded level
+sits at zero forever, and "throttle released while current flows" would then be
+permanently true. A throttle at rest reads about 0.8 V; nothing connected reads
+zero. That one check is what keeps this from being a lie generator.
+
+On after 600 ms of the pattern, off after 200 ms without it. Asymmetric on
+purpose: slow to claim, quick to drop, and one odd sample doesn't make it
+flicker.
+
+`COMM_GET_DECODED_ADC` (32) goes out **every other round** — 3 Hz is plenty for
+something that has to hold for half a second, and it halves the traffic for that
+packet. Same fallback as `useSetup`: firmware that never answers gets asked six
+times and then left alone.
+
+One thing the wire test caught and unit tests couldn't: this must be fed from
+the VESC's own `values` event, **not** from the `/data` route. Hang it off the
+request and the sample window follows however often the browser polls, so the
+half second it's supposed to hold for stops meaning anything. It's the kind of
+mistake that passes every test until you drive it.
+
+The interface gets two hooks and no opinions: `<body>` gets the class `cruise`,
+and anything with `data-cruise` gets `hidden` while it's off. The scan runs
+every paint rather than only on a change, so an element that appears later still
+lines up; nothing is written unless the value actually differs.
+
+Only for ADC throttles. `app_ppm.c` has no cruise control, and the nunchuk has
+it but through `COMM_GET_DECODED_CHUK` (33) with different logic.
 
 ### Riding modes
 
@@ -468,7 +518,7 @@ you're typing a password or shutting something down, not the other way round.
 npm test
 ```
 
-71 tests, no hardware needed: CRC against the known test vector, framing,
+85 tests, no hardware needed: CRC against the known test vector, framing,
 fragmented and mangled packets, the conversion from erpm to km/h and from
 tachometer to distance, zeroing the trip counter (including when the VESC
 restarts and resets its own counters), how the nmcli commands are built,
@@ -517,6 +567,7 @@ src/charge.js        herkennen dat de accu laadt, en hoelang nog
 src/config.js        config.json en de opgeslagen staat
 src/setup.js         weet de VESC hoe de step in elkaar zit?
 src/modes.js         rijmodi: het grenzenpakket voor de VESC
+src/cruise.js        afleiden of cruisecontrol aanstaat
 src/update.js        versie vergelijken met GitHub
 src/server.js        de HTTP-server
 install/step-update  het script dat als root bijwerkt
@@ -645,6 +696,56 @@ geen kapotte config achterlaat. Over `source: "hand"` schrijft hij nooit heen �
 wat jij zelf zet, blijft staan. En mislukt het schrijven (alleen-lezen
 bestandssysteem), dan geeft hij het op in plaats van het elke 150 ms opnieuw te
 proberen.
+
+### Gokken naar cruisecontrol
+
+De VESC meldt het niet. `cc_button` in `app_adc.c` is een hardwarepin van de
+UART-TX- of ICU-pad en komt nergens de comms in, en
+`mc_interface_get_control_mode()` — dat op `CONTROL_MODE_SPEED` springt zodra
+cruise aangrijpt — komt in `commands.c` niet voor.
+
+Wat de firmware wél doet is dit:
+
+```c
+if (current_mode && cc_button && fabsf(pwr) < 0.001) {
+    ...
+    mc_interface_set_pid_speed(pid_rpm);
+```
+
+Gas op nul, motor trekt nog, snelheid vastgehouden. Die combinatie komt verder
+nergens voor, dus `cruise.js` kijkt daarnaar: gas onder 0,02, boven 500 erpm,
+motorstroom boven `cruise.minCurrentA`, en de erpm binnen 4 % over het laatste
+halve seconde.
+
+**De belangrijke rem is `supported`.** Die blijft onwaar tot de
+hendel*spanning* boven 0,2 V is geweest. Zonder ADC-hendel blijft het
+gedecodeerde niveau eeuwig nul, en dan zou "gas los terwijl er stroom loopt"
+permanent waar zijn. Een hendel in rust geeft rond 0,8 V; niets aangesloten
+geeft nul. Die ene controle is wat dit ervan weerhoudt een leugenmachine te
+worden.
+
+Aan na 600 ms patroon, uit na 200 ms zonder. Met opzet scheef: traag met
+beweren, snel met loslaten, en één rare meting laat niets knipperen.
+
+`COMM_GET_DECODED_ADC` (32) gaat **om de andere ronde** de deur uit — 3 Hz is
+ruim genoeg voor iets dat een halve seconde moet standhouden, en het halveert
+het verkeer voor dat pakket. Dezelfde terugval als `useSetup`: firmware die
+nooit antwoordt wordt zes keer gevraagd en daarna met rust gelaten.
+
+Eén ding dat de kabeltest ving en de unittests niet konden: dit moet gevoed
+worden vanuit de `values`-gebeurtenis van de VESC, **niet** vanuit de
+/data-route. Hang je het aan het verzoek, dan volgt het tijdvenster hoe vaak de
+browser toevallig pollt, en betekent die halve seconde niets meer. Precies het
+soort fout dat door elke test heen komt tot je het echt laat rijden.
+
+De interface krijgt twee haken en geen mening: `<body>` krijgt de klasse
+`cruise`, en alles met `data-cruise` krijgt `hidden` zolang het uit staat. Het
+langslopen gebeurt elke tekenronde en niet alleen bij een wisseling, zodat een
+element dat later in de pagina komt ook klopt; er wordt alleen geschreven als de
+stand echt anders is.
+
+Alleen voor ADC-hendels. In `app_ppm.c` zit geen cruisecontrol, en de nunchuk
+heeft het wel maar via `COMM_GET_DECODED_CHUK` (33) met andere logica.
 
 ### Rijmodi
 
@@ -971,7 +1072,7 @@ je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
 npm test
 ```
 
-71 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
+85 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
 gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
 tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
 opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het

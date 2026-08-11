@@ -36,6 +36,19 @@ const DEFAULT_CONFIG = {
     source: null,
     learnedAt: null          // tijdstip waarop dat gebeurde, in ms
   },
+  /* Cruisecontrol herkennen. De VESC meldt niet of hij aanstaat; dit wordt
+     afgeleid uit "gas los terwijl de motor stroom trekt en de snelheid vlak
+     blijft". Werkt alleen bij een ADC-gashendel, en alleen als de VESC het
+     gedecodeerde hendelniveau meldt.
+
+     minCurrentA is de knop om aan te draaien: hij moet boven je rolweerstand
+     liggen en onder wat cruise nodig heeft om de snelheid te houden. Zie
+     `node tools/vesc-probe.js` voor wat jouw hendel doet. */
+  cruise: {
+    enabled: true,
+    minCurrentA: 3,          // hieronder heet het uitrollen
+    holdMs: 600              // zo lang moet het patroon standhouden
+  },
   /* Rijmodi. Standaard uit: dit stuurt commando's naar je motorcontroller, en
      dat hoort een bewuste zet te zijn en niet iets wat gebeurt omdat je je
      dashboard hebt bijgewerkt.

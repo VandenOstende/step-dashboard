@@ -35,6 +35,7 @@ const { Updater } = require("./update");
 const { Charge } = require("./charge");
 const { SetupWatch } = require("./setup");
 const modes = require("./modes");
+const { Cruise } = require("./cruise");
 const sys = require("./system");
 
 const cfg = loadConfig();
@@ -45,14 +46,21 @@ const weather = new Weather(cfg);
 const updater = new Updater(cfg);
 const charge = new Charge();
 const setup = new SetupWatch(cfg, loadStateSeen());
+const cruise = new Cruise(cfg);
 
 const log = (...a) => console.log("[step]", ...a);
 
 /* ── VESC ───────────────────────────────────────────────────────────────── */
 const vesc = new Vesc(cfg.vesc);
 vesc.on("log", (m) => log(m));
+/* Cruisecontrol wordt afgeleid uit een reeks metingen, dus die reeks moet de
+   pollronde van de VESC volgen en niet hoe vaak de browser /data ophaalt. Zou
+   het aan het verzoek hangen, dan verschuift het tijdvenster mee met de UI —
+   en klopt de halve seconde die het patroon moet standhouden niet meer. */
+vesc.on("values", (snap) => cruise.update(snap, Date.now()));
 vesc.on("status", (up) => {
   log(up ? "VESC verbonden" : "VESC weg");
+  if (!up) cruise.reset();
   /* De rijmodus zit in het werkgeheugen van de VESC, dus na een stroom-
      onderbreking is hij weg en staat de step weer op wat er in de controller
      staat. Even wachten tot de verbinding echt staat, en dan terugzetten. */
@@ -191,7 +199,13 @@ const routes = {
     if (setup.status === "ok" && !state.data.setupSeen) state.patch({ setupSeen: true });
     else if (setup.status === "missing" && state.data.setupSeen) state.patch({ setupSeen: false });
     leerVanVesc();
+    /* De VESC meldt cruisecontrol niet; dit leidt het af uit de hendelstand,
+       de motorstroom en een vlakke snelheid. Bijhouden gebeurt op de
+       "values"-gebeurtenis hierboven; hier lezen we alleen de stand. */
+    const cc = cruise.state();
     const data = telemetry.build(snap);
+    data.cruise = cc.active;
+    data.cruise_supported = cc.supported;
     if (data.connected && data.speed_kmh > state.data.topSpeed) {
       state.patch({ topSpeed: data.speed_kmh });
     }

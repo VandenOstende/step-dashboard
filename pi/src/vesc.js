@@ -31,11 +31,15 @@ const COMM_GET_VALUES_SETUP = 47;
    Zie src/modes.js voor de payload. */
 const COMM_SET_MCCONF_TEMP = 48;
 const COMM_SET_MCCONF_TEMP_SETUP = 49;
+/* Het gedecodeerde gashendelniveau. De VESC meldt niet of cruisecontrol
+   aanstaat; met dit pakket erbij is het wel af te leiden — zie src/cruise.js. */
+const COMM_GET_DECODED_ADC = 32;
 
 /* De enige antwoorden die we verwachten — gebruikt om valse startbytes te
    herkennen. De twee mcconf-commando's staan erbij omdat de bevestiging
    hetzelfde nummer draagt. */
 const EXPECTED = new Set([COMM_FW_VERSION, COMM_GET_VALUES, COMM_GET_VALUES_SETUP,
+                          COMM_GET_DECODED_ADC,
                           COMM_SET_MCCONF_TEMP, COMM_SET_MCCONF_TEMP_SETUP]);
 const MAX_PAYLOAD = 512;   // ruim boven het grootste antwoord dat we vragen
 
@@ -150,6 +154,22 @@ function parseValuesSetup(p) {
   return v;
 }
 
+/**
+ * COMM_GET_DECODED_ADC — waar de gashendel staat, 0..1, plus de gemeten
+ * spanning. Die spanning is het bewijs dát er een ADC-hendel gelezen wordt:
+ * blijft hij nul, dan draait de ADC-app niet en valt er niets af te leiden.
+ */
+function parseDecodedAdc(p) {
+  const r = new Reader(p, 1);
+  if (!r.has(16)) return null;
+  return {
+    level: r.i32(1e6),
+    voltage: r.i32(1e6),
+    level2: r.i32(1e6),
+    voltage2: r.i32(1e6)
+  };
+}
+
 function parseFwVersion(p) {
   if (p.length < 3) return null;
   const major = p[1];
@@ -175,6 +195,9 @@ class Vesc extends EventEmitter {
     this.connected = false;
     this.useSetup = true;
     this.setupMisses = 0;
+    this.useAdc = true;
+    this.adcMisses = 0;
+    this.adcRonde = 0;
     this.fw = null;
     this.lastPacketAt = 0;
     this.values = null;
@@ -211,6 +234,9 @@ class Vesc extends EventEmitter {
       this.rx = Buffer.alloc(0);
       this.useSetup = true;
       this.setupMisses = 0;
+      this.useAdc = true;
+      this.adcMisses = 0;
+      this.adc = null;
       port.on("data", (chunk) => this._feed(chunk));
       port.on("error", (err) => this.emit("log", "seriële fout op " + path + ": " + err.message));
       port.on("close", () => {
@@ -255,6 +281,10 @@ class Vesc extends EventEmitter {
     if (!this.port) return;
     this._send(COMM_GET_VALUES);
     if (this.useSetup) this._send(COMM_GET_VALUES_SETUP);
+    /* De hendelstand hoeft niet zo vaak: cruisecontrol moet een halve seconde
+       standhouden voordat het telt, dus om de andere ronde is ruim genoeg en
+       het scheelt de helft van het verkeer voor dit pakket. */
+    if (this.useAdc && (this.adcRonde++ & 1) === 0) this._send(COMM_GET_DECODED_ADC);
   }
 
   _watchdog() {
@@ -268,12 +298,21 @@ class Vesc extends EventEmitter {
           + "snelheid/afstand/accu worden uit config.json berekend");
       }
     }
+    // Idem voor de hendelstand; zonder dat pakket is cruisecontrol niet af te
+    // leiden, en dan blijft die melding gewoon weg.
+    if (this.connected && this.useAdc && !this.adc) {
+      if (++this.adcMisses > 6) {
+        this.useAdc = false;
+        this.emit("log", "VESC beantwoordt COMM_GET_DECODED_ADC niet — "
+          + "cruisecontrol wordt niet herkend");
+      }
+    }
   }
 
   _setConnected(v) {
     if (this.connected === v) return;
     this.connected = v;
-    if (!v) { this.values = null; this.setup = null; }
+    if (!v) { this.values = null; this.setup = null; this.adc = null; }
     this.emit("status", v);
   }
 
@@ -352,6 +391,11 @@ class Vesc extends EventEmitter {
         if (v) { this.setup = v; this.setupMisses = 0; this._setConnected(true); }
         break;
       }
+      case COMM_GET_DECODED_ADC: {
+        const v = parseDecodedAdc(p);
+        if (v) { this.adc = v; this.adcMisses = 0; }
+        break;
+      }
       /* De bevestiging op een rijmodus: één byte, het commandonummer terug.
          Meer staat er niet in — het zegt alleen "aangekomen en toegepast". */
       case COMM_SET_MCCONF_TEMP:
@@ -386,9 +430,13 @@ class Vesc extends EventEmitter {
       speedMs: s ? s.speedMs : null,
       distanceM: s ? s.distanceM : null,
       batteryLevel: s ? s.batteryLevel : null,
-      setupWattHours: s ? s.wattHours : null
+      setupWattHours: s ? s.wattHours : null,
+      // uit COMM_GET_DECODED_ADC; null zolang die niet beantwoord is
+      throttle: this.adc ? this.adc.level : null,
+      throttleVolt: this.adc ? this.adc.voltage : null
     };
   }
 }
 
-module.exports = { Vesc, crc16, frame, parseValues, parseValuesSetup, faultName, COMM_GET_VALUES, COMM_GET_VALUES_SETUP, COMM_FW_VERSION };
+module.exports = { Vesc, crc16, frame, parseValues, parseValuesSetup, parseDecodedAdc,
+  faultName, COMM_GET_VALUES, COMM_GET_VALUES_SETUP, COMM_GET_DECODED_ADC, COMM_FW_VERSION };

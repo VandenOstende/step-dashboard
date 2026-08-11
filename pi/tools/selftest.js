@@ -843,5 +843,133 @@ await atest("status meldt dat er een installatie loopt", async () => {
       "de eerste ECO telt, niet de latere");
   });
 
+  /* ── cruisecontrol herkennen ────────────────────────────────────────────
+     De VESC meldt het niet, dus dit is een gevolgtrekking. Die mag falen naar
+     "weet ik niet", nooit naar "ja hoor" — vandaar dat de helft van deze
+     tests over dingen gaat die er níet uit moeten komen. */
+  console.log("\ncruisecontrol");
+
+  const { Cruise } = require("../src/cruise");
+  const { parseDecodedAdc } = require("../src/vesc");
+
+  test("het hendelpakket wordt goed gelezen", () => {
+    const p = Buffer.alloc(17);
+    p[0] = 32;
+    p.writeInt32BE(Math.round(0.42 * 1e6), 1);
+    p.writeInt32BE(Math.round(1.85 * 1e6), 5);
+    p.writeInt32BE(0, 9);
+    p.writeInt32BE(Math.round(0.83 * 1e6), 13);
+    const v = parseDecodedAdc(p);
+    assert.ok(Math.abs(v.level - 0.42) < 1e-6);
+    assert.ok(Math.abs(v.voltage - 1.85) < 1e-6);
+    assert.ok(Math.abs(v.voltage2 - 0.83) < 1e-6);
+    assert.strictEqual(parseDecodedAdc(Buffer.from([32, 0, 0])), null);
+  });
+
+  /* Een ritje afspelen: elke stap is 150 ms, net als de echte pollronde. */
+  function speel(c, stappen, start) {
+    let t = start || 10000;
+    let uit = c.state();
+    for (const s of stappen) {
+      for (let i = 0; i < (s.n || 1); i++) {
+        t += 150;
+        uit = c.update({
+          throttle: s.gas, throttleVolt: s.volt === undefined ? 0.85 : s.volt,
+          erpm: s.erpm, currentMotor: s.stroom
+        }, t);
+      }
+    }
+    return uit;
+  }
+
+  const RIJDT = { gas: 0.55, erpm: 8100, stroom: 22, n: 10 };
+  const CRUISE = { gas: 0, erpm: 8100, stroom: 12, n: 10 };
+
+  test("gas open is geen cruisecontrol", () => {
+    assert.strictEqual(speel(new Cruise({}), [RIJDT]).active, false);
+  });
+
+  test("uitrollen is geen cruisecontrol", () => {
+    /* Gas los, nauwelijks stroom, snelheid zakt. */
+    const c = new Cruise({});
+    const stappen = [RIJDT];
+    for (let i = 0; i < 12; i++) stappen.push({ gas: 0, erpm: 8100 - i * 150, stroom: 0.4 });
+    assert.strictEqual(speel(c, stappen).active, false);
+  });
+
+  test("remmen is geen cruisecontrol", () => {
+    const c = new Cruise({});
+    assert.strictEqual(speel(c, [RIJDT, { gas: 0, erpm: 8100, stroom: -30, n: 10 }]).active, false);
+  });
+
+  test("bergaf met nul gas is geen cruisecontrol", () => {
+    /* Snelheid blijft vlak, maar de motor doet niets. Dat is precies waar
+       minCurrentA voor is. */
+    const c = new Cruise({});
+    assert.strictEqual(speel(c, [RIJDT, { gas: 0, erpm: 8100, stroom: 1.2, n: 12 }]).active, false);
+  });
+
+  test("het patroon van cruisecontrol wordt herkend", () => {
+    const c = new Cruise({});
+    assert.strictEqual(speel(c, [RIJDT, CRUISE]).active, true);
+  });
+
+  test("maar pas na de wachttijd, niet meteen", () => {
+    const c = new Cruise({});
+    /* Twee stappen is 300 ms; holdMs staat op 600. */
+    assert.strictEqual(speel(c, [RIJDT, { gas: 0, erpm: 8100, stroom: 12, n: 2 }]).active, false);
+  });
+
+  test("versnellen met nul gas telt niet — de snelheid wordt niet vastgehouden", () => {
+    const c = new Cruise({});
+    const stappen = [RIJDT];
+    for (let i = 0; i < 14; i++) stappen.push({ gas: 0, erpm: 6000 + i * 400, stroom: 25 });
+    assert.strictEqual(speel(c, stappen).active, false);
+  });
+
+  test("zonder hendelspanning wordt er niets beweerd", () => {
+    /* Geen ADC-app: het gedecodeerde niveau blijft nul en zou anders altijd
+       als "gas los" gelden. */
+    const c = new Cruise({});
+    const uit = speel(c, [{ gas: 0, volt: 0, erpm: 8100, stroom: 22, n: 20 }]);
+    assert.strictEqual(uit.supported, false);
+    assert.strictEqual(uit.active, false);
+  });
+
+  test("zonder antwoord op het hendelpakket ook niet", () => {
+    const c = new Cruise({});
+    const uit = c.update({ erpm: 8100, currentMotor: 22 }, 10000);
+    assert.strictEqual(uit.supported, false);
+    assert.strictEqual(uit.active, false);
+  });
+
+  test("één rare meting midden in cruise zet het niet uit", () => {
+    const c = new Cruise({});
+    speel(c, [RIJDT, CRUISE]);
+    assert.strictEqual(c.state().active, true);
+    speel(c, [{ gas: 0, erpm: 8100, stroom: 0.2, n: 1 }], 20000);   // 150 ms < LOS_MS
+    assert.strictEqual(c.state().active, true);
+  });
+
+  test("gas geven zet het wel uit", () => {
+    const c = new Cruise({});
+    speel(c, [RIJDT, CRUISE]);
+    assert.strictEqual(c.state().active, true);
+    speel(c, [{ gas: 0.4, erpm: 8100, stroom: 30, n: 4 }], 20000);
+    assert.strictEqual(c.state().active, false);
+  });
+
+  test("uitgeschakeld in config.json levert nooit iets op", () => {
+    const c = new Cruise({ cruise: { enabled: false } });
+    assert.strictEqual(speel(c, [RIJDT, CRUISE]).active, false);
+  });
+
+  test("de verbinding kwijt betekent weer niets weten", () => {
+    const c = new Cruise({});
+    speel(c, [RIJDT, CRUISE]);
+    c.reset();
+    assert.deepStrictEqual(c.state(), { active: false, supported: false });
+  });
+
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();

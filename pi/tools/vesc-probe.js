@@ -70,6 +70,27 @@ setTimeout(() => {
     console.log("  accuniveau         " + fmt(snap.batteryLevel * 100, 1) + " %");
   }
 
+  /* De gashendel. Cruisecontrol meldt de VESC niet; de app leidt het af uit
+     deze waarde plus de motorstroom. Hier zie je of je hendel überhaupt
+     gelezen wordt en welk niveau hij in rust geeft — dat zijn de getallen
+     waarmee je cruise.minCurrentA afstelt. */
+  console.log("\n── gashendel (COMM_GET_DECODED_ADC) ─────────────────────────");
+  if (typeof snap.throttle !== "number") {
+    console.log("  Deze firmware beantwoordt COMM_GET_DECODED_ADC niet.");
+    console.log("  Cruisecontrol wordt dan niet herkend.");
+  } else if ((snap.throttleVolt || 0) <= 0.2) {
+    console.log("  niveau             " + fmt(snap.throttle * 100, 1) + " %");
+    console.log("  spanning           " + fmt(snap.throttleVolt, 3) + " V");
+    console.log("  Geen ADC-hendel in gebruik (spanning blijft nul), dus");
+    console.log("  cruisecontrol is niet af te leiden.");
+  } else {
+    console.log("  niveau             " + fmt(snap.throttle * 100, 1) + " %");
+    console.log("  spanning           " + fmt(snap.throttleVolt, 3) + " V");
+    console.log("  Draai de hendel eens open en draai dit nog een keer: zo zie");
+    console.log("  je het bereik. Cruisecontrol wordt herkend aan niveau nul");
+    console.log("  terwijl de motorstroom boven cruise.minCurrentA blijft.");
+  }
+
   const wizardOk = hasSetup && snap.batteryLevel > 0;
   console.log("\n── conclusie ────────────────────────────────────────────────");
   if (wizardOk) {
