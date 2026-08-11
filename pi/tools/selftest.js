@@ -971,5 +971,170 @@ await atest("status meldt dat er een installatie loopt", async () => {
     assert.deepStrictEqual(c.state(), { active: false, supported: false });
   });
 
+  /* ── kilometerstand, rijtijd en het datacontract ────────────────────── */
+  console.log("\ntellers");
+
+  test("de kilometerstand telt door over een herstart van de VESC heen", () => {
+    const st = fakeState();
+    const t = new Telemetry(cfg, st);
+    /* De tachometer telt in motorstappen; 3 · 2 · polePairs stappen is één
+       wielomwenteling, dus 90 stappen ≈ één wiel rond bij 15 poolparen. */
+    const rond = 3 * 2 * 15;
+    const meter = 0.254 * Math.PI;
+    t.build({ vIn: 50, erpm: 0, tachometerAbs: 10 * rond });
+    t.build({ vIn: 50, erpm: 0, tachometerAbs: 30 * rond });
+    const na = t.build({ vIn: 50, erpm: 0, tachometerAbs: 0 });   // VESC herstart
+    const nog = t.build({ vIn: 50, erpm: 0, tachometerAbs: 5 * rond });
+    assert.ok(Math.abs(na.odo_km - 20 * meter / 1000) < 1e-6,
+      "na de herstart stond de stand op " + na.odo_km);
+    assert.ok(Math.abs(nog.odo_km - 25 * meter / 1000) < 1e-6,
+      "daarna " + nog.odo_km);
+  });
+
+  test("een teruglopende tachometer trekt de stand nooit omlaag", () => {
+    const t = new Telemetry(cfg, fakeState());
+    t.build({ vIn: 50, erpm: 0, tachometerAbs: 9000 });
+    const a = t.build({ vIn: 50, erpm: 0, tachometerAbs: 9000 }).odo_km;
+    const b = t.build({ vIn: 50, erpm: 0, tachometerAbs: 100 }).odo_km;
+    assert.ok(b >= a, "van " + a + " naar " + b);
+  });
+
+  test("de rijtijd loopt alleen als de step rijdt", () => {
+    const t = new Telemetry(cfg, fakeState());
+    t.lastTick = Date.now() - 1000;
+    t.build({ vIn: 50, erpm: 0, speedMs: 0 });          // stil
+    assert.strictEqual(t.tripSec, 0);
+    t.lastTick = Date.now() - 1000;
+    t.build({ vIn: 50, erpm: 5000, speedMs: 5 });       // 18 km/u
+    assert.ok(t.tripSec >= 0.9 && t.tripSec <= 1.1, "tripSec = " + t.tripSec);
+  });
+
+  test("een gat in de lus telt hoogstens twee seconden mee", () => {
+    const t = new Telemetry(cfg, fakeState());
+    t.lastTick = Date.now() - 60000;
+    t.build({ vIn: 50, erpm: 5000, speedMs: 5 });
+    assert.strictEqual(t.tripSec, 2);
+  });
+
+  test("de accutemperatuur is null en niet nul — de VESC meet hem niet", () => {
+    const t = new Telemetry(cfg, fakeState());
+    assert.strictEqual(t.build({ vIn: 50, erpm: 0 }).temp_batt, null);
+    assert.strictEqual(t.offline().temp_batt, null);
+  });
+
+  test("het contract bevat alles wat de UI opvraagt", () => {
+    const t = new Telemetry(cfg, fakeState());
+    for (const d of [t.build({ vIn: 50, erpm: 0 }), t.offline()]) {
+      for (const k of ["speed_kmh", "duty", "battery_pct", "voltage", "battery_current",
+        "temp_motor", "temp_fet", "temp_batt", "wh_used", "trip_km", "trip_s",
+        "avg_kmh", "odo_km", "fault"]) {
+        assert.ok(k in d, "veld ontbreekt: " + k);
+      }
+    }
+  });
+
+  /* ── instellingen die van de UI binnenkomen ─────────────────────────── */
+  console.log("\ninstellingen");
+
+  const { schoneSettings, DEFAULT_STATE } = require("../src/config");
+  const STD = DEFAULT_STATE.settings;
+
+  test("een onbekende accentkleur wordt niet overgenomen", () => {
+    const s = schoneSettings({ accent: "#000000" }, STD);
+    assert.strictEqual(s.accent, STD.accent);
+    assert.strictEqual(schoneSettings({ accent: "#3f7fd9" }, STD).accent, "#3f7fd9");
+  });
+
+  test("een onbekende taal valt terug op wat er stond", () => {
+    assert.strictEqual(schoneSettings({ lang: "es" }, STD).lang, "nl");
+    assert.strictEqual(schoneSettings({ lang: "de" }, STD).lang, "de");
+  });
+
+  test("een thema uit een oudere versie wordt stilzwijgend rechtgezet", () => {
+    assert.strictEqual(schoneSettings({}, { theme: "Auto" }).theme, "day");
+    assert.strictEqual(schoneSettings({ theme: "night" }, STD).theme, "night");
+  });
+
+  test("limieten worden binnen hun bereik geklemd", () => {
+    assert.strictEqual(schoneSettings({ limMotor: 999 }, STD).limMotor, 140);
+    assert.strictEqual(schoneSettings({ limBatt: 0 }, STD).limBatt, 30);
+  });
+
+  test("de schakelaars blijven booleaans, wat je ook stuurt", () => {
+    assert.strictEqual(schoneSettings({ warnBatt: false }, STD).warnBatt, false);
+    assert.strictEqual(schoneSettings({ warnBatt: "nee" }, STD).warnBatt, true);
+  });
+
+  /* ── vertalingen en opmaak ──────────────────────────────────────────── */
+  console.log("\nvertalingen");
+
+  const fsx = require("fs");
+  const pathx = require("path");
+  const vm = require("vm");
+  const PUBX = pathx.resolve(__dirname, "..", "public");
+  const doos = { window: {} };
+  vm.createContext(doos);
+  vm.runInContext(fsx.readFileSync(pathx.join(PUBX, "i18n.js"), "utf8"), doos);
+
+  test("alle vier de talen hebben precies dezelfde sleutels", () => {
+    const talen = Object.keys(doos.T);
+    assert.deepStrictEqual(talen.sort(), ["de", "en", "fr", "nl"]);
+    const basis = Object.keys(doos.T.nl).sort();
+    for (const lg of talen) {
+      assert.deepStrictEqual(Object.keys(doos.T[lg]).sort(), basis, "taal " + lg + " wijkt af");
+    }
+  });
+
+  test("geen enkele vertaling is leeg", () => {
+    for (const lg of Object.keys(doos.T)) {
+      for (const [k, v] of Object.entries(doos.T[lg])) {
+        assert.ok(typeof v === "string" && v.trim(), lg + "." + k + " is leeg");
+      }
+    }
+  });
+
+  test("elke data-t in de pagina heeft een vertaling", () => {
+    const html = fsx.readFileSync(pathx.join(PUBX, "index.html"), "utf8");
+    const sleutels = [...html.matchAll(/data-t="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(sleutels.length > 20, "verdacht weinig data-t: " + sleutels.length);
+    for (const k of new Set(sleutels)) {
+      assert.ok(doos.T.nl[k], "geen vertaling voor data-t=" + k);
+    }
+  });
+
+  test("de acht accentkleuren van de UI zijn ook de acht van de server", () => {
+    const uitUi = doos.ACCENTS.map((a) => a.hex).sort();
+    /* schoneSettings accepteert er precies acht; alles daarbuiten valt terug. */
+    for (const hex of uitUi) {
+      assert.strictEqual(schoneSettings({ accent: hex }, STD).accent, hex,
+        hex + " wordt door de server geweigerd");
+    }
+    assert.strictEqual(uitUi.length, 8);
+  });
+
+  test("elk id dat app.js aanraakt staat in de pagina", () => {
+    const html = fsx.readFileSync(pathx.join(PUBX, "index.html"), "utf8");
+    const js = fsx.readFileSync(pathx.join(PUBX, "app.js"), "utf8");
+    const ids = new Set();
+    for (const r of [/\$\("([^"]+)"\)/g, /txt\("([^"]+)"/g, /cls\("([^"]+)"/g,
+      /icon\("([^"]+)"/g, /show\("([^"]+)"/g, /hide\("([^"]+)"/g]) {
+      for (const m of js.matchAll(r)) ids.add(m[1]);
+    }
+    const heeft = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+    const weg = [...ids].filter((i) => !heeft.has(i) && i !== "root");
+    assert.deepStrictEqual(weg, [], "ontbreekt in index.html: " + weg.join(", "));
+  });
+
+  test("elk icoon dat wordt aangeroepen zit in de sprite", () => {
+    const html = fsx.readFileSync(pathx.join(PUBX, "index.html"), "utf8");
+    const js = fsx.readFileSync(pathx.join(PUBX, "app.js"), "utf8");
+    const inSprite = new Set([...html.matchAll(/<symbol id="(i-[^"]+)"/g)].map((m) => m[1]));
+    const gebruikt = new Set();
+    for (const m of html.matchAll(/href="#(i-[^"]+)"/g)) gebruikt.add(m[1]);
+    for (const m of js.matchAll(/"(i-[a-z0-9-]+)"/g)) gebruikt.add(m[1]);
+    const weg = [...gebruikt].filter((i) => !inSprite.has(i));
+    assert.deepStrictEqual(weg, [], "geen tekening voor: " + weg.join(", "));
+  });
+
   console.log("\n" + passed + " tests geslaagd" + (process.exitCode ? " — er zijn fouten" : ""));
 })();

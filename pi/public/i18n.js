@@ -1,7 +1,12 @@
 "use strict";
 /* Teksten en accentkleuren, letterlijk overgenomen uit het ontwerp
    project/Ride Dash.dc.html. Overtypen is vragen om fouten, en de vier talen
-   zijn daar al nagelopen: 67 sleutels, alle vier compleet.
+   zijn daar al nagelopen.
+
+   Onderaan staat een tweede blok: teksten die het ontwerp niet nodig had maar
+   de echte app wel — de dag/nacht-namen (die stonden in het ontwerp los in de
+   code) en het scherm voor de stepgegevens, dat geen ontwerp heeft omdat de
+   VESC ze meestal zelf weet.
 
    Er staat een test op dat elke taal dezelfde sleutels heeft. Voeg je een
    tekst toe, dan moet hij dus in alle vier de talen. */
@@ -85,3 +90,64 @@ var T = {
     updNow: 'Jetzt aktualisieren auf'
   }
 };
+
+/* ── wat het ontwerp niet had ──────────────────────────────────────────────
+   Dag/nacht stond in het ontwerp los in de rendercode; hier hoort het bij de
+   rest. De stepgegevens zijn een echt scherm dat het ontwerp niet kende:
+   pole pairs, wieldiameter en overbrenging. Zonder die drie rekent de VESC
+   een verkeerde snelheid uit, en dan klopt alles wat eruit volgt niet. */
+var EXTRA = {
+  nl: {
+    day: 'Dag', night: 'Nacht', na: 'n.v.t.',
+    stepValues: 'Stepgegevens', stepOk: 'Herkend door de VESC',
+    stepMissing: 'Niet herkend — zelf invullen', stepHand: 'Met de hand ingesteld',
+    stepUnknown: 'Nog niet vastgesteld — rij een stukje',
+    polePairs: 'Poolparen', wheel: 'Wieldiameter', gear: 'Overbrenging',
+    cells: 'Accucellen', auto: 'auto', save: 'Bewaren', saving: 'Bezig…', saved: 'Bewaard',
+    stepHint: 'Deze drie bepalen de snelheid en de afstand. Staat de setup-wizard '
+      + 'in VESC Tool goed, dan neemt de app ze daar vanzelf van over.',
+    noNotes: 'Geen commits om te tonen.', updFailed: 'Bijwerken mislukt',
+    faultLbl: 'VESC-storing', lowBatt: 'Accu bijna leeg', motorHot: 'Motor wordt warm',
+    escHot: 'Controller wordt warm'
+  },
+  en: {
+    day: 'Day', night: 'Night', na: 'n/a',
+    stepValues: 'Scooter values', stepOk: 'Recognised by the VESC',
+    stepMissing: 'Not recognised — enter them yourself', stepHand: 'Set by hand',
+    stepUnknown: 'Not established yet — ride a little',
+    polePairs: 'Pole pairs', wheel: 'Wheel diameter', gear: 'Gear ratio',
+    cells: 'Battery cells', auto: 'auto', save: 'Save', saving: 'Saving…', saved: 'Saved',
+    stepHint: 'These three set speed and distance. If the setup wizard in VESC Tool '
+      + 'is filled in, the app picks them up from there by itself.',
+    noNotes: 'No commits to show.', updFailed: 'Update failed',
+    faultLbl: 'VESC fault', lowBatt: 'Battery nearly empty', motorHot: 'Motor heating up',
+    escHot: 'Controller heating up'
+  },
+  fr: {
+    day: 'Jour', night: 'Nuit', na: 'n/d',
+    stepValues: 'Données trottinette', stepOk: 'Reconnu par le VESC',
+    stepMissing: 'Non reconnu — à saisir', stepHand: 'Saisi à la main',
+    stepUnknown: 'Pas encore établi — roulez un peu',
+    polePairs: 'Paires de pôles', wheel: 'Diamètre de roue', gear: 'Rapport',
+    cells: 'Cellules', auto: 'auto', save: 'Enregistrer', saving: 'En cours…', saved: 'Enregistré',
+    stepHint: 'Ces trois valeurs déterminent la vitesse et la distance. Si l’assistant '
+      + 'de VESC Tool est rempli, l’app les reprend automatiquement.',
+    noNotes: 'Aucun commit à afficher.', updFailed: 'Échec de la mise à jour',
+    faultLbl: 'Défaut VESC', lowBatt: 'Batterie presque vide', motorHot: 'Le moteur chauffe',
+    escHot: 'Le contrôleur chauffe'
+  },
+  de: {
+    day: 'Tag', night: 'Nacht', na: 'k. A.',
+    stepValues: 'Rollerdaten', stepOk: 'Vom VESC erkannt',
+    stepMissing: 'Nicht erkannt — selbst eintragen', stepHand: 'Von Hand gesetzt',
+    stepUnknown: 'Noch nicht ermittelt — fahr ein Stück',
+    polePairs: 'Polpaare', wheel: 'Raddurchmesser', gear: 'Übersetzung',
+    cells: 'Akkuzellen', auto: 'auto', save: 'Speichern', saving: 'Läuft…', saved: 'Gespeichert',
+    stepHint: 'Diese drei bestimmen Geschwindigkeit und Strecke. Ist der Setup-Assistent '
+      + 'in VESC Tool ausgefüllt, übernimmt die App sie von dort.',
+    noNotes: 'Keine Commits vorhanden.', updFailed: 'Update fehlgeschlagen',
+    faultLbl: 'VESC-Fehler', lowBatt: 'Akku fast leer', motorHot: 'Motor wird warm',
+    escHot: 'Controller wird warm'
+  }
+};
+Object.keys(T).forEach(function (lg) { Object.assign(T[lg], EXTRA[lg]); });

@@ -61,17 +61,15 @@
 
 <header>
   <h1>Step Dashboard — designomgeving</h1>
-  <span class="sub">de echte UI op <code>480 × 320</code>, nagemaakte hardware</span>
+  <span class="sub">de echte UI op <code>320 × 480</code>, nagemaakte hardware</span>
 </header>
 
 <main>
   <div class="stage">
-    <div class="bezel" id="bezel" style="--z:1;--w:480px;--h:320px"><iframe id="ui" src="/" title="dashboard"></iframe></div>
+    <div class="bezel" id="bezel" style="--z:1;--w:320px;--h:480px"><iframe id="ui" src="/" title="dashboard"></iframe></div>
     <div class="caption">
-      <button id="lay-l" class="on">Liggend</button>
-      <button id="lay-p">Staand</button>
-      <button id="lay-pr" title="Staande UI op het liggende paneel van de Pi">Staand op 480 × 320</button>
-      <span id="conceptbtns" style="display:flex;gap:10px"></span>
+      <button id="lay-p" class="on">Staand 320 × 480</button>
+      <button id="lay-pr" title="Dezelfde pagina op het liggende paneel van de Pi — hij draait zichzelf">Op het paneel 480 × 320</button>
       <span style="width:10px"></span>
       <button id="z1" class="on">1×</button>
       <button id="z2">2×</button>
@@ -112,7 +110,7 @@
         </select>
         <label style="width:auto;margin-left:14px">Thema</label>
         <select id="theme">
-          <option>Auto</option><option>Licht</option><option>Donker</option>
+          <option value="day">Dag</option><option value="night">Nacht</option>
         </select>
       </div>
     </div>
@@ -291,79 +289,36 @@ function paint() {
 $("theme").addEventListener("change", function () {
   var v = $("theme").value;
   state.theme = v;
-  post({ patch: { theme: v } });
-  try { W().cfg.theme = v; W().applyTheme(true); } catch (e) { /* nog aan het laden */ }
+  state.settings.theme = v;
+  post({ patch: { theme: v, settings: state.settings } });
+  try { W().cfg.theme = v; W().applyTheme(); } catch (e) { /* nog aan het laden */ }
 });
 $("fault").addEventListener("change", function () {
   post({ patch: { fault: $("fault").value || null } });
 });
 
-/* ── zoom en herladen ───────────────────────────────────────────────────── */
-/* Van indeling wisselen is: eerst de instelling bijstellen, dan de andere
-   pagina laden. De pagina kijkt bij het opstarten of hij de goede is, dus
-   zonder die eerste stap stuurt hij zichzelf meteen terug. */
-/* Drie standen, want de derde is wat er op de step gebeurt: de staande UI op
-   een paneel dat fysiek liggend is. De pagina draait zichzelf dan een
-   kwartslag. Zonder deze knop zie je dat pas op het stuur. */
+/* ── het frame ──────────────────────────────────────────────────────────── */
+/* Eén pagina, twee manieren om ernaar te kijken. Staand is waarvoor hij
+   getekend is; op het paneel is wat er op de step gebeurt — daar hangt het
+   schermpje liggend en draait de pagina zichzelf een kwartslag. Zonder die
+   tweede knop zie je dat pas op het stuur. */
 var opPaneel = false;
 
-function paintLayout(name) {
-  var port = name === "Staand" && !opPaneel;
-  $("bezel").style.setProperty("--w", port ? "320px" : "480px");
-  $("bezel").style.setProperty("--h", port ? "480px" : "320px");
-  $("lay-l").classList.toggle("on", name !== "Staand");
-  $("lay-p").classList.toggle("on", name === "Staand" && !opPaneel);
-  $("lay-pr").classList.toggle("on", name === "Staand" && opPaneel);
+function paintLayout() {
+  $("bezel").style.setProperty("--w", opPaneel ? "480px" : "320px");
+  $("bezel").style.setProperty("--h", opPaneel ? "320px" : "480px");
+  $("lay-p").classList.toggle("on", !opPaneel);
+  $("lay-pr").classList.toggle("on", opPaneel);
 }
 
-function setLayout(name, paneel) {
-  if (!state) return;
-  if (concept === null && state.layout === name && !!paneel === opPaneel && frame.src.indexOf("/concept/") < 0) return;
+function setLayout(paneel) {
+  if (!!paneel === opPaneel) return;
   opPaneel = !!paneel;
-  state.layout = name;
-  paintLayout(name);
-  post({ patch: { layout: name } }).then(function () {
-    frame.src = name === "Staand" ? "/portrait.html" : "/index.html";
-  });
-}
-/* Concepten: ontwerpen die nog niet in public/ staan. Ze draaien wel op het
-   echte app.js, dus je kunt er gewoon doorheen klikken. */
-var concept = null;
-
-function setConcept(naam) {
-  if (!state) return;
-  concept = naam;
-  opPaneel = false;
-  state.layout = "Liggend";
-  paintLayout("Liggend");
-  [].forEach.call($("conceptbtns").children, function (b) {
-    b.classList.toggle("on", b.dataset.naam === naam);
-  });
-  /* De pagina stuurt zichzelf door als de opgeslagen indeling niet klopt; op
-     Liggend zetten voorkomt dat het concept meteen naar portrait.html springt. */
-  post({ patch: { layout: "Liggend" } }).then(function () {
-    frame.src = "/concept/" + naam;
-  });
+  paintLayout();
 }
 
-fetch("/design/concepts").then(function (r) { return r.json(); }).then(function (j) {
-  (j.concepts || []).forEach(function (naam) {
-    var b = document.createElement("button");
-    b.textContent = "Concept: " + naam;
-    b.dataset.naam = naam;
-    b.addEventListener("click", function () { setConcept(naam); });
-    $("conceptbtns").appendChild(b);
-  });
-})["catch"](function () {});
-
-function verlaatConcept() {
-  concept = null;
-  [].forEach.call($("conceptbtns").children, function (b) { b.classList.remove("on"); });
-}
-
-$("lay-l").addEventListener("click", function () { verlaatConcept(); setLayout("Liggend", false); });
-$("lay-p").addEventListener("click", function () { verlaatConcept(); setLayout("Staand", false); });
-$("lay-pr").addEventListener("click", function () { verlaatConcept(); setLayout("Staand", true); });
+$("lay-p").addEventListener("click", function () { setLayout(false); });
+$("lay-pr").addEventListener("click", function () { setLayout(true); });
 
 function zoom(z) {
   $("bezel").style.setProperty("--z", z);
@@ -393,11 +348,6 @@ setInterval(function () {
   fetch("/design/state", { cache: "no-store" }).then(function (r) { return r.json(); })
     .then(function (j) {
       $("log").textContent = j.log.length ? j.log.join("\n") : "—";
-      /* Wissel je van indeling in de UI zelf, dan groeit het frame mee. */
-      if (state && j.state.layout !== state.layout) {
-        state.layout = j.state.layout;
-        paintLayout(state.layout);
-      }
     })["catch"](function () {});
 }, 1500);
 
@@ -409,7 +359,7 @@ fetch("/design/state").then(function (r) { return r.json(); }).then(function (j)
   buildScreens();
   buildPresets(j.presets);
   paint();
-  paintLayout(state.layout);
+  paintLayout();
 });
 </script>
 </body>

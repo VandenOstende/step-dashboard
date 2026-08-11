@@ -91,23 +91,65 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_STATE = {
   settings: {
-    layout: "Liggend",     // "Liggend" = index.html, "Staand" = portrait.html
     rotate: 90,            // kwartslag als de UI niet bij het paneel past
-    theme: "Auto",
+    theme: "day",          // "day" of "night"
+    lang: "nl",            // nl, en, fr, de
+    units: "metric",       // "metric" of "imperial"
+    accent: "#4f9e63",     // een van de acht uit public/i18n.js
     mode: null,            // gekozen rijmodus; null = niets gestuurd
-    tempWarn: 70,
-    tempCrit: 90,
-    motorTempWarn: true,   // motortemperatuur-meldingen; uit bij een kapotte sensor
+    /* Temperatuurlimieten in °C, elk met een schakelaar. Uit betekent: wel
+       tonen, geen waarschuwingsscherm — bruikbaar bij een kapotte sensor. */
+    limMotor: 120, limEsc: 110, limBatt: 70,
+    warnMotor: true, warnEsc: true, warnBatt: true,
     packWh: 1147,
     whPerKm: 18,
     speedMax: 35,
-    bright: 80,
-    start: 0
+    bright: 80
   },
   topSpeed: 0,
   setupSeen: false,        // één keer rijdend "ok" gezien — overleeft een herstart
-  trip: { distanceM: 0, wattHours: 0, valid: false }
+  odo: { meters: 0 },      // kilometerstand; de VESC houdt die zelf niet bij
+  trip: { distanceM: 0, wattHours: 0, valid: false, seconds: 0 }
 };
+
+
+/* ── de instellingen die de UI bewaart ──────────────────────────────────── */
+const getal = (v, lo, hi, fallback) => {
+  const n = Number(v);
+  return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
+};
+const TALEN = ["nl", "en", "fr", "de"];
+/* De acht kleuren uit public/i18n.js. Ze staan hier nog een keer omdat de
+   server niets van de browserbestanden leest en een vrije kleurwaarde uit een
+   POST anders zo in de opmaak terechtkomt. */
+const ACCENTEN = ["#9184d9", "#4fa3a0", "#d98f52", "#3f7fd9",
+                  "#c25a8f", "#e0a92b", "#4f9e63", "#d95f4a"];
+
+const bool = (v, fallback) => (typeof v === "boolean" ? v : fallback);
+const uit = (lijst, v, fallback) => (lijst.includes(v) ? v : fallback);
+
+/** Wat er ook binnenkomt, hier komt een geldig instellingenblok uit. */
+function schoneSettings(body, s) {
+  return {
+    rotate: [90, 270].includes(Number(body.rotate)) ? Number(body.rotate) : (s.rotate || 90),
+    theme: uit(["day", "night"], body.theme, uit(["day", "night"], s.theme, "day")),
+    lang: uit(TALEN, body.lang, uit(TALEN, s.lang, "nl")),
+    units: uit(["metric", "imperial"], body.units,
+      uit(["metric", "imperial"], s.units, "metric")),
+    accent: uit(ACCENTEN, body.accent, uit(ACCENTEN, s.accent, "#4f9e63")),
+    mode: typeof body.mode === "string" || body.mode === null ? body.mode : (s.mode || null),
+    limMotor: getal(body.limMotor, 60, 140, s.limMotor || 120),
+    limEsc: getal(body.limEsc, 50, 120, s.limEsc || 110),
+    limBatt: getal(body.limBatt, 30, 80, s.limBatt || 70),
+    warnMotor: bool(body.warnMotor, s.warnMotor !== false),
+    warnEsc: bool(body.warnEsc, s.warnEsc !== false),
+    warnBatt: bool(body.warnBatt, s.warnBatt !== false),
+    packWh: getal(body.packWh, 200, 4000, s.packWh || 1147),
+    whPerKm: getal(body.whPerKm, 5, 100, s.whPerKm || 18),
+    speedMax: getal(body.speedMax, 10, 120, s.speedMax || 35),
+    bright: getal(body.bright, 20, 100, s.bright || 80)
+  };
+}
 
 function deepMerge(base, over) {
   if (!over || typeof over !== "object" || Array.isArray(over)) return base;
@@ -210,4 +252,7 @@ function loadState() {
   return new State(file);
 }
 
-module.exports = { loadConfig, loadState, saveConfigStep, DEFAULT_CONFIG, DEFAULT_STATE, ROOT };
+module.exports = {
+  loadConfig, loadState, saveConfigStep, schoneSettings,
+  DEFAULT_CONFIG, DEFAULT_STATE, ROOT
+};

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=320,height=480,initial-scale=1,user-scalable=no">
+<title>Ride Dash</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<!-- De iconen. 45 stuks uit Phosphor (MIT), door tools/build-page.js hier
+     ingezet vanuit tools/icons/. Ze staan in het bestand omdat de Pi geen
+     internet heeft; het ontwerp haalde ze van unpkg. -->
+<!--ICONEN-->
+
+<div id="root">
+
+  <!-- ── titelbalk ──────────────────────────────────────────────────────── -->
+  <div id="top">
+    <div id="topleft">
+      <span id="link"></span>
+      <span id="linkname">D100L</span>
+      <span class="sep">·</span>
+      <span id="linksub">VESC</span>
+    </div>
+    <button id="topright">
+      <svg class="ico" id="btico"><use href="#i-bluetooth-slash"></use></svg>
+      <svg class="ico" id="wifiico"><use href="#i-wifi-slash"></use></svg>
+      <span id="cellgrp">
+        <svg class="ico" id="cellico"><use href="#i-cell-signal-slash"></use></svg>
+        <span id="celltxt">--</span>
+      </span>
+      <span id="clock">--:--</span>
+      <svg class="ico gear"><use href="#i-gear-six"></use></svg>
+    </button>
+  </div>
+
+  <!-- ── rijscherm ──────────────────────────────────────────────────────── -->
+  <div id="ride">
+    <div id="ridemid">
+      <div id="railleft">
+        <button id="bell"><svg class="ico" id="bellico"><use href="#i-bell"></use></svg></button>
+        <!-- De modusknoppen. app.js vult deze doos uit /modes; alleen de
+             actieve is zichtbaar en tikken loopt door de standen heen. -->
+        <div id="modes"></div>
+        <div id="cruise" data-cruise hidden><svg class="ico"><use href="#i-gauge-f"></use></svg></div>
+      </div>
+
+      <button id="speedbtn">
+        <span id="speed">0</span>
+        <span id="speedunit">km/h</span>
+      </button>
+
+      <div id="railright">
+        <div id="dutytrack"><i id="dutyfill"></i><i class="ticks"></i></div>
+        <span class="micro">Duty</span>
+      </div>
+    </div>
+
+    <div id="battrow">
+      <div class="battmain">
+        <div class="battline">
+          <span class="val"><span id="battpct">0</span><span class="u">%</span></span>
+          <span id="battva">-- V · -- A</span>
+        </div>
+        <div id="batttrack"><i id="battfill"></i></div>
+      </div>
+      <div class="vrule"></div>
+      <div class="battrange">
+        <span class="micro" data-t="range">Bereik</span>
+        <span class="val"><span id="range">0</span><span class="u" id="rangeunit">km</span></span>
+      </div>
+    </div>
+
+    <div id="cards">
+      <button id="tripcard" class="card">
+        <span class="micro" id="triplbl" data-t="trip">Trip A</span>
+        <span class="big" id="tripval">0</span>
+        <span class="sub" id="tripsub">0m</span>
+      </button>
+      <div class="card">
+        <span class="micro" data-t="odo">Kilometerstand</span>
+        <span class="big" id="odo">0</span>
+        <span class="sub"><span id="odounit">km</span> <span data-t="kmTotal">totaal</span></span>
+      </div>
+      <div class="card">
+        <span class="micro" data-t="temps">Temp.</span>
+        <span class="big" id="motortemp">0°</span>
+        <span class="sub">esc <span id="esctemp">0</span>°</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── meldingen ──────────────────────────────────────────────────────── -->
+  <div id="alerts" class="scrim">
+    <div class="drawer">
+      <div class="drawerhead">
+        <span class="title" data-t="notifications">Meldingen</span>
+        <span class="headright">
+          <button id="alertclear" class="link" data-t="clear">Wissen</button>
+          <button id="alertclose" class="iconbtn"><svg class="ico"><use href="#i-x"></use></svg></button>
+        </span>
+      </div>
+      <div id="alertlist" class="list"></div>
+    </div>
+  </div>
+
+  <!-- ── snelheidsmeting ────────────────────────────────────────────────── -->
+  <div id="speedsheet" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="speedsheet"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="speedDetail">Snelheidsmeting</span>
+    </div>
+    <div id="speedstats" class="list grow"></div>
+    <button id="speedreset" class="wide">
+      <svg class="ico"><use href="#i-arrow-counter-clockwise"></use></svg>
+      <span data-t="holdToReset">Resetten</span>
+    </button>
+  </div>
+
+  <!-- ── aan/uit ────────────────────────────────────────────────────────── -->
+  <div id="powermenu" class="scrim bottom">
+    <div class="stack">
+      <button id="doreboot" class="row">
+        <svg class="ico accent"><use href="#i-arrows-clockwise"></use></svg>
+        <span data-t="reboot">Herstarten</span>
+      </button>
+      <button id="doshutdown" class="row danger">
+        <svg class="ico"><use href="#i-power"></use></svg>
+        <span data-t="shutdown">Uitschakelen</span>
+      </button>
+      <button class="row mid" data-close="powermenu" data-t="cancel">Annuleren</button>
+    </div>
+  </div>
+
+  <div id="off">
+    <svg class="ico big" id="officon"><use href="#i-power"></use></svg>
+    <span id="offlabel" data-t="tapToWake">Tik om te starten</span>
+  </div>
+
+  <!-- ── eenheden ───────────────────────────────────────────────────────── -->
+  <div id="units" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="units"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="units">Eenheden</span>
+    </div>
+    <div id="unitlist" class="list grow"></div>
+  </div>
+
+  <!-- ── taal ───────────────────────────────────────────────────────────── -->
+  <div id="lang" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="lang"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="language">Taal</span>
+    </div>
+    <div id="langlist" class="list grow"></div>
+  </div>
+
+  <!-- ── accentkleur ────────────────────────────────────────────────────── -->
+  <div id="accent" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="accent"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="accent">Accentkleur</span>
+    </div>
+    <div id="accentlist" class="list grow scroll"></div>
+  </div>
+
+  <!-- ── temperatuurlimieten ────────────────────────────────────────────── -->
+  <div id="limits" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="limits"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="limits">Temperatuurlimieten</span>
+    </div>
+    <div class="grow scroll">
+      <div id="limlist" class="list"></div>
+      <p class="hint" data-t="limitsHint">Bij het bereiken van een limiet verschijnt het waarschuwingsscherm.</p>
+    </div>
+  </div>
+
+  <!-- ── stepgegevens ───────────────────────────────────────────────────────
+       Geen scherm uit het ontwerp: de VESC weet poolparen, wieldiameter en
+       overbrenging meestal zelf, en dan is hier niets te doen. Weet hij ze
+       niet, dan klopt elke snelheid en elke afstand niet, en dan moet je ze
+       met de hand kunnen zetten. De rij in de instellingen verschijnt alleen
+       dan. -->
+  <div id="setup" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="setup"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="stepValues">Stepgegevens</span>
+    </div>
+    <div class="grow scroll">
+      <p id="setupstat" class="hint"></p>
+      <div id="steplist" class="list"></div>
+      <p class="hint" data-t="stepHint"></p>
+    </div>
+    <button id="stepsave" class="wide accentbtn">
+      <svg class="ico"><use href="#i-check-circle-f"></use></svg>
+      <span id="stepsavelbl" data-t="save">Bewaren</span>
+    </button>
+  </div>
+
+  <!-- ── laden ──────────────────────────────────────────────────────────── -->
+  <div id="charge">
+    <div class="chargehead">
+      <svg class="ico"><use href="#i-lightning-f"></use></svg>
+      <span id="chargetitle" data-t="charging">Opladen</span>
+    </div>
+    <div class="chargemid">
+      <div class="chargepct"><span id="chargeval">0</span><span class="u">%</span></div>
+      <div id="chargetrack"><i id="chargefill"></i></div>
+      <div class="chargesub">
+        <span><span id="chargevolts">--</span> V</span>
+        <span><span id="chargerange">--</span> <span class="chargeunit">km</span></span>
+      </div>
+    </div>
+    <div class="chargecards">
+      <div class="card">
+        <span class="micro" data-t="chargeAmp">Laadstroom</span>
+        <span class="big"><span id="chargeamps">--</span><span class="u"> A</span></span>
+      </div>
+      <div class="card">
+        <span class="micro" data-t="timeLeft">Resterend</span>
+        <span class="big" id="chargeeta">--</span>
+      </div>
+      <div class="card">
+        <span class="micro" data-t="gainRate">Winst</span>
+        <span class="big"><span id="chargegain">--</span><span class="u"> <span class="chargeunit">km</span>/min</span></span>
+      </div>
+    </div>
+    <div class="tapclose" data-t="tapClose">Tik om te sluiten</div>
+  </div>
+
+  <!-- ── temperatuuralarm ───────────────────────────────────────────────── -->
+  <div id="alarm">
+    <div class="alarmhead">
+      <svg class="ico"><use href="#i-warning"></use></svg>
+      <span data-t="warning">WARNING</span>
+    </div>
+    <p id="alarmmsg"></p>
+    <button id="alarmack" data-t="confirm">BEVESTIGEN</button>
+  </div>
+
+  <!-- ── release-notities ───────────────────────────────────────────────── -->
+  <div id="release" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="release"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="titlecol">
+        <span class="micro" id="relrepo">--</span>
+        <span class="title" id="relversion">--</span>
+      </span>
+      <span class="micro" id="reldate"></span>
+    </div>
+    <div id="relnotes" class="list grow scroll"></div>
+    <button id="reldo" class="wide accentbtn">
+      <svg class="ico" id="relicon"><use href="#i-download-simple"></use></svg>
+      <span id="rellabel">--</span>
+    </button>
+  </div>
+
+  <!-- ── wachtwoord met schermtoetsenbord ───────────────────────────────── -->
+  <div id="pw" class="sheet">
+    <div class="sheethead">
+      <button id="pwcancel" class="back"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="titlecol">
+        <span class="micro" id="pwkind">--</span>
+        <span class="title" id="pwname">--</span>
+      </span>
+    </div>
+    <div id="pwfield">
+      <svg class="ico"><use href="#i-lock-simple"></use></svg>
+      <span id="pwmasked"></span>
+      <button id="pweye" class="iconbtn"><svg class="ico"><use href="#i-eye"></use></svg></button>
+    </div>
+    <p class="hint" id="pwhint"></p>
+    <div class="spacer"></div>
+    <div id="keyrows"></div>
+  </div>
+
+  <!-- ── verbindingen ───────────────────────────────────────────────────── -->
+  <div id="conn" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="conn"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="connections">Verbindingen</span>
+    </div>
+    <div class="grow scroll">
+      <div class="grouphead">
+        <span class="micro"><svg class="ico"><use href="#i-wifi-high"></use></svg> Wi-Fi</span>
+        <button id="wifiscan" class="chip" data-t="scan">Scan</button>
+      </div>
+      <div id="wifilist" class="list"></div>
+      <div class="grouphead">
+        <span class="micro"><svg class="ico"><use href="#i-bluetooth"></use></svg> Bluetooth</span>
+        <button id="btscan" class="chip" data-t="scan">Scan</button>
+      </div>
+      <div id="btlist" class="list"></div>
+    </div>
+  </div>
+
+  <!-- ── instellingen ───────────────────────────────────────────────────── -->
+  <div id="settings" class="sheet">
+    <div class="sheethead">
+      <span class="title" data-t="settings">Instellingen</span>
+      <button class="iconbtn right" data-close="settings"><svg class="ico"><use href="#i-x"></use></svg></button>
+    </div>
+
+    <div class="grow scroll setlist">
+      <button id="updrow" class="row">
+        <svg class="ico" id="updicon"><use href="#i-git-branch"></use></svg>
+        <span class="rowtext">
+          <span id="updlabel">--</span>
+          <span class="sub" id="updmeta">--</span>
+        </span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <button id="opensetup" class="row" hidden>
+        <svg class="ico accent"><use href="#i-gauge"></use></svg>
+        <span class="rowtext">
+          <span data-t="stepValues">Stepgegevens</span>
+          <span class="sub" id="setupsub">--</span>
+        </span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <div class="pair">
+        <button id="openconn" class="row">
+          <svg class="ico accent"><use href="#i-wifi-high"></use></svg>
+          <span class="ell" data-t="connections">Verbindingen</span>
+        </button>
+        <button id="openpower" class="row danger">
+          <svg class="ico"><use href="#i-power"></use></svg>
+          <span class="ell" data-t="power">Uitschakelen</span>
+        </button>
+      </div>
+
+      <div class="pair">
+        <button id="openaccent" class="row">
+          <svg class="ico accent"><use href="#i-palette"></use></svg>
+          <span class="ell" data-t="accent">Accentkleur</span>
+          <span id="accentdot" class="dot"></span>
+        </button>
+        <button id="thememode" class="row">
+          <svg class="ico accent" id="themeicon"><use href="#i-sun"></use></svg>
+          <span class="ell" id="themelabel">Dag</span>
+          <span id="themeswitch" class="switch"><i></i></span>
+        </button>
+      </div>
+
+      <button id="openunits" class="row">
+        <svg class="ico accent"><use href="#i-ruler"></use></svg>
+        <span class="ell" data-t="units">Eenheden</span>
+        <span class="sub" id="unitslabel">km/h · km · °C</span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <button id="openlang" class="row">
+        <svg class="ico accent"><use href="#i-translate"></use></svg>
+        <span class="ell" data-t="language">Taal</span>
+        <span class="sub" id="langlabel">NL</span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <button id="openlimits" class="row">
+        <svg class="ico accent"><use href="#i-thermometer-simple"></use></svg>
+        <span class="rowtext">
+          <span data-t="limits">Temperatuurlimieten</span>
+          <span class="sub" id="limsummary">--</span>
+        </span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
