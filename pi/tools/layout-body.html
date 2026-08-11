@@ -242,6 +242,13 @@
         <span class="setval" id="setcrit">90&deg;</span>
         <button class="step" data-k="tempCrit" data-d="5">+</button>
       </div>
+      <!-- Bij een kapotte of ontbrekende motorsensor onderdrukt dit de
+           motortemperatuur-meldingen en het alarm. De FET-bewaking blijft
+           altijd staan: die zit in de controller zelf en is wél te vertrouwen. -->
+      <div class="setrow"><span class="lbl">Motormelding</span>
+        <button class="seg mt" data-mt="1">Aan</button>
+        <button class="seg mt" data-mt="0">Uit</button>
+      </div>
       <div class="setrow"><span class="lbl">Helderheid</span>
         <button class="step bright" data-d="-10">&minus;</button>
         <span class="setval wide" id="setbright">80 %</span>
