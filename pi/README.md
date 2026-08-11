@@ -15,84 +15,127 @@ This is more of a notebook to myself about how the code works and why some of it
 is odd.
 
 ```
-tools/layout-body.html   the markup — one source for both layouts
-tools/build-layouts.js   assembles the two pages from it
-public/index.html    landscape, 480 × 320   ← output
-public/portrait.html portrait,  320 × 480   ← output
-public/theme.css     the design language and the sizing, shared by both
-public/app.js        the behaviour, shared by both
+tools/page.html          the markup — one page, fifteen screens
+tools/icons/             45 Phosphor SVGs (MIT)
+tools/build-page.js      welds those two into public/index.html
+public/index.html    portrait, 320 × 480   ← output, don't edit
+public/theme.css     the design language and the sizing
+public/app.js        the behaviour
+public/i18n.js       the four languages and the eight accent colours
 src/serial.js        serial port without npm modules
 src/vesc.js          VESC protocol: framing, CRC16, packets
 src/telemetry.js     raw values → what the UI expects
 src/system.js        nmcli, bluetoothctl, mmcli, backlight
 src/weather.js       outside temperature
 src/charge.js        recognising that the battery is charging, and for how long
-src/config.js        config.json and the stored state
+src/config.js        config.json, the stored state, and sanitising the settings
 src/setup.js         does the VESC know how the scooter is put together?
 src/modes.js         riding modes: the limits packet for the VESC
 src/cruise.js        inferring whether cruise control is on
-src/update.js        comparing the version with GitHub
+src/update.js        comparing the version with GitHub, and the release notes
 src/server.js        the HTTP server
 install/step-update  the script that updates as root
 tools/design.js      design environment: the UI with faked hardware
+tools/shots.js       the screenshots in docs/ui/
 tools/vesc-probe.js  seeing what your VESC has to say
 tools/selftest.js    tests, no hardware needed
 ```
 
-### Two layouts, one source
+### One page, welded together
 
 No framework and no bundler. The Pi has no internet, so everything is local:
-`theme.css` for the design language, `app.js` for the behaviour, icons as inline
-SVG. Inter is used if you have it installed (`apt install fonts-inter`),
-otherwise it falls back to system-ui — the design leans on shape, not on one
-particular typeface.
+`theme.css` for the design language, `app.js` for the behaviour, `i18n.js` for
+the words, and the icons baked into the page.
 
-`index.html` is landscape, `portrait.html` is portrait, and both are **output**.
-The markup lives once in `tools/layout-body.html`, and the design language plus
-the sizing for both in `public/theme.css`; the `data-layout` attribute on the
-body picks which half applies. `tools/build-layouts.js` assembles the two pages:
+`public/index.html` is **output**. The markup lives in `tools/page.html` and the
+icons as 45 separate SVGs in `tools/icons/`; `tools/build-page.js` makes one
+sprite out of them, drops it in at `<!--ICONEN-->`, and writes the result:
 
 ```bash
-node tools/build-layouts.js     # after every change to layout-body.html
+node tools/build-page.js
 ```
 
-Everything that can be shared really is shared — markup, design language,
-behaviour. Two hand-written pages drift apart at the first change, and then a
-button works in one layout and not in the other. That's exactly the kind of
-mistake you only find on the handlebars.
-
-The design language is Nocturne, the original design: dark blue ground, purple
-accent, flat cards with a 1 px border, dots at the bottom, and a battery that
-colours the whole card as it drains. There were four styles side by side for a
-while — Windows, Apple and Cyber as well, selectable in the settings. That was
-rolled back; if you want to see them, they're in commit `9f816b2`.
-
-Which page you're looking at is on the body:
+Why a build step for a single page: the icons. The design uses 45 from Phosphor
+and pulls them off unpkg. That's not available on the scooter, so they have to be
+in the file — and pasting 45 SVGs into the markup by hand makes it unreadable and
+unmaintainable. They're fetched from
+`raw.githubusercontent.com/phosphor-icons/core/main/assets/<variant>/<name>.svg`;
+Phosphor is MIT. In the markup you use them as:
 
 ```html
-<body data-layout="Liggend">     <!-- or "Staand" -->
+<svg class="ico"><use href="#i-gauge"></use></svg>      <!-- regular -->
+<svg class="ico"><use href="#i-warning-f"></use></svg>  <!-- fill -->
 ```
 
-`app.js` reads that as `PAGE_LAYOUT`. If the settings hold a different layout,
-the page redirects to the other one at startup — before the timers start. The
-kiosk needs to know nothing: it always opens `/` and ends up in the right place.
+The same script is the safety net under the trapeze. It checks that every id
+`app.js` touches exists in the markup, and that every icon that gets called has a
+drawing. A typo in an id otherwise gives you a silent, half-working UI; a typo in
+an icon name gives you an empty square, and the browser says nothing about
+either. Both checks are in `npm test` as well, so it can't be forgotten.
 
-Switching saves first and jumps afterwards (`saveSettingsNow`). With the normal
-save, which waits 400 ms, the POST dies with the reload and the other page sends
-you straight back.
+There used to be two layouts, landscape and portrait, assembled from one shared
+body. Ride Dash is portrait only and `build-layouts.js`, `layout-body.html` and
+`portrait.html` are gone.
 
-What a new layout has to honour: every id `app.js` touches must exist in the
-markup, and elements `cls()` writes to keep exactly the classes that script puts
-on them (`#tm` is `v big`, `#batcard` is `card`). Both are extractable from
-`app.js` with a regex and checkable — that saves hunting.
+### Four languages, one table
 
-Rendering happens ~6× a second and only touches the nodes that actually change —
-hence `cacheT` and `cacheS` in `paint()`. The little screen is slow; a normal
-redraw loop makes it unusably slow.
+`public/i18n.js` holds `T.nl`, `T.en`, `T.fr` and `T.de`, and the eight accent
+colours. The file was generated from the design rather than retyped — the design
+already had all four languages in it, and copying 67 keys by hand four times is
+asking for trouble.
 
-There's a demo mode too. If `/data` is unreachable, the page simulates a ride
-itself after three failed attempts. So you can work on the looks by simply
-opening the HTML file.
+Text in the markup carries `data-t="key"`; `applyLang()` walks over those and
+fills them in. Anything the app composes at runtime goes through `t.<key>`
+directly. Switching language is `applyLang()` plus a repaint — no reload, so it
+works while you're riding.
+
+A test checks that all four languages have exactly the same keys, that none of
+them is empty, and that every `data-t` in the page resolves. Add a text and it
+has to be in all four.
+
+### Everything the user picks goes to the Pi
+
+Language, units, accent colour, day or night, the three temperature limits and
+their switches: they all live in `state.json`, over `GET`/`POST /settings`. The
+design put them in `localStorage`, which won't do here — the kiosk profile is
+disposable, and a setting you can't read from anywhere else isn't much of a
+setting.
+
+`schoneSettings()` in `config.js` is the gatekeeper. Whatever comes in, something
+valid comes out: the accent colour has to be one of the eight, the language one
+of four, the limits are clamped to their ranges, the switches stay booleans. It
+runs on reading too, not just on writing, because a `state.json` from the
+previous version still has `theme: "Auto"` and a layout in it and the UI can't do
+anything with those.
+
+The accent colour is one CSS variable. `applyTheme()` sets `--accent`,
+`--accent-soft` (the same colour at 12 or 18 % depending on the theme) and
+`--accent-ink` (darkened for the day theme, because the raw colour is too light
+on white). Everything else in `theme.css` refers to those three, so eight colours
+cost three lines of JavaScript instead of eight palettes.
+
+### What the VESC doesn't measure
+
+Battery temperature is the honest case: the controller has no input for it, so
+`temp_batt` is `null` — not `0`. The UI shows **n/a**, the limit still exists and
+can be set, and the alarm skips that one. A zero would have read as "very cold"
+and put a green tick next to a sensor that isn't there.
+
+The odometer is the other one. The VESC has no odometer that survives a restart:
+its tachometer starts at zero the moment the controller powers up. So
+`telemetry.js` accumulates it — each measurement adds the bit that came in
+between, a counter running backwards means a restart and the reference moves
+along, and the total goes to `state.json` every ten seconds. Not every
+measurement: `state.patch()` postpones the write by half a second, so patching
+seven times a second means it never happens while you ride.
+
+Riding time works the same way, for Timer A and the average speed, and only while
+the scooter is actually moving. The jump is capped at two seconds so a hiccup in
+the loop or a suspended tab doesn't land in the counter.
+
+Charging current is only reported when the charger runs through the controller.
+On most scooters it hangs straight off the battery, the VESC sees nothing of it,
+and the charging screen says n/a there too.
 
 ### The VESC protocol
 
@@ -350,6 +393,12 @@ branch from `config.json` itself, so nothing has to pass through sudo.
 It always fetches a fresh clone instead of pulling in the directory where you
 once ran `git clone` — that one may have been moved or thrown away.
 
+The release screen shows what's actually in the update. That's a second call:
+GitHub's compare API (`/compare/<current>...<latest>`) returns the commits in
+between, and those become the list. It's only fetched when there is something
+new, and if it fails there's simply no list — a version you can install is more
+important than the story behind it.
+
 ### Power
 
 `systemctl reboot` and `poweroff` are normally allowed without root, but through
@@ -364,24 +413,27 @@ The screen is the confirmation. Another "are you sure" on a touchscreen only
 makes it more annoying, not safer — and you're two taps away from it starting on
 the ride screen.
 
-### What's different in portrait
+### Sizing on 320 × 480
 
-Portrait is 320 px wide, and that forces a few things:
+Portrait is 320 px wide, and that decides a lot. The numbers below come from the
+design and are worth knowing before you move something:
 
-- **Button rows** (system, power) no longer fit side by side with readable
-  labels, so they stack. Watch out for `flex:none` there: the shared `.pbtn` has
-  `flex:1`, and in a column that doesn't grow itself that means a basis of zero —
-  the buttons then shrink to the height of their own text. They were 20 px tall
-  like that, and you don't hit that with a thumb. They're a fixed 64 px now, and
-  `margin-top:auto` keeps them at the bottom where your thumb already is.
-- **The keyboard** has ten keys per row, so 27 px wide. That's narrow, but
-  there's height to spare: the keys are 59 px tall and stuck to the bottom.
-  Stretching them over the full height gave 91 px keys, and you don't aim better
-  for that.
-- **The speed unit** sits on the baseline of the big digits through
-  `align-items: baseline` on `#speedrow`, with a bit of `padding-bottom` on
-  `#speedmeta` to line up "max 41" underneath it. A fixed number of pixels stops
-  being right the moment Inter is or isn't installed.
+- The page is a flex column with `gap: 8px` and `padding: 10px 12px 12px`, so the
+  content is exactly 296 px wide. The ride area in the middle is `flex: 1`; the
+  battery row and the three cards are `flex: none`. Everything else follows from
+  that.
+- **The speed** is 132 px with `line-height: 1.69`, so its line box is 223 px
+  tall. That looks like a mistake and isn't: it's what pushes the unit down and
+  keeps the number optically centred in the space above the battery.
+- `#speedbtn` is a flex item with `min-width: 0`. Without that the 132 px digits
+  set the minimum width of the whole row and the bell and the duty bar get pushed
+  off the screen. That is exactly what happened the first time.
+- **The keys** are ten per row on 296 px, so about 26 px wide, and 52 px tall.
+  Narrow, but there's height to spare and you aim with your thumb vertically.
+- **KILOMETERSTAND** doesn't fit in a card of 95 px and runs over the edge a
+  little. That's in the design too, and it's the better of the two options —
+  clipping it with an ellipsis costs you the word, running over costs you
+  nothing.
 
 ### The design environment
 
@@ -391,59 +443,51 @@ npm run design      # http://127.0.0.1:8081/design
 
 `tools/design.js` serves `public/` exactly as the real server does, but every
 endpoint is faked. Next to the frame sit sliders and switches for speed,
-battery, temperatures, charging, Wi-Fi, Bluetooth, modem and weather, plus
-ready-made situations (riding, motor hot, low battery, charging, no VESC) so you
-can reach every screen in one click. The frame reloads by itself when a file in
-`public/` changes.
+battery, temperatures, charging, Wi-Fi, Bluetooth and modem, plus ready-made
+situations (riding, motor hot, low battery, charging, no VESC) so you can reach
+every screen in one click. The frame reloads by itself when a file in `public/`
+changes.
 
-Three buttons pick the layout: landscape, portrait, and **Staand op 480 × 320** —
-the portrait page in a landscape frame, exactly like on the scooter, so you see
-a wrong rotation here instead of on the handlebars.
+Two buttons pick the view: **Staand 320 × 480**, the page as it was drawn, and
+**Op het paneel 480 × 320**, the same page in a landscape frame — exactly like on
+the scooter, so you see a wrong rotation here instead of on the handlebars.
 
-`install.sh` deletes `tools/design.js` and `tools/design.html` after copying.
-The design environment is for the computer, not for the Pi.
+The design environment also keeps the settings, so language, units and accent
+colour survive a reload of the frame. That matters more than it sounds: without
+it every screenshot comes out in a different colour.
 
-### Concepts
+`install.sh` deletes `tools/design.js`, `tools/design.html`, `tools/shots.js` and
+`tools/icons/` after copying. Those are for the computer, not for the Pi.
 
-`tools/concepts/` is empty — there are no designs sitting next to the app any
-more. What used to be there (nocturne, wijzerplaat, cyber, apple, windows) is in
-the history: `git show 9cc94c0:pi/tools/concepts/` shows them.
+### Screenshots
 
-The mechanism is still there. Drop an `.html` into `tools/concepts/` and it shows
-up by itself as a button under the frame of the design environment, served on
-`/concept/<name>`. Such pages load the real `public/app.js` — same element ids,
-same behaviour — with only different markup around it, so you click through a
-working UI and not a picture. They deliberately don't belong in `public/`: until
-a design is approved it doesn't belong in the app.
+```bash
+node tools/design.js &
+node tools/shots.js         # → docs/ui/*.png
+```
 
-What a new set of markup has to honour:
+Fifteen pictures, taken from the running page at 320 × 480 with a device pixel
+ratio of 2, and one at 480 × 320 to show the rotation. The script resets the
+settings before every shot — otherwise the colour of the previous run is still in
+there and no two series look alike.
 
-- **every id `app.js` touches must exist** — otherwise the render loop falls
-  over. Extractable with a regex from `app.js`; the builder of the portrait
-  version does exactly that.
-- **elements `cls()` writes to keep their base classes**, because that function
-  overwrites `className` wholesale (`#tm` is `v big`, `#batcard` is `card`).
-- **the colour names `app.js` writes straight into style attributes must exist**:
-  `--color-crit-fill`, `--color-warn-fill`, `--color-warn`, `--color-accent`,
-  `--color-neutral-800`, `--color-neutral-500` and `--color-text`. Forget those
-  and the temperature alarm loses its background and the arcs of the Wi-Fi icon
-  stay grey. If your design has its own palette, point them at your own names.
+Two things it has to wait for. The temperature alarm blinks seven times and its
+acknowledge button fades in after 2.9 seconds, so that one gets 3.6 seconds
+before the shutter. And clicking is `force: true`: the app listens on
+`pointerdown` and finds its target with `closest()`, so a hit on a child element
+is fine — Playwright refuses those by default.
 
-What `app.js` cannot do is draw: it sets text and widths, nothing more. A design
-that wants rings or segments reads `window.last` itself in its own script block.
-That collides with nothing, because app.js only manages its own ids.
-
-One trap while testing: overwriting `window.last` does nothing, because `poll()`
-fetches again every 150 ms. To pin a value down and look at it, intercept
-`/data` itself.
+Playwright is not in `package.json`. It's a 300 MB dependency for a repository
+that otherwise has none; `PLAYWRIGHT=/path/to/playwright node tools/shots.js`
+points it at an existing installation.
 
 ### The page rotates itself
 
-The panel on the handlebars is 480 × 320 and stays that way, even if you pick the
-portrait layout. So `fitRotation()` compares what the page was drawn for
-(`DESIGN`) with what it got (`innerWidth/innerHeight`), and puts a quarter turn
-on it when those don't match. The body fills the panel, `#root` keeps the design
-size and is rotated about its own centre.
+The panel on the handlebars is 480 × 320. The page is 320 × 480. So
+`fitRotation()` compares what the page was drawn for with what it got
+(`innerWidth`/`innerHeight`) and puts a quarter turn on it when those don't
+match. The body fills the panel, `#root` keeps the design size and is rotated
+about its own centre.
 
 Why not at OS level: `display_rotate` in `config.txt` only works with certain
 drivers, fbtft wants a module parameter, and under Wayland it's `wlr-randr`
@@ -451,66 +495,47 @@ again. One wrong attempt and your screen stays black while you can no longer get
 at it. This is one line of CSS that does the same thing everywhere.
 
 Touch didn't need converting: the browser hit-tests straight through the
-transform. Tested with a real `touchscreen.tap()` on the Settings button in the
-rotated system window.
+transform.
 
-Which way round is in `cfg.rotate` (90 or 270) — how you hang the screen decides
+Which way round is in `rotate` (90 or 270) — how you hang the screen decides
 which of the two is right.
 
-The design environment has a **Staand op 480 × 320** button for this: it loads
-the portrait page in a landscape frame, exactly like on the scooter. Without that
-button you only see a wrong rotation once it's on the handlebars.
+### Notifications are derived, not stored
 
-### Notifications that go somewhere
+The bell doesn't have a list you fill; it has a list that follows from the data.
+Every paint, `bouwAlerts()` works out what's wrong — a VESC fault, a battery
+under 10 %, a motor or controller within ten degrees of its limit — and that *is*
+the list. Cause gone, notification gone.
 
-Most notifications tell you something: too hot, battery low, VESC gone. For those
-the list is the end of the line. The update notification is different — it's
-about a button somewhere else. A notification that says "see Settings" is a
-notification that gives you work.
+Dismissing puts the key on an ignore list, and that list empties itself as soon
+as the cause disappears. Without that second half one tap would hide a fault
+forever, which is the opposite of what dismissing should mean.
 
-So a notification like that gets an `act` in `notices()`. Tap the bar while that
-one is showing and it goes straight to that screen instead of to the list; and in
-the list, that row is tappable itself, with an accent border and "openen" instead
-of "info" beside it. The rest of the notifications behave unchanged.
-
-Moving is not a tap, same as in the network list: scrolling through the
-notifications opens nothing.
-
-### Buttons for the lists
-
-The settings list is eleven rows, 564 px of content in a space of 228 px, so you
-see about four of them. There is no scrollbar — that's hidden on purpose — so
-nothing tells you there's more underneath, and dragging over a row full of
-buttons feels risky.
-
-Hence two chevrons in the header of every scrollable list (settings, connections,
-notifications), in the same style as the close button. They're **hidden** when
-the list fits entirely and **dimmed** when you're already at the top or bottom,
-so they also say where you are. Jumping happens in one go, without
-`behavior:"smooth"` — the SPI display is slow and a 300 ms animated scroll is
-exactly what you don't want.
-
-Holding one down repeats: after 400 ms it keeps going at about eight rows a
-second, because the connections screen can show up to forty networks and that
-would otherwise be forty separate taps. Dragging with a finger keeps working; the
-buttons are an addition, not a replacement.
+Redrawing happens on change only. This runs seven times a second, and rebuilding
+the drawer's HTML every time would make the little screen crawl — so there's a
+fingerprint of keys and details, and only a different one triggers a repaint.
 
 ### Layers on the screen
 
 The overlays sit at fixed z-index levels:
 
 ```
-7  temperature alarm
-6  power
-5  on-screen keyboard, and setting the scooter up
-4  system and settings
-3  notifications
-2  connections
-1  charging
+12  temperature alarm, powered off
+11  power menu, charging
+ 9  on-screen keyboard
+ 8  speed readout, units, language, accent, limits, release, scooter values
+ 7  connections
+ 6  notifications
+ 5  settings
 ```
 
 The alarm is deliberately on top. An overheating motor has to interrupt you while
 you're typing a password or shutting something down, not the other way round.
+
+The keyboard above the connections screen is not a detail either: it opens *from*
+that screen, so with the same z-index the DOM order decides, and the network list
+would sit on top of the keys. It did, once — the keys reacted and you couldn't see
+them.
 
 ### Testing
 
@@ -518,26 +543,29 @@ you're typing a password or shutting something down, not the other way round.
 npm test
 ```
 
-85 tests, no hardware needed: CRC against the known test vector, framing,
+102 tests, no hardware needed: CRC against the known test vector, framing,
 fragmented and mangled packets, the conversion from erpm to km/h and from
 tachometer to distance, zeroing the trip counter (including when the VESC
-restarts and resets its own counters), how the nmcli commands are built,
-comparing versions, recognising charging — including the slowest charger we still
-want to see — which location source wins for the weather, that the power
-screen can never produce anything other than `systemctl reboot` or `systemctl
-poweroff`, and how the VESC's setup state is recognised — including that a
-single outlier doesn't skew the derived wheel size and that writing to
+restarts and resets its own counters), the odometer that carries on across such
+a restart, the riding time that only runs while you ride, how the nmcli commands
+are built, comparing versions, recognising charging — including the slowest
+charger we still want to see — which location source wins for the weather, that
+the power screen can never produce anything other than `systemctl reboot` or
+`systemctl poweroff`, and how the VESC's setup state is recognised — including
+that a single outlier doesn't skew the derived wheel size and that writing to
 `config.json` leaves the rest of the file alone — and the riding-mode packet,
 byte for byte, including that `store` is never anything but zero.
 
-For the UI I clicked through it with Playwright at 480 × 320 and 320 × 480, in
-both themes, over all ten screens. That isn't in the repo, but the approach is
-simple: start the server, intercept `/data` to pin the values down, `page.tap()`
-the buttons, and check two things — that `scrollWidth`/`scrollHeight` stay within
-the panel, so everything fits without scrolling, and that every visible button
-measures at least 28 px in both directions. That second check exists because the
-portrait system buttons were 20 px tall for a while and nothing noticed until I
-tried it on the handlebars.
+Six of them are about the UI without opening a browser: all four languages have
+the same keys, none of the translations is empty, every `data-t` in the page
+resolves, the eight accent colours of the UI are the eight the server accepts,
+every id `app.js` touches exists, and every icon that gets called has a drawing
+in the sprite. Those are the mistakes that produce a silent, half-working
+screen, and they're cheap to catch from a file.
+
+Beyond that I clicked through it with Playwright at 320 × 480 and 480 × 320, in
+both themes, over all fifteen screens — that's what `tools/shots.js` does, and it
+fails on any error in the console.
 
 Without a VESC you can fake one with a PTY pair: `pty.openpty()`, listen for
 commands 4 and 47, and send answers back with the same framing. That makes the
@@ -552,87 +580,129 @@ Dit is meer een notitieblok voor mezelf over hoe de code werkt en waarom
 sommige dingen zo raar zijn.
 
 ```
-tools/layout-body.html   de opmaak — één bron voor beide indelingen
-tools/build-layouts.js   zet daar de twee pagina's uit samen
-public/index.html    liggend, 480 × 320   ← uitvoer
-public/portrait.html staand,  320 × 480   ← uitvoer
-public/theme.css     de vormtaal en de maatvoering, gedeeld door allebei
-public/app.js        het gedrag, gedeeld door allebei
+tools/page.html          de opmaak — één pagina, vijftien schermen
+tools/icons/             45 Phosphor-SVG's (MIT)
+tools/build-page.js      last die twee tot public/index.html aan elkaar
+public/index.html    staand, 320 × 480   ← uitvoer, niet bewerken
+public/theme.css     de vormtaal en de maatvoering
+public/app.js        het gedrag
+public/i18n.js       de vier talen en de acht accentkleuren
 src/serial.js        seriële poort zonder npm-modules
 src/vesc.js          VESC-protocol: framing, CRC16, pakketten
 src/telemetry.js     ruwe waarden → wat de UI verwacht
 src/system.js        nmcli, bluetoothctl, mmcli, backlight
 src/weather.js       buitentemperatuur
 src/charge.js        herkennen dat de accu laadt, en hoelang nog
-src/config.js        config.json en de opgeslagen staat
+src/config.js        config.json, de opgeslagen staat en het schonen van de instellingen
 src/setup.js         weet de VESC hoe de step in elkaar zit?
 src/modes.js         rijmodi: het grenzenpakket voor de VESC
 src/cruise.js        afleiden of cruisecontrol aanstaat
-src/update.js        versie vergelijken met GitHub
+src/update.js        versie vergelijken met GitHub, en de release-notities
 src/server.js        de HTTP-server
 install/step-update  het script dat als root bijwerkt
 tools/design.js      designomgeving: de UI met nagemaakte hardware
+tools/shots.js       de schermafdrukken in docs/ui/
 tools/vesc-probe.js  kijken wat je VESC vertelt
 tools/selftest.js    tests, zonder hardware
 ```
 
-### Twee indelingen, één bron
+### Eén pagina, aan elkaar gelast
 
 Geen framework en geen bundler. De Pi heeft geen internet, dus alles staat
-lokaal: `theme.css` voor de vormtaal, `app.js` voor het gedrag, iconen als
-inline SVG. Inter wordt gebruikt als je hem geïnstalleerd hebt (`apt install
-fonts-inter`), anders valt hij terug op system-ui — het ontwerp leunt op vorm en
-niet op één specifiek lettertype.
+lokaal: `theme.css` voor de vormtaal, `app.js` voor het gedrag, `i18n.js` voor de
+woorden, en de iconen in de pagina gebakken.
 
-`index.html` is liggend, `portrait.html` staand, en ze zijn **allebei uitvoer**.
-De opmaak staat één keer in `tools/layout-body.html` en de vormtaal plus de
-maatvoering voor allebei in `public/theme.css`; het kenmerk `data-layout` op de
-body kiest welke helft telt. `tools/build-layouts.js` zet de twee pagina's
-samen:
+`public/index.html` is **uitvoer**. De opmaak staat in `tools/page.html` en de
+iconen als 45 losse SVG's in `tools/icons/`; `tools/build-page.js` maakt er één
+sprite van, zet die op `<!--ICONEN-->` neer en schrijft het resultaat weg:
 
 ```bash
-node tools/build-layouts.js     # na elke wijziging in layout-body.html
+node tools/build-page.js
 ```
 
-Alles wat gedeeld kan worden is ook echt gedeeld — opmaak, vormtaal, gedrag.
-Twee handgeschreven pagina's lopen bij de eerste wijziging al uit elkaar, en
-dan werkt een knop in de ene indeling wel en in de andere niet. Dat is precies
-het soort fout dat je pas op het stuur ziet.
-
-De vormtaal is Nocturne, het oorspronkelijke ontwerp: donkerblauwe ondergrond,
-paars accent, platte kaarten met een rand van 1 px, puntjes onderaan en een
-accu die de hele kaart kleurt als hij leegloopt. Er zijn een tijdlang vier
-stijlen naast elkaar geweest — Windows, Apple en Cyber erbij, te kiezen in de
-instellingen. Dat is teruggedraaid; wie ze wil terugzien vindt ze in commit
-`9f816b2`.
-
-Welke pagina je voor je hebt staat op de body:
+Waarom een bouwstap voor één pagina: de iconen. Het ontwerp gebruikt er 45 uit
+Phosphor en haalt ze van unpkg. Dat bestaat niet op de step, dus ze moeten mee in
+het bestand — en 45 SVG's met de hand in de opmaak plakken maakt die onleesbaar
+en niet meer bij te werken. Ophalen deed ik met
+`raw.githubusercontent.com/phosphor-icons/core/main/assets/<variant>/<naam>.svg`;
+Phosphor is MIT. In de opmaak gebruik je ze als:
 
 ```html
-<body data-layout="Liggend">     <!-- of "Staand" -->
+<svg class="ico"><use href="#i-gauge"></use></svg>      <!-- regular -->
+<svg class="ico"><use href="#i-warning-f"></use></svg>  <!-- fill -->
 ```
 
-`app.js` leest dat als `PAGE_LAYOUT`. Staat er in de instellingen een andere
-indeling opgeslagen, dan stuurt de pagina bij het opstarten meteen door naar de
-andere — vóór de timers gaan lopen. De kiosk hoeft dus niets te weten: die opent
-altijd `/` en komt vanzelf op de goede uit.
+Datzelfde script is het net onder de trapeze. Het controleert of elk id dat
+`app.js` aanraakt in de opmaak staat, en of elk icoon dat aangeroepen wordt een
+tekening heeft. Een typefout in een id levert anders een stille, halve UI op; een
+typefout in een icoonnaam een leeg vierkantje, en de browser zegt over allebei
+niets. Beide controles zitten ook in `npm test`, zodat het niet vergeten kan
+worden.
 
-Wisselen slaat eerst op en springt daarna pas (`saveSettingsNow`). Met de gewone
-opslag, die 400 ms wacht, gaat de POST mee het graf in bij het herladen en
-stuurt de andere pagina je meteen terug.
+Er waren twee indelingen, liggend en staand, samengesteld uit één gedeelde body.
+Ride Dash is alleen staand, en `build-layouts.js`, `layout-body.html` en
+`portrait.html` zijn weg.
 
-Wat je bij een nieuwe indeling moet naleven: elk id dat `app.js` aanraakt moet
-in de opmaak staan, en elementen waar `cls()` op werkt houden precies de klassen
-die dat script erop zet (`#tm` is `v big`, `#batcard` is `card`). Die twee dingen
-zijn met een regex uit `app.js` te halen en na te lopen — dat scheelt zoeken.
+### Vier talen, één tabel
 
-Renderen gebeurt ~6× per seconde en alleen de nodes die echt veranderen worden
-aangeraakt — vandaar die `cacheT` en `cacheS` in `paint()`. Het schermpje is
-traag; een normale herteken-loop maakt het onbruikbaar traag.
+`public/i18n.js` bevat `T.nl`, `T.en`, `T.fr` en `T.de`, en de acht
+accentkleuren. Dat bestand is uit het ontwerp gegenereerd en niet overgetypt —
+het ontwerp had de vier talen al, en 67 sleutels vier keer met de hand
+overnemen is vragen om fouten.
 
-Er zit ook een demo-modus in. Is `/data` onbereikbaar, dan simuleert de pagina
-na drie mislukte pogingen zelf een rit. Zo kun je aan het uiterlijk werken door
-gewoon het HTML-bestand te openen.
+Tekst in de opmaak draagt `data-t="sleutel"`; `applyLang()` loopt daaroverheen en
+vult ze in. Wat de app zelf samenstelt gaat rechtstreeks via `t.<sleutel>`. Van
+taal wisselen is `applyLang()` plus opnieuw tekenen — geen herlaadbeurt, dus het
+kan onderweg.
+
+Een test controleert of alle vier de talen precies dezelfde sleutels hebben, of
+er geen enkele leeg is, en of elke `data-t` in de pagina iets oplevert. Voeg je
+een tekst toe, dan moet hij in alle vier.
+
+### Alles wat de gebruiker kiest gaat naar de Pi
+
+Taal, eenheden, accentkleur, dag of nacht, de drie temperatuurlimieten en hun
+schakelaars: ze staan allemaal in `state.json`, via `GET`/`POST /settings`. Het
+ontwerp zette ze in `localStorage`, en dat kan hier niet — het kioskprofiel is
+wegwerpbaar, en een instelling die je nergens anders kunt uitlezen is niet echt
+een instelling.
+
+`schoneSettings()` in `config.js` is de portier. Wat er ook binnenkomt, er komt
+iets geldigs uit: de accentkleur moet een van de acht zijn, de taal een van vier,
+de limieten worden binnen hun bereik geklemd, de schakelaars blijven booleaans.
+Hij draait ook bij het lezen en niet alleen bij het schrijven, want in een
+`state.json` van de vorige versie staat nog `theme: "Auto"` en een indeling, en
+daar kan de UI niets mee.
+
+De accentkleur is één CSS-variabele. `applyTheme()` zet `--accent`,
+`--accent-soft` (dezelfde kleur op 12 of 18 % afhankelijk van het thema) en
+`--accent-ink` (donkerder gemaakt voor het dagthema, want de rauwe kleur is te
+licht op wit). Al de rest in `theme.css` verwijst naar die drie, dus acht kleuren
+kosten drie regels JavaScript in plaats van acht paletten.
+
+### Wat de VESC niet meet
+
+De accutemperatuur is het eerlijke geval: de controller heeft er geen ingang
+voor, dus `temp_batt` is `null` — geen `0`. De UI zet er **n.v.t.** neer, de
+limiet bestaat en is in te stellen, en het alarm slaat die over. Een nul zou
+gelezen zijn als "erg koud" en een groen vinkje zetten naast een sensor die er
+niet is.
+
+De kilometerstand is het andere. De VESC heeft geen teller die een herstart
+overleeft: zijn tachometer begint bij nul zodra de controller opstart. Dus telt
+`telemetry.js` zelf op — elke meting legt het stukje ertussen erbij, een teller
+die terugloopt betekent een herstart en dan schuift het ijkpunt mee, en het
+totaal gaat elke tien seconden naar `state.json`. Niet elke meting:
+`state.patch()` stelt het schrijven een halve seconde uit, dus zeven keer per
+seconde patchen betekent dat het nooit gebeurt zolang je rijdt.
+
+De rijtijd werkt hetzelfde, voor Timer A en de gemiddelde snelheid, en telt
+alleen terwijl de step ook echt rijdt. De sprong is afgetopt op twee seconden,
+zodat een hapering in de lus of een geschorst tabblad niet in de teller belandt.
+
+De laadstroom wordt alleen gemeld als de lader via de controller loopt. Bij de
+meeste steps hangt hij rechtstreeks aan de accu, ziet de VESC er niets van, en
+staat er ook op het laadscherm n.v.t.
 
 ### Het VESC-protocol
 
@@ -894,8 +964,14 @@ map is van de service-gebruiker. Een script dat je zelf kunt aanpassen én met
 sudo mag draaien is een achterdeur naar root. Om dezelfde reden staan er geen
 jokertekens in de sudoers-regel: `step-update` leest de repository en de tak zelf
 uit `config.json`, zodat er niks door sudo heen hoeft.
-
 Het haalt altijd een verse kloon op in plaats van te pullen in de map waar je
+ooit `git clone` deed — die kan verplaatst of weggegooid zijn.
+
+Het release-scherm laat zien wat er écht in de update zit. Dat is een tweede
+oproep: de compare-API van GitHub (`/compare/<huidig>...<nieuwste>`) geeft de
+commits ertussen terug, en die worden de lijst. Hij wordt alleen opgehaald als er
+iets nieuws is, en mislukt hij, dan is er gewoon geen lijst — een versie die je
+kunt installeren is belangrijker dan het verhaal erachter.
 ooit `git clone` deed — die kan verplaatst of weggegooid zijn.
 
 ### Aan/uit
@@ -913,24 +989,25 @@ Het scherm is zelf de bevestiging. Nog een "weet je het zeker" erbij maakt het
 op een aanraakscherm alleen maar irritanter, niet veiliger — en je bent er pas
 na twee tikken vanaf het rijscherm.
 
-### Wat er staand anders is
+### Maatvoering op 320 × 480
 
-Staand is 320 px breed, en dat dwingt een paar dingen af:
+Staand is 320 px breed, en dat bepaalt veel. De getallen hieronder komen uit het
+ontwerp en zijn goed om te weten voor je iets verschuift:
 
-- **Knoppenrijen** (systeem, aan/uit) passen niet meer naast elkaar met leesbare
-  labels, dus die staan onder elkaar. Let daar op `flex:none`: de gedeelde
-  `.pbtn` heeft `flex:1`, en in een kolom die zelf niet meegroeit betekent dat
-  een basis van nul — dan krimpen de knoppen tot de hoogte van hun eigen tekst.
-  Ze waren zo 20 px hoog, en daar mik je met een duim niet op. Nu vast 64 px, en
-  `margin-top:auto` houdt ze onderaan waar je duim toch al is.
-- **Het toetsenbord** heeft tien toetsen per rij, dus 27 px breed. Dat is smal,
-  maar er is hoogte zat: de toetsen zijn 59 px hoog en staan onderaan geplakt.
-  Uitrekken over de hele hoogte gaf toetsen van 91 px, en daar mik je niet beter
-  door.
-- **De eenheid bij de snelheid** staat op de basislijn van de grote cijfers via
-  `align-items: baseline` op `#speedrow`, met wat `padding-bottom` op
-  `#speedmeta` om "max 41" eronder uit te lijnen. Een vast aantal pixels klopt
-  niet meer zodra Inter wel of juist niet geïnstalleerd is.
+- De pagina is een flexkolom met `gap: 8px` en `padding: 10px 12px 12px`, dus de
+  inhoud is precies 296 px breed. Het rijgedeelte in het midden is `flex: 1`; de
+  accurij en de drie kaarten zijn `flex: none`. De rest volgt daaruit.
+- **De snelheid** is 132 px met `line-height: 1.69`, dus zijn regelvak is 223 px
+  hoog. Dat ziet eruit als een vergissing en is het niet: het is wat de eenheid
+  omlaag duwt en het cijfer optisch midden in de ruimte boven de accu houdt.
+- `#speedbtn` is een flexitem met `min-width: 0`. Zonder dat bepalen de cijfers
+  van 132 px de minimumbreedte van de hele rij en worden de bel en de duty-balk
+  van het scherm geduwd. Precies dat gebeurde de eerste keer.
+- **De toetsen** zijn er tien per rij op 296 px, dus zo'n 26 px breed, en 52 px
+  hoog. Smal, maar er is hoogte over en met je duim mik je verticaal.
+- **KILOMETERSTAND** past niet in een kaart van 95 px en loopt een stukje over de
+  rand. Dat doet het in het ontwerp ook, en het is de beste van de twee opties —
+  afkappen met een beletselteken kost je het woord, overlopen kost je niets.
 
 ### De designomgeving
 
@@ -938,133 +1015,103 @@ Staand is 320 px breed, en dat dwingt een paar dingen af:
 npm run design      # http://127.0.0.1:8081/design
 ```
 
-`tools/design.js` serveert `public/` precies zoals de echte server dat doet,
-maar alle endpoints zijn nagemaakt. Naast het frame staan schuiven en schakelaars
-voor snelheid, accu, temperaturen, laden, wifi, bluetooth, modem en weer, plus
-kant-en-klare situaties (rijden, motor heet, lage accu, laden, geen vesc) zodat
-je elk scherm in één klik te pakken hebt. Het frame herlaadt vanzelf zodra er
-een bestand in `public/` verandert.
+`tools/design.js` serveert `public/` precies zoals de echte server dat doet, maar
+alle endpoints zijn nagemaakt. Naast het frame staan schuiven en schakelaars voor
+snelheid, accu, temperaturen, laden, wifi, bluetooth en modem, plus
+kant-en-klare situaties (rijden, motor heet, lage accu, laden, geen VESC) zodat
+je elk scherm in één klik te pakken hebt. Het frame herlaadt zichzelf als er een
+bestand in `public/` verandert.
 
-Drie knoppen kiezen de indeling: liggend, staand, en **Staand op 480 × 320** —
-de staande pagina in een liggend frame, precies zoals op de step, zodat je een
-verkeerde draaiing hier ziet en niet op het stuur.
+Twee knoppen kiezen het beeld: **Staand 320 × 480**, de pagina zoals hij getekend
+is, en **Op het paneel 480 × 320**, dezelfde pagina in een liggend frame — precies
+zoals op de step, zodat je een verkeerde draaiing hier ziet en niet op het stuur.
 
-`install.sh` gooit `tools/design.js` en `tools/design.html` weg na het kopiëren.
-De designomgeving is voor op de computer, niet voor op de Pi.
+De designomgeving bewaart ook de instellingen, dus taal, eenheden en accentkleur
+overleven een herlaadbeurt van het frame. Dat scheelt meer dan het klinkt: zonder
+komt elke schermafdruk in een andere kleur uit de bus.
 
-### Concepten
+`install.sh` gooit `tools/design.js`, `tools/design.html`, `tools/shots.js` en
+`tools/icons/` na het kopiëren weer weg. Dat is gereedschap voor de computer, niet
+voor de Pi.
 
-De map `tools/concepts/` is leeg — er staan geen ontwerpen meer naast de app.
-Wat er stond (nocturne, wijzerplaat, cyber, apple, windows) zit in de
-geschiedenis: `git show 9cc94c0:pi/tools/concepts/` laat ze zien.
+### Schermafdrukken
 
-Het mechanisme is er nog wél. Zet je een `.html` in `tools/concepts/`, dan
-verschijnt hij vanzelf als knop onder het frame van de designomgeving en
-serveert de server hem op `/concept/<naam>`. Zulke pagina's laden het echte
-`public/app.js` — dezelfde element-id's, hetzelfde gedrag — met alleen een
-andere opmaak eromheen, dus je klikt er doorheen als door een werkende UI en
-niet door een plaatje. Ze horen bewust níet in `public/`: tot een ontwerp
-goedgekeurd is hoort het niet in de app.
+```bash
+node tools/design.js &
+node tools/shots.js         # → docs/ui/*.png
+```
 
-Wat een nieuwe opmaak moet naleven:
+Vijftien platen, gemaakt van de draaiende pagina op 320 × 480 met een
+pixelverhouding van 2, en één op 480 × 320 om de draaiing te laten zien. Het
+script zet de instellingen voor elke afdruk terug — anders hangt de kleur van de
+vorige keer er nog in en lijkt geen enkele reeks op de andere.
 
-- **elk id dat `app.js` aanraakt moet bestaan** — anders valt de tekenlus om.
-  Op te halen met een regex uit `app.js`; de bouwer van de staande versie doet
-  dat ook.
-- **elementen waar `cls()` op werkt houden hun basisklassen**, want die functie
-  overschrijft `className` in z'n geheel (`#tm` is `v big`, `#batcard` is
-  `card`).
-- **de kleurnamen die `app.js` rechtstreeks in style-attributen schrijft moeten
-  bestaan**: `--color-crit-fill`, `--color-warn-fill`, `--color-warn`,
-  `--color-accent`, `--color-neutral-800`, `--color-neutral-500` en
-  `--color-text`. Vergeet je die, dan verliest het temperatuuralarm zijn
-  achtergrond en blijven de boogjes van het wifi-icoon grijs. Heeft je ontwerp
-  een eigen palet, laat ze dan doorwijzen naar je eigen namen.
+Twee dingen waarop hij moet wachten. Het temperatuuralarm knippert zeven keer en
+zijn bevestigknop komt na 2,9 seconden op, dus die krijgt 3,6 seconden voor de
+sluiter. En klikken gaat met `force: true`: de app luistert op `pointerdown` en
+vindt zijn doel met `closest()`, dus een treffer op een kindelement is prima —
+Playwright weigert die standaard.
 
-Wat `app.js` níet kan is tekenen: hij zet tekst en breedtes, meer niet. Een
-ontwerp dat ringen of segmenten wil, leest daarvoor zelf `window.last` uit in
-een eigen scriptblok. Dat botst nergens mee, want app.js beheert alleen zijn
-eigen id's.
-
-Eén valkuil bij het testen: `window.last` overschrijven doet niets, want
-`poll()` haalt elke 150 ms opnieuw op. Wil je een waarde vastzetten om naar te
-kijken, onderschep dan `/data` zelf.
+Playwright staat niet in `package.json`. Het is een dependency van 300 MB voor een
+repo die er verder geen heeft; `PLAYWRIGHT=/pad/naar/playwright node tools/shots.js`
+wijst hem naar een bestaande installatie.
 
 ### De pagina draait zichzelf
 
-Het paneel op het stuur is 480 × 320 en blijft dat, ook als je de staande
-indeling kiest. `fitRotation()` vergelijkt daarom waar de pagina voor getekend
-is (`DESIGN`) met wat hij krijgt (`innerWidth/innerHeight`), en zet er een
-kwartslag op als die niet overeenkomen. De body vult het paneel, `#root` houdt
-de ontwerpmaat en wordt geroteerd om zijn eigen midden.
+Het paneel op het stuur is 480 × 320. De pagina is 320 × 480. Dus vergelijkt
+`fitRotation()` waarvoor de pagina getekend is met wat hij krijgt
+(`innerWidth`/`innerHeight`), en zet er een kwartslag op als die twee niet
+overeenkomen. De body vult het paneel, `#root` houdt de ontwerpmaat en wordt om
+zijn eigen midden gedraaid.
 
-Waarom niet op OS-niveau: `display_rotate` in `config.txt` werkt alleen bij
+Waarom niet op OS-niveau: `display_rotate` in `config.txt` werkt alleen met
 bepaalde drivers, fbtft wil een moduleparameter, en onder Wayland is het weer
 `wlr-randr`. Eén verkeerde poging en je scherm blijft zwart terwijl je er niet
 meer bij kunt. Dit is één regel CSS die overal hetzelfde doet.
 
-Aanraken hoefde niet omgerekend te worden: de browser doet hit-testing dwars
-door de transform heen. Getest met een echte `touchscreen.tap()` op de
-Instellingen-knop in het gedraaide systeemvenster.
+Aanraken hoefde niet omgerekend: de browser rekent tikken dwars door de transform
+heen terug.
 
-Welke kant op staat in `cfg.rotate` (90 of 270) — hoe je het scherm ophangt
-bepaalt welke van de twee klopt.
+Welke kant op staat in `rotate` (90 of 270) — hoe jij het scherm ophangt bepaalt
+welke van de twee klopt.
 
-In de designomgeving zit er een knop **Staand op 480 × 320** voor: die laadt de
-staande pagina in een liggend frame, precies zoals op de step. Zonder die knop
-zie je een verkeerde draaiing pas op het stuur staan.
+### Meldingen zijn afgeleid, niet bewaard
 
-### Meldingen die ergens heen gaan
+De bel heeft geen lijst die je vult, maar een lijst die uit de data volgt. Bij
+elke tekenbeurt rekent `bouwAlerts()` uit wat er mis is — een VESC-storing, een
+accu onder 10 %, een motor of controller binnen tien graden van zijn limiet — en
+dát is de lijst. Oorzaak weg, melding weg.
 
-De meeste meldingen vertellen je iets: te warm, accu laag, VESC weg. Daar is de
-lijst het eindstation. De update-melding is anders — die gaat over een knop die
-ergens anders staat. Een melding die zegt "zie Instellingen" is een melding die
-je werk geeft.
+Wegtikken zet de sleutel op een negeerlijst, en die loopt vanzelf leeg zodra de
+oorzaak verdwijnt. Zonder die tweede helft zou één tik een storing voorgoed
+verbergen, en dat is het tegenovergestelde van wat wegtikken hoort te betekenen.
 
-Zo'n melding krijgt daarom een `act` in `notices()`. Tik je op de balk terwijl
-die melding aan de beurt is, dan gaat hij rechtstreeks naar dat scherm in plaats
-van naar de lijst; en in de lijst is die rij zelf aantikbaar, met een accentrand
-en "openen" in plaats van "info" ernaast. De rest van de meldingen gedraagt zich
-onveranderd.
-
-Bewegen is geen tik, net als bij de netwerklijst: scrollen door de meldingen
-opent niets.
-
-### Knoppen voor de lijsten
-
-Het instellingenscherm is elf rijen, 564 px inhoud in een vlak van 228 px, dus
-je ziet er een stuk of vier. Een scrollbalk is er niet — die is bewust verborgen
-— dus niets verraadt dat er meer onder staat, en slepen over een rij vol knoppen
-voelt riskant.
-
-Vandaar twee chevrons in de kop van elke scrollbare lijst (instellingen,
-verbindingen, meldingen), in dezelfde stijl als de sluitknop. Ze zijn
-**verborgen** als de lijst helemaal past en **gedimd** als je al boven- of
-onderaan bent, zodat ze ook vertellen waar je zit. Springen gebeurt in één keer,
-zonder `behavior:"smooth"` — de SPI-display is traag en een geanimeerde scroll
-van 300 ms is precies wat je niet wilt.
-
-Ingedrukt houden herhaalt: na 400 ms schuift hij door met zo'n acht rijen per
-seconde, want het verbindingsscherm kan tot veertig netwerken tonen en dat
-zouden anders veertig losse tikken zijn. Slepen met je vinger blijft werken; de
-knoppen zijn een aanvulling, geen vervanging.
+Hertekenen gebeurt alleen bij verandering. Dit draait zeven keer per seconde, en
+de HTML van de lade elke keer opnieuw opbouwen laat het schermpje kruipen — dus
+er is een vingerafdruk van sleutels en details, en alleen een andere zet een
+tekenbeurt in gang.
 
 ### Lagen op het scherm
 
-De overlays zitten op vaste z-index-niveaus:
+De overlays liggen op vaste z-index-niveaus:
 
 ```
-7  temperatuuralarm
-6  aan/uit
-5  schermtoetsenbord en step instellen
-4  systeem en instellingen
-3  meldingen
-2  verbindingen
-1  laden
+12  temperatuuralarm, uitgeschakeld
+11  aan/uit-menu, laden
+ 9  schermtoetsenbord
+ 8  snelheidsmeting, eenheden, taal, accent, limieten, release, stepgegevens
+ 7  verbindingen
+ 6  meldingen
+ 5  instellingen
 ```
 
-Het alarm staat bewust bovenaan. Een te warme motor moet je onderbreken terwijl
-je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
+Het alarm ligt met opzet bovenaan. Een oververhitte motor moet je onderbreken
+terwijl je een wachtwoord typt of iets afsluit, en niet andersom.
+
+Dat het toetsenbord boven het verbindingsscherm ligt is ook geen detail: het gaat
+vanúit dat scherm open, dus met dezelfde z-index beslist de volgorde in de opmaak
+en zou de netwerklijst bovenop de toetsen liggen. Dat gebeurde ook — de toetsen
+reageerden en je zag ze niet.
 
 ### Testen
 
@@ -1072,27 +1119,29 @@ je een wachtwoord intypt of iets aan het afsluiten bent, niet andersom.
 npm test
 ```
 
-85 tests, geen hardware nodig: CRC tegen de bekende testvector, framing,
-gefragmenteerde en verminkte pakketten, de omrekening van erpm naar km/u en van
-tachometer naar afstand, het nulpunt van de ritteller (ook als de VESC opnieuw
-opstart en zijn tellers terugzet), de opbouw van de nmcli-commando's, het
-vergelijken van versies, het herkennen van laden — inclusief de traagste lader
-die we nog willen zien — welke locatiebron voorgaat bij het weer, en dat er uit
-het aan/uit-scherm nooit iets anders komt dan `systemctl reboot` of
-`systemctl poweroff`, en hoe de setup-staat van de VESC herkend wordt —
-inclusief dat één uitschieter de afgeleide wielmaat niet scheeftrekt en dat
-schrijven naar `config.json` de rest van het bestand met rust laat — en het
-rijmoduspakket, byte voor byte, inclusief dat `store` nooit iets anders is dan
-nul.
+102 tests, zonder hardware: CRC tegen de bekende testvector, framing, pakketten
+in stukjes en met een kapotte CRC, de omrekening van erpm naar km/u en van
+tachometer naar afstand, de ritteller op nul (ook als de VESC herstart en zijn
+eigen tellers terugzet), de kilometerstand die over zo'n herstart heen doortelt,
+de rijtijd die alleen loopt terwijl je rijdt, hoe de nmcli-commando's worden
+opgebouwd, versies vergelijken, laden herkennen — inclusief de traagste lader die
+we nog willen zien — welke locatiebron wint voor het weer, dat het aan/uit-scherm
+nooit iets anders kan opleveren dan `systemctl reboot` of `systemctl poweroff`,
+en hoe de setup-staat van de VESC wordt herkend — inclusief dat één uitschieter
+de afgeleide wielmaat niet scheeftrekt en dat schrijven naar `config.json` de
+rest van dat bestand met rust laat — en het rijmoduspakket, byte voor byte,
+inclusief dat `store` nooit iets anders is dan nul.
 
-Voor de UI heb ik met Playwright doorgeklikt op 480 × 320 en 320 × 480, in beide
-thema's, over alle tien de schermen. Dat zit niet in de repo, maar de aanpak is
-simpel: server starten, `/data` onderscheppen om de waarden vast te zetten,
-`page.tap()` op de knoppen, en twee dingen controleren — dat
-`scrollWidth`/`scrollHeight` binnen het paneel blijven, dus dat alles past zonder
-scrollen, en dat elke zichtbare knop minstens 28 px haalt in beide richtingen.
-Die tweede controle bestaat omdat de staande systeemknoppen een tijd 20 px hoog
-zijn geweest en niets het merkte tot ik het op het stuur probeerde.
+Zes ervan gaan over de UI zonder een browser te openen: alle vier de talen hebben
+dezelfde sleutels, geen enkele vertaling is leeg, elke `data-t` in de pagina
+levert iets op, de acht accentkleuren van de UI zijn de acht die de server
+accepteert, elk id dat `app.js` aanraakt bestaat, en elk icoon dat aangeroepen
+wordt heeft een tekening in de sprite. Dat zijn de fouten die een stil, half
+werkend scherm opleveren, en ze zijn goedkoop uit een bestand te halen.
+
+Verder heb ik met Playwright doorgeklikt op 320 × 480 en 480 × 320, in beide
+thema's, over alle vijftien de schermen — dat is wat `tools/shots.js` doet, en hij
+valt om op elke fout in de console.
 
 Zonder VESC kun je er ook een nadoen met een PTY-paar: `pty.openpty()`, luisteren
 op commando 4 en 47, en antwoorden terugsturen met dezelfde framing. Zo is de
