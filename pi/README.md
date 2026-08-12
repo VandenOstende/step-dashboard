@@ -430,10 +430,11 @@ design and are worth knowing before you move something:
   off the screen. That is exactly what happened the first time.
 - **The keys** are ten per row on 296 px, so about 26 px wide, and 52 px tall.
   Narrow, but there's height to spare and you aim with your thumb vertically.
-- **KILOMETERSTAND** doesn't fit in a card of 95 px and runs over the edge a
-  little. That's in the design too, and it's the better of the two options —
-  clipping it with an ellipsis costs you the word, running over costs you
-  nothing.
+- **The card labels** get about nine characters at 11 px with `.14em` of
+  tracking. The design had "KILOMETERSTAND" there and it ran over the edge;
+  it's **ODO** now, in all four languages. Where something still overflows — the
+  trip card says "Ø VERBRUIK" when you tap it — running over beats an ellipsis,
+  because the word stays readable.
 
 ### The design environment
 
@@ -1005,9 +1006,11 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   van het scherm geduwd. Precies dat gebeurde de eerste keer.
 - **De toetsen** zijn er tien per rij op 296 px, dus zo'n 26 px breed, en 52 px
   hoog. Smal, maar er is hoogte over en met je duim mik je verticaal.
-- **KILOMETERSTAND** past niet in een kaart van 95 px en loopt een stukje over de
-  rand. Dat doet het in het ontwerp ook, en het is de beste van de twee opties —
-  afkappen met een beletselteken kost je het woord, overlopen kost je niets.
+- **De kaartlabels** hebben ruimte voor zo'n negen tekens op 11 px met `.14em`
+  spatiëring. In het ontwerp stond daar "KILOMETERSTAND" en dat liep over de
+  rand; het is nu **ODO**, in alle vier de talen. Loopt er toch nog iets over —
+  de trip-kaart zegt "Ø VERBRUIK" als je erop tikt — dan is overlopen beter dan
+  afkappen, want het woord blijft leesbaar.
 
 ### De designomgeving
 
