@@ -27,7 +27,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const { loadConfig, loadState, saveConfigStep, ROOT } = require("./config");
+const { loadConfig, loadState, saveConfigStep, schoneSettings, ROOT } = require("./config");
 const { Vesc } = require("./vesc");
 const { Telemetry } = require("./telemetry");
 const { Weather } = require("./weather");
@@ -217,6 +217,11 @@ const routes = {
     data.charge_eta_min = ch.etaMin;
     data.charge_full = ch.full;
     data.charge_session = ch.session;
+    /* Laadstroom alleen als de lader via de controller loopt. Hangt hij
+       rechtstreeks aan de accu — bij de meeste steps is dat zo — dan ziet de
+       VESC er niets van en zet de UI n.v.t. neer. */
+    data.charge_a = ch.charging && data.battery_current < -0.2 ? -data.battery_current : null;
+    data.top_kmh = state.data.topSpeed || 0;
     send(res, 200, data);
   },
 
@@ -280,7 +285,9 @@ const routes = {
   },
 
   "GET /settings": (req, res) => {
-    send(res, 200, Object.assign({}, state.settings, {
+    /* Ook lezen gaat door de schoonmaak: een state.json van een oudere versie
+       bevat nog theme "Auto" en een indeling, en daar kan de UI niets mee. */
+    send(res, 200, Object.assign(schoneSettings(state.settings, state.settings), {
       topSpeed: state.data.topSpeed,
       pollMs: cfg.vesc.pollMs
     }));
@@ -288,20 +295,7 @@ const routes = {
 
   "POST /settings": async (req, res) => {
     const body = await readJson(req);
-    const s = state.settings;
-    const next = {
-      layout: ["Liggend", "Staand"].includes(body.layout) ? body.layout : s.layout,
-      rotate: [90, 270].includes(Number(body.rotate)) ? Number(body.rotate) : s.rotate,
-      theme: ["Auto", "Licht", "Donker"].includes(body.theme) ? body.theme : s.theme,
-      tempWarn: num(body.tempWarn, 40, 120, s.tempWarn),
-      tempCrit: num(body.tempCrit, 50, 130, s.tempCrit),
-      motorTempWarn: typeof body.motorTempWarn === "boolean" ? body.motorTempWarn : s.motorTempWarn !== false,
-      packWh: num(body.packWh, 200, 4000, s.packWh),
-      whPerKm: num(body.whPerKm, 5, 100, s.whPerKm),
-      speedMax: num(body.speedMax, 10, 120, s.speedMax),
-      bright: num(body.bright, 20, 100, s.bright),
-      start: num(body.start, 0, 2, s.start)
-    };
+    const next = schoneSettings(body, state.settings);
     state.patch({ settings: next });
     send(res, 200, next);
   },

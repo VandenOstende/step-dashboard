@@ -24,9 +24,6 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
-/* Ontwerpen die nog geen productie zijn. Ze laden wel het echte /app.js, dus
-   je klikt door een volwaardige UI en niet door een plaatje. */
-const CONCEPTS = path.join(__dirname, "concepts");
 const PORT = Number(process.env.PORT || 8081);
 const HOST = process.env.HOST || "0.0.0.0";
 
@@ -44,12 +41,13 @@ function base() {
     motorCurrent: 32,
     batteryCurrent: 14,
     tripKm: 7.4,
+    tripSec: 1840,
+    odoKm: 1428.6,
     whUsed: 132,
     fault: null,
     charging: false,
     chargeEta: 95,
-    theme: "Auto",
-    layout: "Liggend",      // welke pagina het frame toont
+    theme: "day",
 
     wifi: { connected: true, ssid: "Huisnet", level: 3 },
     bt: { connected: true, name: "Sena 50S" },
@@ -63,7 +61,15 @@ function base() {
        grenzen naar de VESC; hier is het een naam en een logregel. */
     modes: { enabled: true, active: "SPORT" },
     cruise: false,          // de app leidt dit normaal af; hier is het een knop
-    update: { available: false, message: "Bluetooth zoekt nu naar apparaten" }
+    update: { available: false, message: "Bluetooth zoekt nu naar apparaten" },
+    /* Instellingen die de UI zelf bewaart. Het paneel schrijft ze terug, zodat
+       taal, eenheden en accentkleur blijven staan als je het frame herlaadt. */
+    settings: {
+      rotate: 90, theme: "day", lang: "nl", units: "metric", accent: "#4f9e63",
+      mode: "SPORT", limMotor: 120, limEsc: 110, limBatt: 70,
+      warnMotor: true, warnEsc: true, warnBatt: true,
+      packWh: 1147, whPerKm: 18, speedMax: 35, bright: 80
+    }
   };
 }
 
@@ -104,7 +110,9 @@ function data() {
       connected: false, speed_kmh: 0, rpm: 0, erpm: 0, duty: 0,
       battery_pct: 0, voltage: 0, cell_voltage: 0,
       motor_current: 0, battery_current: 0, power_w: 0,
-      temp_motor: 0, temp_fet: 0, wh_used: 0, trip_km: 0, fault: null,
+      temp_motor: 0, temp_fet: 0, temp_batt: null,
+      wh_used: 0, trip_km: 0, trip_s: S.tripSec, avg_kmh: 0,
+      odo_km: S.odoKm, top_kmh: 41.2, fault: null,
       cruise: false, cruise_supported: false
     }, charge());
   }
@@ -133,19 +141,29 @@ function data() {
     power_w: batteryCurrent * voltage,
     temp_motor: S.tempMotor,
     temp_fet: S.tempFet,
+    /* Net als de echte VESC: geen accusensor, dus geen getal. Zo zie je in de
+       designomgeving ook echt de n.v.t. staan. */
+    temp_batt: null,
     wh_used: S.whUsed,
     trip_km: S.tripKm,
+    trip_s: S.tripSec,
+    avg_kmh: S.tripSec > 5 ? S.tripKm / (S.tripSec / 3600) : 0,
+    odo_km: S.odoKm,
+    top_kmh: 41.2,
     fault: S.fault || null
   }, charge());
 }
 
 function charge() {
-  if (!S.charging) return { charging: false, charge_eta_min: null, charge_full: false, charge_session: 0 };
+  if (!S.charging) {
+    return { charging: false, charge_eta_min: null, charge_full: false, charge_session: 0, charge_a: null };
+  }
   return {
     charging: true,
     charge_eta_min: S.battery >= 99 ? 0 : S.chargeEta,
     charge_full: S.battery >= 99,
-    charge_session: 1
+    charge_session: 1,
+    charge_a: S.battery >= 99 ? 0.4 : 8
   };
 }
 
@@ -254,18 +272,6 @@ const server = http.createServer(async (req, res) => {
 
   /* het paneel zelf */
   if (p === "/design" || p === "/design/") return file(res, path.join(__dirname, "design.html"));
-  if (p === "/design/concepts") {
-    let namen = [];
-    try {
-      namen = fs.readdirSync(CONCEPTS).filter((f) => f.endsWith(".html")).map((f) => f.slice(0, -5));
-    } catch { /* nog geen concepten */ }
-    return send(res, 200, { concepts: namen });
-  }
-  if (p.startsWith("/concept/")) {
-    const naam = path.basename(p.slice(9)).replace(/[^a-z0-9_-]/gi, "");
-    if (!naam) return send(res, 404, { error: "niet gevonden" });
-    return file(res, path.join(CONCEPTS, naam + ".html"));
-  }
   if (p === "/design/state" && m === "GET") return send(res, 200, { state: S, presets: Object.keys(PRESETS), log: log });
   if (p === "/design/state" && m === "POST") {
     const b = await body(req);
@@ -315,19 +321,15 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { ok: true, step: Object.assign({}, S.setup, { learnedAt: null }) });
   }
   if (p === "/settings" && m === "GET") {
-    return send(res, 200, {
-      layout: S.layout, theme: S.theme, tempWarn: 70, tempCrit: 90,
-      packWh: 1147, whPerKm: 18, speedMax: 35, bright: 80, start: 0,
-      topSpeed: 41.2, pollMs: 150
-    });
+    return send(res, 200, Object.assign({}, S.settings, { topSpeed: 41.2, pollMs: 150 }));
   }
   if (p === "/settings" && m === "POST") {
     const b = await body(req);
+    Object.assign(S.settings, b);
+    // Wisselt de UI zelf van thema, dan volgt het paneel mee.
     if (b.theme) S.theme = b.theme;
-    // Wisselt de UI zelf van indeling, dan volgt het paneel mee.
-    if (b.layout === "Liggend" || b.layout === "Staand") S.layout = b.layout;
     note("instellingen: " + JSON.stringify(b));
-    return send(res, 200, b);
+    return send(res, 200, S.settings);
   }
   if (p === "/reset-trip") { S.tripKm = 0; S.whUsed = 0; note("ritteller op nul"); return send(res, 200, { ok: true }); }
   if (p === "/reset-top") { note("topsnelheid op nul"); return send(res, 200, { ok: true }); }
@@ -381,9 +383,17 @@ const server = http.createServer(async (req, res) => {
 
   if (p === "/update" && m === "GET") {
     return send(res, 200, {
+      repo: "VandenOstende/step-dashboard",
       current: "0000000design0000000", currentShort: "design",
       available: S.update.available,
-      latestShort: "abc1234", message: S.update.message,
+      latestShort: "abc1234", latestDate: new Date().toISOString(),
+      message: S.update.message,
+      notes: S.update.available ? [
+        { sha: "abc123", msg: "Het nieuwe ontwerp Ride Dash" },
+        { sha: "77b0d2", msg: "Kilometerstand telt nu door over een VESC-herstart heen" },
+        { sha: "2fd815", msg: "Vier talen, eenheden en accentkleur in de UI" },
+        { sha: "c04a6b", msg: "Cruisecontrol wordt afgeleid uit de hendelstand" }
+      ] : [],
       state: "klaar"
     });
   }

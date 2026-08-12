@@ -1,874 +1,667 @@
 "use strict";
 /* ═══════════════════════════════════════════════════════════════════════════
-   Step Dashboard — het gedrag, gedeeld door beide indelingen.
+   Ride Dash — het gedrag.
 
-   index.html is liggend (480 × 320), portrait.html staand (320 × 480). Ze
-   verschillen alleen in opmaak: dezelfde element-id's, hetzelfde script. Eén
-   los bestand dus, want twee kopieën van negenhonderd regels lopen bij de
-   eerste wijziging al uit elkaar.
+   Eén pagina, vijftien schermen. Het rijscherm staat er altijd; de rest zijn
+   lagen die eroverheen schuiven (.sheet met .open). De volgorde van z-index
+   staat in theme.css en niet hier — een scherm weet niet wat er boven hem ligt.
 
-   Welke van de twee je voor je hebt staat op de body:
-       <body data-layout="Liggend">   of   "Staand"
+   Alles wat de gebruiker kiest — taal, eenheden, accentkleur, dag/nacht, de
+   drie temperatuurlimieten met hun schakelaars — gaat naar POST /settings en
+   staat er na een herstart weer. Het ontwerp bewaarde het in localStorage;
+   dat werkt niet als de kiosk zijn profiel weggooit, en het is ook niet te
+   lezen vanaf een andere kant.
+
+   Wat de VESC niet meldt, liegt deze app niet bij elkaar: dan staat er n.v.t.
+   De accutemperatuur is daar het duidelijkste geval van — de VESC heeft er
+   geen sensor voor, dus de limiet staat er wel en de waarde niet.
    ═══════════════════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════════════════
-   Step Dashboard — 480 × 320, Chromium kiosk op een Raspberry Pi 4.
-   Alles vanilla: geen libraries, geen externe requests behalve de eigen
-   endpoints op dezelfde origin. Rendert ~6×/s en raakt alleen gewijzigde
-   nodes aan, want de SPI-display is traag.
-   ═══════════════════════════════════════════════════════════════════════ */
 
-var $ = function (id) { return document.getElementById(id); };
+/* ── kleine helpers ──────────────────────────────────────────────────────── */
+function $(id) { return document.getElementById(id); }
+function txt(id, v) { var e = $(id); if (e && e.textContent !== v) e.textContent = v; }
+function cls(id, name, on) { var e = $(id); if (e) e.classList.toggle(name, !!on); }
+function show(id, on) { var e = $(id); if (e) e.classList.toggle("open", on !== false); }
+function hide(id) { show(id, false); }
+function icon(id, naam) {
+  var e = $(id); if (!e) return;
+  var u = e.querySelector("use");
+  if (u && u.getAttribute("href") !== "#" + naam) u.setAttribute("href", "#" + naam);
+}
+function svg(naam, klasse) {
+  return '<svg class="' + (klasse || "ico") + '"><use href="#' + naam + '"></use></svg>';
+}
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function num(v, dec) {
+  return typeof v === "number" && isFinite(v) ? v.toFixed(dec || 0) : null;
+}
 
-/* ── instellingen ───────────────────────────────────────────────────────
-   Defaults uit de tweaks van het component (data-props). tempWarn staat op
-   70 in plaats van de 100 die in het component stond: 100 lag boven
-   tempCrit, waardoor de waarschuwing pas ná kritiek zou komen. */
-/* Welke indeling deze pagina ís. index.html is de liggende, portrait.html de
-   staande; de instelling bepaalt naar welke van de twee de kiosk gaat. Als
-   beginwaarde nemen we de eigen indeling, zodat een pagina die je los opent
-   niet meteen naar de andere springt als er geen server is. */
-var PAGE_LAYOUT = document.body.getAttribute("data-layout") === "Staand" ? "Staand" : "Liggend";
+/* Hex → rgba en hex → donkerder. Uit het ontwerp overgenomen; ze maken van
+   één accentkleur de drie tinten die de opmaak nodig heeft. */
+function rgba(hex, a) {
+  var h = hex.replace("#", "");
+  var n = parseInt(h.length === 3 ? h.split("").map(function (c) { return c + c; }).join("") : h, 16);
+  return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+}
+function shade(hex, f) {
+  var h = hex.replace("#", "");
+  var n = parseInt(h.length === 3 ? h.split("").map(function (c) { return c + c; }).join("") : h, 16);
+  var p = function (v) { return Math.round(v * f).toString(16).padStart(2, "0"); };
+  return "#" + p((n >> 16) & 255) + p((n >> 8) & 255) + p(n & 255);
+}
 
-/* Waar deze pagina voor getekend is. Past dat niet op het paneel waar hij op
-   staat, dan draait hij zichzelf een kwartslag — zie fitRotation(). */
-var DESIGN = PAGE_LAYOUT === "Staand" ? { w: 320, h: 480 } : { w: 480, h: 320 };
-
+/* ── instellingen ────────────────────────────────────────────────────────── */
+/* Dezelfde namen als in state.settings op de server. Deze waarden zijn de
+   noodgreep voor als /settings niet antwoordt; normaal komen ze daarvandaan. */
 var cfg = {
-  layout: PAGE_LAYOUT,
   rotate: 90,
-  theme: "Auto",
-  tempWarn: 70,
-  tempCrit: 90,
+  theme: "day",
+  lang: "nl",
+  units: "metric",
+  accent: "#4f9e63",
+  limMotor: 120, limEsc: 110, limBatt: 70,
+  warnMotor: true, warnEsc: true, warnBatt: true,
   packWh: 1147,
   whPerKm: 18,
   speedMax: 35,
-  bright: 80,
-  start: 0
+  mode: null
 };
+var LIMGRENZEN = {
+  limMotor: { min: 60, max: 140, warn: "warnMotor", lbl: "motor", ico: "i-fan" },
+  limEsc: { min: 50, max: 120, warn: "warnEsc", lbl: "controller", ico: "i-cpu" },
+  limBatt: { min: 30, max: 80, warn: "warnBatt", lbl: "battery", ico: "i-battery-charging" }
+};
+var DESIGN = { w: 320, h: 480 };
 var POLL_MS = 150;
-var RENDER_MS = 165;
-var LIMITS = { tempWarn: [40, 120], tempCrit: [50, 130] };
 
-/* ── panes ─────────────────────────────────────────────────────────────── */
-var panes = [$("p0"), $("p1"), $("p2")];
-var dots = [].slice.call($("dots").children);
-var view = 0;
+var data = { connected: false };
+var t = T.nl;
 
-function show(i) {
-  i = i < 0 ? 0 : (i > 2 ? 2 : i);
-  panes[view].classList.remove("on");
-  dots[view].classList.remove("on");
-  view = i;
-  panes[i].classList.add("on");
-  dots[i].classList.add("on");
-  $("net").classList.remove("on");
-  cacheT = {}; cacheS = {};
-  paint();
+/* ── taal en eenheden ────────────────────────────────────────────────────── */
+function isImp() { return cfg.units === "imperial"; }
+function d2(v) { return isImp() ? v * 0.621371 : v; }          // km → mi
+function tp(v) { return isImp() ? v * 9 / 5 + 32 : v; }        // °C → °F
+function uSpeed() { return isImp() ? "mph" : "km/h"; }
+function uDist() { return isImp() ? "mi" : "km"; }
+function uTemp() { return isImp() ? "°F" : "°C"; }
+
+function applyLang() {
+  t = T[cfg.lang] || T.nl;
+  document.documentElement.lang = cfg.lang;
+  var nodes = document.querySelectorAll("[data-t]");
+  for (var i = 0; i < nodes.length; i++) {
+    var k = nodes[i].getAttribute("data-t");
+    if (t[k]) nodes[i].textContent = t[k];
+  }
 }
 
-/* Een tik op de pagina gaat naar het volgende scherm; bewegen is geen tik. */
-var tp = null;
-var pn = $("panes");
-pn.addEventListener("pointerdown", function (e) {
-  /* Een knop op een paneel is een knop, geen paneeltik. Zonder dit schakelt
-     hij én de knop én naar het volgende scherm. */
-  if (e.target.closest("button")) { tp = null; return; }
-  tp = { x: e.clientX, y: e.clientY };
+function applyTheme() {
+  document.body.dataset.theme = cfg.theme === "night" ? "night" : "day";
+  var night = cfg.theme === "night";
+  var s = document.documentElement.style;
+  s.setProperty("--accent", cfg.accent);
+  s.setProperty("--accent-soft", rgba(cfg.accent, night ? 0.18 : 0.12));
+  s.setProperty("--accent-ink", night ? cfg.accent : shade(cfg.accent, 0.72));
+  icon("themeicon", night ? "i-moon" : "i-sun");
+  txt("themelabel", night ? t.night : t.day);
+  cls("themeswitch", "on", night);
+}
+
+/* ── schermen ────────────────────────────────────────────────────────────── */
+/* Elk scherm dat opengaat, sluit het vorige niet: ze stapelen. Terug sluit er
+   één. Dat is waarom Instellingen → Taal → terug weer bij Instellingen komt. */
+function openSheet(id) { show(id, true); }
+
+document.addEventListener("pointerdown", function (e) {
+  var c = e.target.closest("[data-close]");
+  if (c) { e.preventDefault(); hide(c.getAttribute("data-close")); }
 });
-pn.addEventListener("pointerup", function (e) {
-  var t = tp; tp = null;
-  if (!t || Math.abs(e.clientX - t.x) > 12 || Math.abs(e.clientY - t.y) > 12) return;
-  show((view + 1) % 3);
-});
-pn.addEventListener("pointercancel", function () { tp = null; });
-document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
 
-/* ── thema — automatisch op de klok: 07:30–18:00 licht ──────────────────── */
-function wantLight() {
-  if (cfg.theme === "Licht") return true;
-  if (cfg.theme === "Donker") return false;
-  var d = new Date(), m = d.getHours() * 60 + d.getMinutes();
-  return m >= 450 && m < 1080;
-}
-function applyTheme(force) {
-  var light = wantLight();
-  if (!force && light === document.body.classList.contains("light")) return;
-  document.body.classList.toggle("light", light);
-  cacheT = {}; cacheS = {};
+/* ── rijscherm ───────────────────────────────────────────────────────────── */
+var tripView = 0;                 // 0 = afstand, 1 = verbruik
+
+function battKleur(p) {
+  return p < 10 ? "#c2453f" : p < 20 ? "#d9622f" : p < 35 ? "#c9911f" : p < 60 ? "#8ca33a" : "#3f8b52";
 }
 
-/* ── data ──────────────────────────────────────────────────────────────── */
-var MODE = "demo";           // "live" | "demo" | "off"
-var prevMode = "demo";
-var liveFails = 0;
-var topSpeed = 0;
-var bootTopSpeed = 0;      // laatst bewaarde echte topsnelheid van de Pi
-var dm = { t: 0, spd: 0, tgt: 14, bat: 87, wh: 120, trip: 6.4, tm: 42, tf: 38 };
-var last = demoTick();
+function hms(sec) {
+  if (typeof sec !== "number" || !isFinite(sec)) return null;
+  var m = Math.floor(sec / 60), h = Math.floor(m / 60);
+  return (h ? h + "h " : "") + (m % 60) + "m";
+}
+function mmss(sec) {
+  if (typeof sec !== "number" || !isFinite(sec)) return "--";
+  var m = Math.floor(sec / 60), h = Math.floor(m / 60);
+  return (h ? h + ":" : "") + String(m % 60).padStart(2, "0")
+    + ":" + String(Math.floor(sec) % 60).padStart(2, "0");
+}
 
-function poll() {
-  fetch("/data", { cache: "no-store" }).then(function (r) {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(function (d) {
-    liveFails = 0;
-    MODE = d && d.connected === false ? "off" : "live";
-    last = d;
-  })["catch"](function () {
-    if (++liveFails > 2) MODE = "demo";
+function paintRide() {
+  var d = data;
+  var st = document.documentElement.style;
+
+  /* Snelheid. De VESC uit? Dan 0 en niet n.v.t. — nul is hier de waarheid. */
+  txt("speed", num(d2(d.speed_kmh || 0), 0));
+  txt("speedunit", uSpeed());
+  cls("speed", "sport", (cfg.mode || "").toUpperCase() === "SPORT");
+
+  /* Duty. Wat de VESC meldt is al 0..1. */
+  var duty = Math.max(0, Math.min(1, d.duty || 0));
+  var df = $("dutyfill");
+  if (df) df.style.height = (duty * 100).toFixed(0) + "%";
+  cls("dutyfill", "hot", duty > 0.85 && duty <= 0.95);
+  cls("dutyfill", "max", duty > 0.95);
+
+  /* Accu. */
+  var pct = Math.max(0, Math.min(100, d.battery_pct || 0));
+  st.setProperty("--batt", battKleur(pct));
+  txt("battpct", num(pct, 0));
+  txt("battva", (num(d.voltage, 1) || "--") + " V · " + (num(Math.abs(d.battery_current || 0), 0) || "--") + " A");
+  var bf = $("battfill");
+  if (bf) bf.style.width = Math.max(2, pct) + "%";
+  cls("battrow", "low", pct <= 20);
+
+  /* Bereik: wat er nog in het pak zit, gedeeld door het verbruik per km.
+     Beide staan in de instellingen; de VESC weet ze niet. */
+  var whLeft = pct / 100 * cfg.packWh;
+  txt("range", (d2(whLeft / cfg.whPerKm)).toFixed(1));
+  txt("rangeunit", uDist());
+
+  /* Trip-kaart. Tikken wisselt tussen afstand en verbruik. */
+  txt("triplbl", tripView ? t.avgUse : t.trip);
+  if (tripView) {
+    var km = d.trip_km || 0;
+    txt("tripval", km > 0.2 ? num((d.wh_used || 0) / d2(km), 0) : "—");
+    txt("tripsub", "Wh/" + uDist());
+  } else {
+    txt("tripval", num(d2(d.trip_km || 0), 1));
+    txt("tripsub", hms(d.trip_s) || "0m");
+  }
+
+  txt("odo", typeof d.odo_km === "number" ? num(d2(d.odo_km), 0) : t.na);
+  txt("odounit", uDist());
+
+  var tm = typeof d.temp_motor === "number" && d.temp_motor > 0 ? d.temp_motor : null;
+  var te = typeof d.temp_fet === "number" && d.temp_fet > 0 ? d.temp_fet : null;
+  txt("motortemp", tm === null ? t.na : num(tp(tm), 0) + "°");
+  txt("esctemp", te === null ? t.na : num(tp(te), 0));
+  cls("motortemp", "warn", tm !== null && tm > cfg.limMotor - 35 && tm <= cfg.limMotor - 20);
+  cls("motortemp", "crit", tm !== null && tm > cfg.limMotor - 20);
+
+  /* Cruisecontrol. Het element verschijnt alleen als de afleiding hem ziet;
+     kan de step het niet (geen ADC-hendel), dan blijft het weg. */
+  var cr = $("cruise");
+  if (cr) {
+    var aan = !!d.cruise;
+    if (cr.hidden === aan) cr.hidden = !aan;
+  }
+}
+
+/* ── titelbalk ───────────────────────────────────────────────────────────── */
+var net = { wifi: null, bt: null, modem: null };
+
+function paintTop() {
+  var st = document.documentElement.style;
+  st.setProperty("--link", data.connected ? "#2f9e5f" : "#c2453f");
+
+  var w = net.wifi && net.wifi.connected;
+  icon("wifiico", w ? "i-wifi-high-f" : "i-wifi-slash");
+  cls("wifiico", "on", w);
+
+  var b = net.bt && net.bt.connected;
+  icon("btico", b ? "i-bluetooth-connected-f" : "i-bluetooth-slash");
+  cls("btico", "on", b);
+
+  var m = net.modem && net.modem.present && net.modem.bars > 0;
+  icon("cellico", m ? "i-cell-signal-high-f" : "i-cell-signal-slash");
+  cls("cellgrp", "on", m);
+  txt("celltxt", m ? (net.modem.tech || "") : "--");
+}
+
+function tikKlok() {
+  var d = new Date();
+  txt("clock", d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0"));
+}
+
+/* ── meldingen ───────────────────────────────────────────────────────────── */
+/* Meldingen zijn afgeleid, niet bewaard: ze staan er zolang de oorzaak er is.
+   Wegtikken zet ze op de negeerlijst, en die loopt leeg zodra de oorzaak weg
+   is — anders zou één tik een storing voorgoed onzichtbaar maken. */
+var negeer = {};
+var alerts = [];
+
+function bouwAlerts() {
+  var d = data, nu = [];
+  var tijd = new Date();
+  var klok = tijd.getHours() + ":" + String(tijd.getMinutes()).padStart(2, "0");
+  function add(key, kind, ico, titel, detail) {
+    nu.push({ key: key, kind: kind, ico: ico, titel: titel, detail: detail, tijd: klok });
+  }
+  if (d.fault) add("fault", "err", "i-plugs", t.faultLbl, String(d.fault));
+  if (d.connected && d.battery_pct < 10) {
+    add("batt", "err", "i-battery-charging", t.lowBatt, num(d.battery_pct, 0) + " %");
+  }
+  var tm = d.temp_motor, te = d.temp_fet;
+  if (cfg.warnMotor && tm > 0 && tm >= cfg.limMotor - 10 && tm < cfg.limMotor) {
+    add("motor", "warn", "i-thermometer-hot", t.motorHot, num(tp(tm), 0) + " " + uTemp());
+  }
+  if (cfg.warnEsc && te > 0 && te >= cfg.limEsc - 10 && te < cfg.limEsc) {
+    add("esc", "warn", "i-thermometer-hot", t.escHot, num(tp(te), 0) + " " + uTemp());
+  }
+
+  /* Negeerlijst opschonen: wat er niet meer is, mag straks weer verschijnen. */
+  Object.keys(negeer).forEach(function (k) {
+    if (!nu.some(function (a) { return a.key === k; })) delete negeer[k];
   });
-}
+  var zicht = nu.filter(function (a) { return !negeer[a.key]; });
 
-/* Demo-rit zodat het ontwerp ook standalone te bekijken is. */
-function demoTick() {
-  dm.t += 0.15;
-  if (Math.random() < 0.02) dm.tgt = Math.random() < 0.25 ? 0 : 6 + Math.random() * 32;
-  dm.spd += (dm.tgt - dm.spd) * 0.06;
-  var spd = Math.max(0, dm.spd + Math.sin(dm.t * 1.7) * 0.35);
-  var pw = Math.max(0, spd * 26 + (dm.tgt - dm.spd) * 95 + Math.sin(dm.t) * 30);
-  var v = 50.4 - (100 - dm.bat) * 0.062 - pw / 900;
-  dm.bat -= pw * 0.0000045 + 0.0006;
-  if (dm.bat < 4) dm.bat = 96;
-  dm.wh += pw * 0.0000417;
-  dm.trip += spd * 0.0000417;
-  dm.tm += (30 + pw * 0.055 - dm.tm) * 0.0022;
-  dm.tf += (28 + pw * 0.040 - dm.tf) * 0.0025;
-  return {
-    connected: true, speed_kmh: spd, rpm: spd * 118, erpm: spd * 118 * 15,
-    duty: Math.min(0.97, spd / 42 + pw / 6000), battery_pct: dm.bat, voltage: v,
-    cell_voltage: v / 13, motor_current: pw / Math.max(20, v) * 1.6,
-    battery_current: pw / Math.max(20, v), power_w: pw,
-    temp_motor: dm.tm, temp_fet: dm.tf, wh_used: dm.wh, trip_km: dm.trip
-  };
-}
-
-/* ── meldingen ─────────────────────────────────────────────────────────── */
-var noticeList = [];
-var ni = 0;
-
-function notices(d) {
-  var out = [];
-  if (MODE === "off") out.push({ lv: 2, t: "Geen VESC-verbinding" });
-  if (d.fault) out.push({ lv: 2, t: "VESC-storing — " + d.fault });
-  var tm = d.temp_motor || 0, tf = d.temp_fet || 0, bp = d.battery_pct || 0;
-  if (cfg.motorTempWarn !== false) {
-    if (tm >= cfg.tempCrit) out.push({ lv: 2, t: "Motor " + tm.toFixed(0) + "°C — stop en laat afkoelen" });
-    else if (tm >= cfg.tempWarn) out.push({ lv: 1, t: "Motor " + tm.toFixed(0) + "°C — verminder belasting" });
+  /* Alleen hertekenen als er iets veranderd is — dit draait 7× per seconde. */
+  var vinger = zicht.map(function (a) { return a.key + a.detail; }).join("|");
+  if (vinger !== bouwAlerts.vorige) {
+    bouwAlerts.vorige = vinger;
+    alerts = zicht;
+    tekenAlerts();
   }
-  if (tf >= cfg.tempCrit) out.push({ lv: 2, t: "FET " + tf.toFixed(0) + "°C — stop en laat afkoelen" });
-  else if (tf >= cfg.tempWarn) out.push({ lv: 1, t: "FET " + tf.toFixed(0) + "°C — verminder belasting" });
-  if (bp < 10) out.push({ lv: 2, t: "Accu " + bp.toFixed(0) + "% — bijna leeg" });
-  else if (bp < 20) out.push({ lv: 1, t: "Accu " + bp.toFixed(0) + "% — laag" });
-  /* Deze melding gaat érgens over: de knop om bij te werken. Tik erop en je
-     komt daar meteen, in plaats van in een lijst die je vertelt waar je moet
-     zijn. `act` markeert dat. */
-  if (upd.available) out.push({ lv: 0, act: "settings", t: "Nieuwe versie beschikbaar" });
-  /* Weet de VESC niet hoe de step in elkaar zit, dan klopt de snelheid alleen
-     als de waarden in config.json kloppen. Dat is iets om te doen, geen iets
-     om te weten — dus met een `act` erop. */
-  if (stp.status === "missing") {
-    out.push({ lv: 1, act: "setup", t: "Step niet ingesteld — vul de gegevens in" });
+
+  var ernst = zicht.length ? (zicht.some(function (a) { return a.kind === "err"; }) ? "err" : "warn") : "";
+  var bell = $("bell");
+  if (bell && bell.dataset.lvl !== ernst) {
+    if (ernst) bell.dataset.lvl = ernst; else delete bell.dataset.lvl;
+    icon("bellico", ernst ? "i-warning-f" : "i-bell");
   }
-  out.sort(function (a, b) { return b.lv - a.lv; });
-  return out;
 }
 
-function paintNotice(d) {
-  noticeList = notices(d);
-  var b = $("notice");
-  if (!noticeList.length) {
-    ni = 0;
-    if (cacheS.nz !== "0") { cacheS.nz = "0"; b.className = ""; $("notices").classList.remove("on"); }
-    return;
-  }
-  var sig = noticeList.map(function (x) { return x.lv + x.t; }).join("|");
-  if ($("notices").classList.contains("on") && cacheS.nsig !== sig) { cacheS.nsig = sig; renderNotices(); }
-  var cur = noticeList[ni % noticeList.length];
-  var key = cur.lv + "|" + cur.t;
-  if (cacheS.nz === key) return;
-  cacheS.nz = key;
-  b.className = "on" + (cur.lv === 2 ? " crit" : cur.lv === 0 ? " info" : "");
-  $("noticetxt").textContent = cur.t;
-  /* Alleen de staande balk heeft dit hoekje; het zegt wat een tik doet. */
-  var more = $("noticemore");
-  if (more) more.textContent = cur.act ? "openen" : "alle";
-}
-
-function renderNotices() {
-  $("noticelist").innerHTML = noticeList.map(function (nt) {
-    var cls = nt.lv === 2 ? " crit" : nt.lv === 0 ? " info" : "";
-    var label = nt.act ? "openen" : (nt.lv === 2 ? "fout" : nt.lv === 0 ? "info" : "let op");
-    return '<div class="row' + cls + (nt.act ? " act" : "") + '"'
-      + (nt.act ? ' data-act="' + nt.act + '"' : "") + '>'
-      + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>'
-      + '<div class="msg"></div>'
-      + '<div class="lv">' + label + '</div></div>';
-  }).join("");
-  /* tekst apart zetten: melding-tekst kan servertekst bevatten */
-  [].slice.call($("noticelist").querySelectorAll(".msg")).forEach(function (el, i) {
-    el.textContent = noticeList[i].t;
+function tekenAlerts() {
+  var h = "";
+  if (!alerts.length) h = '<div class="empty">' + esc(t.noAlerts) + "</div>";
+  alerts.forEach(function (a) {
+    h += '<div class="alert ' + a.kind + '">' + svg(a.ico)
+      + '<div class="body"><div class="t">' + esc(a.titel) + "</div>"
+      + '<div class="d">' + esc(a.detail) + " · " + esc(a.tijd) + "</div></div>"
+      + '<button class="x" data-drop="' + esc(a.key) + '">' + svg("i-x") + "</button></div>";
   });
-  syncNav("noticelist");
+  $("alertlist").innerHTML = h;
 }
 
-/* Meldingen wisselen elke 3 s door de actieve lijst. */
-setInterval(function () {
-  if (noticeList.length > 1) { ni++; paintNotice(last); }
-}, 3000);
-
-$("notice").addEventListener("pointerdown", function (e) {
+$("bell").addEventListener("pointerdown", function (e) { e.preventDefault(); openSheet("alerts"); });
+$("alertclose").addEventListener("pointerdown", function (e) { e.preventDefault(); hide("alerts"); });
+$("alertclear").addEventListener("pointerdown", function (e) {
   e.preventDefault();
-  if (!noticeList.length) return;
-  var cur = noticeList[ni % noticeList.length];
-  if (cur.act === "settings") return openSettings();
-  if (cur.act === "setup") return openSetup();
-  renderNotices();
-  $("notices").classList.add("on");
-  syncNav("noticelist");
+  alerts.forEach(function (a) { negeer[a.key] = true; });
+  bouwAlerts.vorige = null;
+  bouwAlerts();
 });
-
-/* En vanuit de lijst ook, met dezelfde regel als bij de netwerken: bewegen is
-   geen tik, zodat scrollen niets opent. */
-var nod = null;
-$("noticelist").addEventListener("pointerdown", function (e) {
-  var r = e.target.closest("[data-act]");
-  nod = r ? { x: e.clientX, y: e.clientY, act: r.dataset.act } : null;
-});
-$("noticelist").addEventListener("pointerup", function (e) {
-  var d = nod; nod = null;
-  if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
-  if (d.act === "settings") openSettings();
-  else if (d.act === "setup") openSetup();
-});
-$("noticelist").addEventListener("pointercancel", function () { nod = null; });
-$("noticesclose").addEventListener("pointerdown", function (e) {
+$("alertlist").addEventListener("pointerdown", function (e) {
+  var x = e.target.closest("[data-drop]");
+  if (!x) return;
   e.preventDefault();
-  $("notices").classList.remove("on");
+  negeer[x.getAttribute("data-drop")] = true;
+  bouwAlerts.vorige = null;
+  bouwAlerts();
+});
+$("alerts").addEventListener("pointerdown", function (e) {
+  if (e.target === this) { e.preventDefault(); hide("alerts"); }
 });
 
-/* ── volledig-scherm temperatuuralarm ───────────────────────────────────
-   Knippert 3× (0,5 s aan / 0,5 s uit) en blijft daarna staan tot de
-   gebruiker bevestigt. Amber en rood alarmeren elk apart. */
-var alarm = { level: null, acked: {} };
-var blink = null;
+/* ── temperatuuralarm ────────────────────────────────────────────────────── */
+/* Vol scherm, rood, knipperend. Bevestigen laat het weggaan; het komt pas
+   terug als alles vijf graden onder de limiet is geweest. Zonder die
+   hysterese zou het bij precies-op-de-limiet blijven knipperen. */
+var alarmAck = false;
 
-function checkAlarm(d) {
-  var tm = cfg.motorTempWarn !== false ? (d.temp_motor || 0) : 0,
-      tf = d.temp_fet || 0, hot = Math.max(tm, tf);
-  var level = hot >= cfg.tempCrit ? "crit" : (hot >= cfg.tempWarn ? "warn" : null);
-  var el = $("alarm");
-  if (!level) {
-    if (alarm.level) {
-      alarm.level = null; alarm.acked = {};
-      clearTimeout(blink); blink = null;
-      el.classList.remove("on");
-    }
-    return;
-  }
-  if (level === alarm.level) return;
-  alarm.level = level;
-  var crit = level === "crit";
-  el.style.background = crit ? "var(--color-crit-fill)" : "var(--color-warn-fill)";
-  el.style.color = crit ? "#f3f5fe" : "#161826";
-  $("alarmclose").style.color = crit ? "#f3f5fe" : "#161826";
-  $("alarmclose").style.borderColor = crit ? "#f3f5fe" : "#161826";
-  $("alarmmsg").textContent =
-    (tm >= tf ? "Motortemperatuur " + tm.toFixed(0) : "FET-temperatuur " + tf.toFixed(0))
-    + "°C — " + (crit ? "stop en laat afkoelen" : "verminder belasting");
-  if (alarm.acked[level]) return;
-
-  clearTimeout(blink);
-  var step = 0;
-  el.classList.add("on");
-  var next = function () {
-    step++;
-    if (step >= 6) { blink = null; el.classList.add("on"); return; }
-    el.classList.toggle("on", step % 2 === 0);
-    blink = setTimeout(next, 500);
-  };
-  blink = setTimeout(next, 500);
+function paintAlarm() {
+  var d = data;
+  var paren = [
+    ["limMotor", "warnMotor", d.temp_motor, "motorTemp"],
+    ["limEsc", "warnEsc", d.temp_fet, "escTemp"],
+    ["limBatt", "warnBatt", d.temp_batt, "battTemp"]
+  ];
+  var raak = null, allesKoel = true;
+  paren.forEach(function (p) {
+    var waarde = p[2];
+    if (typeof waarde !== "number" || waarde <= 0) return;   // geen sensor = geen oordeel
+    if (!cfg[p[1]]) return;
+    if (waarde >= cfg[p[0]] && !raak) raak = p;
+    if (waarde >= cfg[p[0]] - 5) allesKoel = false;
+  });
+  if (allesKoel) alarmAck = false;
+  if (!raak || alarmAck) { hide("alarm"); return; }
+  txt("alarmmsg", t[raak[3]] + " " + num(tp(raak[2]), 0) + uTemp() + " " + t.coolDown);
+  show("alarm", true);
 }
-
-$("alarmclose").addEventListener("pointerdown", function (e) {
-  e.preventDefault();
-  clearTimeout(blink); blink = null;
-  alarm.acked[alarm.level] = true;
-  $("alarm").classList.remove("on");
+$("alarmack").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); alarmAck = true; hide("alarm");
 });
 
-/* ── topbalk rechts: wifi, bluetooth, mobiel bereik ─────────────────────── */
-var wifiLevel = null;
-var cell = { bars: 0, tech: null, present: false };
-var net = {
-  tab: "wifi", wifiOn: false, ssid: "", btOn: false, dev: "", devMac: "",
-  items: { wifi: [], bt: [] }, busy: "", error: null,
-  scanning: false, scanErr: "", scanTimer: null
-};
+/* ── laden ───────────────────────────────────────────────────────────────── */
+/* Het laadscherm komt vanzelf op zodra de server ziet dat de spanning stijgt
+   terwijl de step stilstaat, en gaat weg als dat stopt. Wegtikken mag ook. */
+var laadWeg = false;
 
-function paintWifi() {
-  $("btico").style.display = net.btOn ? "block" : "none";
-  $("wifiico").style.display = net.wifiOn ? "block" : "none";
-  if (!net.wifiOn) return;
-  var lv = Math.max(1, Math.min(3, wifiLevel == null ? 3 : wifiLevel));
-  var c = lv === 1 ? "var(--color-warn)" : "var(--color-accent)";
-  $("wadot").setAttribute("fill", c);
-  [].slice.call(document.querySelectorAll("#wifiico .wa")).forEach(function (p) {
-    p.setAttribute("stroke", +p.dataset.lv <= lv ? c : "var(--color-neutral-800)");
-  });
+function paintCharge() {
+  var d = data;
+  if (!d.charging) { laadWeg = false; hide("charge"); return; }
+  if (laadWeg) return;
+
+  var pct = Math.max(0, Math.min(100, d.battery_pct || 0));
+  var vol = !!d.charge_full;
+  document.documentElement.style.setProperty("--charge", vol ? "#3f8b52" : cfg.accent);
+  txt("chargetitle", vol ? t.chargeFull : t.charging);
+  txt("chargeval", num(pct, 0));
+  var f = $("chargefill");
+  if (f) f.style.width = Math.max(2, pct) + "%";
+  txt("chargevolts", num(d.voltage, 1) || "--");
+
+  var whLeft = pct / 100 * cfg.packWh;
+  txt("chargerange", d2(whLeft / cfg.whPerKm).toFixed(1));
+
+  var a = typeof d.charge_a === "number" ? Math.abs(d.charge_a) : null;
+  txt("chargeamps", a === null ? t.na : a.toFixed(1));
+  txt("chargeeta", vol ? "—" : (hms((d.charge_eta_min || 0) * 60) || t.na));
+  /* Winst per minuut: laadvermogen omgerekend naar afstand. Zonder gemeten
+     laadstroom valt er niets te rekenen, dan staat er n.v.t. */
+  txt("chargegain", vol ? "0.0"
+    : a === null ? t.na
+      : (a * (d.voltage || 0) / 60 / cfg.whPerKm * (isImp() ? 0.621371 : 1)).toFixed(2));
+
+  var eh = document.querySelectorAll(".chargeunit");
+  for (var i = 0; i < eh.length; i++) eh[i].textContent = uDist();
+  show("charge", true);
 }
-
-function fetchWifi() {
-  fetch("/wifi", { cache: "no-store" }).then(function (r) {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(function (w) {
-    net.wifiOn = !!w.connected;
-    net.ssid = w.ssid || "";
-    wifiLevel = w.level;
-    paintWifi();
-  })["catch"](function () { paintWifi(); });
-}
-
-function fetchBt() {
-  fetch("/bt", { cache: "no-store" }).then(function (r) {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(function (b) {
-    net.btOn = !!b.connected;
-    net.dev = b.name || "";
-    net.devMac = b.mac || "";
-    paintWifi();
-  })["catch"](function () { paintWifi(); });
-}
-
-var sigbars = [].slice.call(document.querySelectorAll("#sig span"));
-/* Verschijnen mag meteen, verdwijnen pas na drie keer op rij niks. ModemManager
-   is even stil als hij herstart, en een balkjesmeter die daarbij in en uit
-   springt is onrustiger dan een halve minuut wachten. */
-var cellSeen = false, cellMiss = 0;
-
-function paintSignal(bars, tech, present) {
-  var b = Math.max(0, Math.min(5, bars || 0));
-  cell.bars = b; cell.tech = tech;
-
-  if (present) { cellSeen = true; cellMiss = 0; }
-  else { cellMiss++; }
-  cell.present = present || (cellSeen && cellMiss < 3);
-  $("cellgrp").classList[cell.present ? "add" : "remove"]("on");
-  var row = $("syscellrow");
-  if (row) row.style.display = cell.present ? "" : "none";
-  if (!cell.present) return;
-
-  var weak = b <= 1;
-  sigbars.forEach(function (s, k) { s.className = k < b ? (weak ? "weak" : "on") : ""; });
-  var t = $("tech");
-  t.textContent = b === 0 ? "GEEN" : (tech || "--");
-  t.style.color = b === 0 ? "var(--color-neutral-500)" : "var(--color-text)";
-}
-
-function fetchModem() {
-  fetch("/modem", { cache: "no-store" }).then(function (r) {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(function (m) { paintSignal(m.bars, m.tech, !!m.present); })
-  ["catch"](function () { paintSignal(0, null, false); });
-}
-
-function fetchWeather() {
-  fetch("/weather", { cache: "no-store" }).then(function (r) {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(function (w) {
-    if (typeof w.temp_c === "number") $("outtemp").textContent = w.temp_c.toFixed(0) + "°";
-  })["catch"](function () {
-    $("outtemp").textContent = "--°";
-  });
-}
-
-/* ── systeemvenster ────────────────────────────────────────────────────── */
-function openSys() {
-  var lv = wifiLevel == null ? 3 : wifiLevel;
-  $("syswifi").textContent = net.wifiOn
-    ? net.ssid + "  ·  " + (lv >= 3 ? "sterk" : lv === 2 ? "matig" : "zwak")
-    : "niet verbonden";
-  $("syscell").textContent = cell.bars
-    ? (cell.tech || "?") + "  ·  " + cell.bars + "/5"
-    : "geen bereik";
-  $("sys").classList.add("on");
-}
-$("status").addEventListener("pointerdown", function (e) { e.preventDefault(); openSys(); });
-$("sysclose").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); });
-$("sysnet").addEventListener("pointerdown", function (e) { e.preventDefault(); $("sys").classList.remove("on"); openNet("wifi"); });
-function openSettings() {
-  ["sys", "notices", "net", "setup"].forEach(function (id) { $(id).classList.remove("on"); });
-  renderSettings();
-  $("settings").classList.add("on");
-  syncNav("setlist");            // pas meten als het scherm zichtbaar is
-}
-$("sysset").addEventListener("pointerdown", function (e) { e.preventDefault(); openSettings(); });
-$("setclose").addEventListener("pointerdown", function (e) {
-  e.preventDefault(); $("settings").classList.remove("on"); openSys();
-});
-
-/* ── aan/uit ───────────────────────────────────────────────────────────── */
-/* Twee tikken van het rijscherm naar uitschakelen: eerst de topbalk, dan
-   Power. Ver genoeg weg om er onderweg niet per ongeluk op te komen, en dit
-   scherm is zelf de bevestiging — nog een "weet je het zeker" erbij maakt het
-   op een aanraakscherm alleen maar irritanter, niet veiliger. */
-function openPower() {
-  $("powermsg").textContent = "";
-  $("powermsg").className = "";
-  powbtns.forEach(function (b) { b.disabled = false; b.classList.remove("hit"); });
-  $("powerclose").disabled = false;
-  $("power").classList.add("on");
-}
-
-function doPower(action, label) {
-  powbtns.forEach(function (b) { b.disabled = true; });
-  $("powerclose").disabled = true;
-  $("powermsg").className = "";
-  $("powermsg").textContent = label + "…";
-  fetch("/power", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: action })
-  }).then(function (r) {
-    return r.json()["catch"](function () { return {}; }).then(function (j) {
-      if (!r.ok || !j.ok) throw new Error(j.error || (r.status === 404 ? "server te oud — werk bij" : "mislukt"));
-      /* Vanaf hier gaat de Pi eruit. Niets meer te doen: de melding blijft
-         staan tot het scherm zwart wordt. */
-    });
-  })["catch"](function (err) {
-    $("powermsg").className = "bad";
-    $("powermsg").textContent = err.message;
-    powbtns.forEach(function (b) { b.disabled = false; });
-    $("powerclose").disabled = false;
-  });
-}
-
-var powbtns = [$("powreboot"), $("powshutdown")];
-powbtns.forEach(function (b) {
-  b.addEventListener("pointerdown", function (e) {
-    e.preventDefault();
-    if (b.disabled) return;
-    b.classList.add("hit");
-    setTimeout(function () { b.classList.remove("hit"); }, 120);
-    if (b.id === "powreboot") doPower("reboot", "Opnieuw opstarten");
-    else doPower("shutdown", "Uitschakelen");
-  });
-});
-
-$("syspower").addEventListener("pointerdown", function (e) {
-  e.preventDefault(); $("sys").classList.remove("on"); openPower();
-});
-$("powerclose").addEventListener("pointerdown", function (e) {
-  e.preventDefault();
-  if ($("powerclose").disabled) return;
-  $("power").classList.remove("on");
-  openSys();
-});
-
-/* ── instellingen ──────────────────────────────────────────────────────── */
-function renderSettings() {
-  $("setbright").textContent = cfg.bright + " %";
-  $("setwarn").textContent = cfg.tempWarn + "°";
-  $("setcrit").textContent = cfg.tempCrit + "°";
-  [].slice.call(document.querySelectorAll(".seg.start")).forEach(function (b) {
-    b.classList.toggle("on", +b.dataset.i === cfg.start);
-  });
-  [].slice.call(document.querySelectorAll(".seg[data-theme]")).forEach(function (b) {
-    b.classList.toggle("on", b.dataset.theme === cfg.theme);
-  });
-  [].slice.call(document.querySelectorAll(".seg.lay")).forEach(function (b) {
-    b.classList.toggle("on", b.dataset.lay === cfg.layout);
-  });
-  [].slice.call(document.querySelectorAll(".seg.rot")).forEach(function (b) {
-    b.classList.toggle("on", +b.dataset.rot === cfg.rotate);
-  });
-  [].slice.call(document.querySelectorAll(".seg.mt")).forEach(function (b) {
-    b.classList.toggle("on", (b.dataset.mt === "1") === (cfg.motorTempWarn !== false));
-  });
-}
-
-function bump(key, step) {
-  var lim = LIMITS[key];
-  cfg[key] = Math.max(lim[0], Math.min(lim[1], cfg[key] + step));
-  if (key === "tempWarn" && cfg.tempWarn > cfg.tempCrit) cfg.tempCrit = cfg.tempWarn;
-  if (key === "tempCrit" && cfg.tempCrit < cfg.tempWarn) cfg.tempWarn = cfg.tempCrit;
-  cacheT = {}; cacheS = {};
-  renderSettings();
-  saveSettings();
-}
-
-/* De UI mag zelf niets opslaan (geen localStorage) — de Pi bewaart het. */
-var saveTimer = null;
-function saveSettings() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveSettingsNow, 400);
-}
-
-/* Zonder wachten wegschrijven. Nodig bij het wisselen van indeling: dan
-   herlaadt de pagina, en een POST die nog in de wachtrij staat gaat mee het
-   graf in — waarna de andere pagina je meteen terugstuurt. */
-function saveSettingsNow() {
-  clearTimeout(saveTimer);
-  return fetch("/settings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(cfg)
-  })["catch"](function () {});
-}
-
-function layoutFile(name) { return name === "Staand" ? "portrait.html" : "index.html"; }
-
-/* ── het scherm draaien ────────────────────────────────────────────────────
-   Het schermpje op het stuur zit in één stand vastgeschroefd: het paneel is
-   480 × 320, ook als je de staande indeling kiest. Het besturingssysteem laten
-   draaien (display_rotate, xrandr, wlr-randr) verschilt per driver en per
-   Pi-OS, en een verkeerde regel in config.txt levert een zwart scherm op
-   zonder dat je er nog bij kunt. Daarom draait de pagina zichzelf: hij
-   vergelijkt waarvoor hij getekend is met wat hij krijgt, en zet er een
-   kwartslag op als die twee niet overeenkomen.
-
-   Aanraken blijft gewoon werken: de browser rekent tikken door de transform
-   heen terug, dus we hoeven zelf geen coördinaten om te klappen. */
-function fitRotation() {
-  var root = $("root");
-  var paneelLiggend = window.innerWidth >= window.innerHeight;
-  var ontwerpLiggend = DESIGN.w >= DESIGN.h;
-  var deg = paneelLiggend === ontwerpLiggend ? 0 : (cfg.rotate === 270 ? 270 : 90);
-
-  root.style.width = DESIGN.w + "px";
-  root.style.height = DESIGN.h + "px";
-  if (!deg) {
-    root.style.position = "relative";
-    root.style.left = "";
-    root.style.top = "";
-    root.style.transform = "";
-    return;
-  }
-  root.style.position = "absolute";
-  /* Ankeren aan wat er echt te zien is, niet aan het venster: Chromium heeft
-     een minimumbreedte (~500 px) en zonder window manager doet fullscreen
-     niets, dus het venster kan breder zijn dan het paneel — dan schuift
-     50%-centrering de balk van het scherm af. Op een desktop is het venster
-     juist kleiner dan de monitor; vandaar de kleinste van de twee. */
-  var sw = Math.min(window.innerWidth, (window.screen && screen.width) || window.innerWidth);
-  var sh = Math.min(window.innerHeight, (window.screen && screen.height) || window.innerHeight);
-  root.style.left = Math.round((sw - DESIGN.w) / 2) + "px";
-  root.style.top = Math.round((sh - DESIGN.h) / 2) + "px";
-  root.style.transform = "rotate(" + deg + "deg)";
-}
-
-function gotoLayout(name) {
-  if (name === PAGE_LAYOUT) return;
-  location.replace(layoutFile(name));
-}
-
-$("setlist").addEventListener("pointerdown", function (e) {
-  var br = e.target.closest(".step.bright");
-  if (br) {
-    e.preventDefault();
-    cfg.bright = Math.max(20, Math.min(100, cfg.bright + (+br.dataset.d)));
-    fetch("/backlight", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level: cfg.bright })
-    })["catch"](function () {});
-    renderSettings();
-    saveSettings();
-    return;
-  }
-  var s = e.target.closest(".step");
-  if (s) { e.preventDefault(); bump(s.dataset.k, +s.dataset.d); return; }
-  var t = e.target.closest(".seg[data-theme]");
-  if (t) { e.preventDefault(); cfg.theme = t.dataset.theme; applyTheme(true); renderSettings(); saveSettings(); return; }
-  var mt = e.target.closest(".seg.mt");
-  if (mt) {
-    e.preventDefault();
-    cfg.motorTempWarn = mt.dataset.mt === "1";
-    renderSettings();
-    saveSettings();
-    return;
-  }
-  var rt = e.target.closest(".seg.rot");
-  if (rt) {
-    e.preventDefault();
-    cfg.rotate = +rt.dataset.rot;
-    renderSettings();
-    saveSettings();
-    fitRotation();
-    return;
-  }
-  var ly = e.target.closest(".seg.lay");
-  if (ly) {
-    e.preventDefault();
-    if (ly.dataset.lay === cfg.layout) return;
-    cfg.layout = ly.dataset.lay;
-    renderSettings();
-    // pas springen als de instelling echt weg is
-    saveSettingsNow().then(function () { gotoLayout(cfg.layout); });
-    return;
-  }
-  var st = e.target.closest(".seg.start");
-  if (st) {
-    e.preventDefault();
-    cfg.start = +st.dataset.i;
-    renderSettings();
-    saveSettings();
-    $("settings").classList.remove("on");
-    show(cfg.start);
-  }
-});
-
-$("toprst").addEventListener("pointerdown", function (e) {
-  e.preventDefault();
-  topSpeed = bootTopSpeed = 0;
-  fetch("/reset-top", { method: "POST" })["catch"](function () {});
-  cacheT = {}; cacheS = {};
-  paint();
-});
-$("triprst").addEventListener("pointerdown", function (e) {
-  e.preventDefault();
-  dm.trip = 0; dm.wh = 0;
-  fetch("/reset-trip", { method: "POST" })["catch"](function () {});
-  cacheT = {}; cacheS = {};
-  paint();
-});
-
-/* ── laden ─────────────────────────────────────────────────────────────────
-   De server herkent dat de lader eraan hangt en schat hoe lang het nog duurt.
-   Het scherm verschijnt vanzelf en verdwijnt met een tik; bij de volgende
-   laadbeurt komt het terug. */
-
-var chg = { shown: false, dismissed: 0, session: 0 };
-
-function etaText(min) {
-  if (min === 0) return "vol";
-  if (min == null) return "tijd nog onbekend";
-  if (min < 60) return "nog \u00b1 " + min + " min";
-  var u = Math.floor(min / 60), m = min % 60;
-  return "nog \u00b1 " + u + " u" + (m ? " " + ("0" + m).slice(-2) : "");
-}
-
-function paintCharge(d) {
-  var el = $("charge");
-  if (!d || !d.charging) {
-    if (chg.shown) { chg.shown = false; el.classList.remove("on"); cacheT = {}; cacheS = {}; }
-    return;
-  }
-  /* Nieuwe laadbeurt: het scherm mag weer opkomen, ook als je het vorige
-     hebt weggetikt. */
-  if (d.charge_session !== chg.session) {
-    chg.session = d.charge_session;
-    chg.dismissed = 0;
-  }
-  if (chg.dismissed === chg.session) {
-    if (chg.shown) { chg.shown = false; el.classList.remove("on"); }
-    return;
-  }
-  if (!chg.shown) { chg.shown = true; el.classList.add("on"); }
-
-  var pct = d.battery_pct || 0;
-  el.classList.toggle("full", !!d.charge_full);
-  txt("chargelabel", d.charge_full ? "Volledig geladen" : "Laden");
-  txt("chargeval", n(pct));
-  wide("chargebar", pct);
-  txt("chargeeta", d.charge_full ? "vol" : etaText(d.charge_eta_min));
-  txt("chargesub", n(d.voltage, 1) + " V \u00b7 " + n(d.cell_voltage, 2) + " V/cel");
-}
-
 $("charge").addEventListener("pointerdown", function (e) {
-  e.preventDefault();
-  e.stopPropagation();
-  chg.dismissed = chg.session;            // deze beurt niet meer tonen
-  chg.shown = false;
-  $("charge").classList.remove("on");
-  cacheT = {}; cacheS = {};
-  paint();
+  e.preventDefault(); laadWeg = true; hide("charge");
 });
 
-/* ── rijmodi ───────────────────────────────────────────────────────────────
-   ECO, SPORT, of wat er in config.json staat. De knoppen komen uit de opmaak:
-   alles met class "seg mode" en een data-mode doet mee, waar het ook staat.
-   Staat er een leeg #modes, dan bouwt deze code de knoppen daar zelf in — dan
-   bepaalt config.json het aantal standen en niet de opmaak.
+/* ── snelheidsmeting ─────────────────────────────────────────────────────── */
+$("speedbtn").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); tekenSpeedStats(); openSheet("speedsheet");
+});
+$("tripcard").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); tripView = tripView ? 0 : 1; paintRide();
+});
 
-   Wat de VESC ermee doet staat in src/modes.js. Kort: het gaat naar zijn
-   werkgeheugen, niet naar flash, en er kan nooit méér vermogen uit komen dan
-   er in de controller staat. */
-
-var mds = { enabled: false, list: [], active: null, bezig: false };
-
-function modeKnoppen() {
-  return [].slice.call(document.querySelectorAll(".seg.mode"));
+function tekenSpeedStats() {
+  var d = data;
+  var rij = [
+    ["i-gauge", t.current, num(d2(d.speed_kmh || 0), 0), uSpeed(), "var(--ink)"],
+    ["i-arrow-line-up", t.topSpeed, num(d2(d.top_kmh || 0), 0), uSpeed(), "#c2453f"],
+    ["i-chart-line", t.avgSpeed, num(d2(d.avg_kmh || 0), 0), uSpeed(), "var(--accent)"],
+    ["i-timer", "Timer A", mmss(d.trip_s), "", "var(--ink)"]
+  ];
+  $("speedstats").innerHTML = rij.map(function (r) {
+    return '<div class="stat"><span style="color:' + r[4] + '">' + svg(r[0]) + "</span>"
+      + '<span class="lbl">' + esc(r[1]) + "</span>"
+      + '<span class="num"><b style="color:' + r[4] + '">' + esc(r[2]) + "</b>"
+      + '<span>' + esc(r[3]) + "</span></span></div>";
+  }).join("");
 }
+$("speedreset").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  fetch("/reset-top", { method: "POST" })["catch"](function () {});
+  fetch("/reset-trip", { method: "POST" })["catch"](function () {});
+  setTimeout(tekenSpeedStats, 300);
+});
 
-function renderModes() {
-  /* De doos #modes is van deze code: staat er iets anders in dan de standen uit
-     config.json, dan wordt hij opnieuw opgebouwd. Knoppen die het ontwerp
-     ergens ánders neerzet blijven onaangeroerd — die krijgen alleen hun
-     markering. */
+/* ── rijmodi ─────────────────────────────────────────────────────────────── */
+/* /modes zegt of ze aanstaan en welke er zijn. Staat het uit in config.json,
+   dan is er geen knop — dit stuurt commando's naar de motorcontroller en dat
+   hoort een bewuste keuze te zijn. */
+var modi = { enabled: false, list: [], active: null };
+
+function tekenModi() {
   var doos = $("modes");
-  if (doos && [].map.call(doos.children, function (c) { return c.dataset.mode; })
-      .join("\u0000") !== mds.list.join("\u0000")) {
-    doos.innerHTML = "";
-    mds.list.forEach(function (naam) {
+  if (!doos) return;
+  var namen = modi.enabled ? modi.list : [];
+  var huidig = [].slice.call(doos.querySelectorAll(".mode")).map(function (b) { return b.dataset.mode; });
+  if (namen.join("|") !== huidig.join("|")) {
+    /* Alleen de eigen knoppen vervangen: er kan iets anders in deze doos
+       staan dat niet van ons is. */
+    [].slice.call(doos.querySelectorAll(".mode")).forEach(function (b) { doos.removeChild(b); });
+    namen.forEach(function (n) {
       var b = document.createElement("button");
-      b.className = "seg mode";
-      b.dataset.mode = naam;
-      b.textContent = naam;
+      b.className = "mode";
+      b.dataset.mode = n.toLowerCase();
+      b.textContent = n;
       doos.appendChild(b);
     });
   }
-  var rij = $("moderow");
-  if (rij) rij.hidden = !(mds.enabled && mds.list.length);
-  modeKnoppen().forEach(function (b) {
-    /* Een stand die niet in config.json staat kan de opmaak wel tekenen, maar
-       er valt niets te kiezen — dan is hem weglaten eerlijker dan een knop die
-       een foutmelding oplevert. */
-    var kent = mds.enabled && mds.list.indexOf(b.dataset.mode) >= 0;
-    b.hidden = !kent;
-    b.classList.toggle("on", kent && b.dataset.mode === mds.active);
-    b.style.opacity = mds.bezig ? "0.45" : "";
+  [].slice.call(doos.querySelectorAll(".mode")).forEach(function (b) {
+    b.classList.toggle("on", b.textContent === (cfg.mode || modi.active));
   });
+  /* Niets actief maar er zijn wel standen: toon de eerste, anders is er niets
+     om op te tikken. */
+  if (namen.length && !doos.querySelector(".mode.on")) {
+    doos.querySelector(".mode").classList.add("on");
+  }
 }
 
-function fetchModes() {
+$("modes").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest(".mode");
+  if (!b || !modi.list.length) return;
+  e.preventDefault();
+  var i = modi.list.indexOf(b.textContent);
+  var volgende = modi.list[(i + 1) % modi.list.length];
+  cfg.mode = volgende;
+  modi.active = volgende;
+  tekenModi();
+  paintRide();
+  fetch("/mode", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: volgende })
+  })["catch"](function () {});
+});
+
+function haalModi() {
   return fetch("/modes", { cache: "no-store" }).then(function (r) { return r.json(); })
     .then(function (j) {
-      mds.enabled = !!j.enabled;
-      mds.list = j.list || [];
-      if (!mds.bezig) mds.active = j.active;
-      renderModes();
+      modi.enabled = !!j.enabled;
+      modi.list = j.list || [];
+      modi.active = j.active || null;
+      if (!cfg.mode) cfg.mode = modi.active;
+      tekenModi();
     })["catch"](function () {});
 }
 
-function setMode(naam) {
-  if (mds.bezig || naam === mds.active) return;
-  var vorige = mds.active;
-  mds.active = naam;              // meteen laten zien; de step reageert traag
-  mds.bezig = true;
-  renderModes();
-  fetch("/mode", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: naam })
-  }).then(function (r) { return r.json()["catch"](function () { return {}; })
-      .then(function (j) { return { ok: r.ok, j: j }; }); })
-    .then(function (a) { if (!a.ok) mds.active = vorige; })
-    ["catch"](function () { mds.active = vorige; })
-    ["then"](function () { mds.bezig = false; renderModes(); });
+/* ── instellingen bewaren ────────────────────────────────────────────────── */
+var bewaarTimer = null;
+
+function bewaar() {
+  clearTimeout(bewaarTimer);
+  bewaarTimer = setTimeout(function () {
+    fetch("/settings", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg)
+    })["catch"](function () {});
+  }, 250);
 }
 
-/* Gedelegeerd, want de knoppen kunnen overal staan — ook in een scherm dat pas
-   later getekend wordt. */
-document.addEventListener("pointerdown", function (e) {
-  var b = e.target.closest(".seg.mode");
-  if (!b || b.hidden) return;
+/* ── keuzeschermen: eenheden, taal, accentkleur ──────────────────────────── */
+function vink(aan) { return svg(aan ? "i-check-circle-f" : "i-circle"); }
+
+function tekenUnits() {
+  var rij = [
+    { id: "metric", nm: t.metric + " — km/h, km, °C" },
+    { id: "imperial", nm: t.imperial + " — mph, mi, °F" }
+  ];
+  $("unitlist").innerHTML = rij.map(function (u) {
+    var aan = cfg.units === u.id;
+    return '<button class="pick' + (aan ? " on" : "") + '" data-unit="' + u.id + '">'
+      + '<span class="nm">' + esc(u.nm) + "</span>" + vink(aan) + "</button>";
+  }).join("");
+}
+$("unitlist").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest("[data-unit]");
+  if (!b) return;
   e.preventDefault();
-  setMode(b.dataset.mode);
+  cfg.units = b.getAttribute("data-unit");
+  tekenUnits(); paintAlles(); bewaar();
 });
 
-/* ── de step instellen ─────────────────────────────────────────────────────
-   Heeft de setup-wizard van VESC Tool gedraaid, dan levert de VESC snelheid,
-   afstand en accuniveau zelf en hoeft hier niets ingevuld te worden — de
-   server kijkt dat af en zet het in config.json. Heeft hij níet gedraaid, dan
-   rekent de Pi het uit met deze constanten, en dan moet je ze wel kloppend
-   krijgen. Vandaar dit scherm, plus een melding die ernaartoe brengt. */
+var TALEN = [
+  { id: "en", abbr: "EN", nm: "English" },
+  { id: "nl", abbr: "NL", nm: "Nederlands" },
+  { id: "fr", abbr: "FR", nm: "Français" },
+  { id: "de", abbr: "DE", nm: "Deutsch" }
+];
+function tekenLangs() {
+  $("langlist").innerHTML = TALEN.map(function (l) {
+    var aan = cfg.lang === l.id;
+    return '<button class="pick' + (aan ? " on" : "") + '" data-lang="' + l.id + '">'
+      + '<span class="abbr">' + l.abbr + "</span>"
+      + '<span class="nm">' + esc(l.nm) + "</span>" + vink(aan) + "</button>";
+  }).join("");
+}
+$("langlist").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest("[data-lang]");
+  if (!b) return;
+  e.preventDefault();
+  cfg.lang = b.getAttribute("data-lang");
+  applyLang(); tekenLangs(); paintAlles(); bewaar();
+});
 
-var stp = {
-  status: "unknown",
-  step: { batteryCells: null, polePairs: 15, wheelDiameterM: 0.254, gearRatio: 1,
-          source: null, learnedAt: null },
-  vuil: false,          // er staat iets in het scherm dat nog niet bewaard is
-  bezig: false
-};
+function tekenAccents() {
+  $("accentlist").innerHTML = ACCENTS.map(function (a) {
+    var aan = cfg.accent === a.hex;
+    return '<button class="pick' + (aan ? " on" : "") + '" data-accent="' + a.hex + '"'
+      + ' style="--swatch:' + a.hex + '">'
+      + '<span class="sw" style="background:' + a.hex + '"></span>'
+      + '<span class="nm">' + esc(a[cfg.lang] || a.en) + "</span>" + vink(aan) + "</button>";
+  }).join("");
+}
+$("accentlist").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest("[data-accent]");
+  if (!b) return;
+  e.preventDefault();
+  cfg.accent = b.getAttribute("data-accent");
+  applyTheme(); tekenAccents(); paintAlles(); bewaar();
+});
 
-var STAP = {
-  wheel: { min: 0.10, max: 0.60, d: 0.0127 },   // een halve inch per tik
-  poles: { min: 1, max: 40, d: 1 },
-  gear:  { min: 1, max: 20, d: 0.5 },
-  cells: { min: 2, max: 30, d: 1 }              // 2 betekent hier "auto"
-};
-
-/* Kort voor de rij in de instellingen, lang voor het scherm zelf — daar is
-   ruimte, en daar wil je weten wat je eraan hebt. */
-function stapTekst() {
-  if (stp.status === "ok") {
-    return { t: "De VESC weet het zelf", c: "",
-             lang: "De VESC weet het zelf. Deze waarden komen van hem en worden "
-                 + "alleen gebruikt als hij ze een keer niet meer levert." };
-  }
-  if (stp.status === "missing") {
-    return { t: "Niet ingesteld", c: "bad",
-             lang: "De VESC weet het niet — vul het hier in, anders klopt de "
-                 + "snelheid niet. Of draai de setup-wizard in VESC Tool." };
-  }
-  return { t: "Nog niet te zien", c: "",
-           lang: "Nog niet te zien. Rijd een stukje; zodra de motor draait "
-               + "kijkt de app mee of de VESC het zelf weet." };
+/* ── temperatuurlimieten ─────────────────────────────────────────────────── */
+function nuTemp(sleutel) {
+  var d = data;
+  var v = sleutel === "limMotor" ? d.temp_motor : sleutel === "limEsc" ? d.temp_fet : d.temp_batt;
+  return typeof v === "number" && v > 0 ? v : null;
 }
 
-function toon(v, n) { return v.toFixed(n).replace(".", ","); }
+function tekenLimits() {
+  $("limlist").innerHTML = Object.keys(LIMGRENZEN).map(function (k) {
+    var g = LIMGRENZEN[k], v = cfg[k], aan = cfg[g.warn];
+    var nu = nuTemp(k);
+    var raak = nu !== null && nu >= v;
+    return '<div class="lim' + (aan ? "" : " off") + '">'
+      + '<div class="limhead"><span class="left">' + svg(g.ico)
+      + '<span class="lbl">' + esc(t[g.lbl]) + "</span></span>"
+      + '<span class="right"><span class="limval' + (raak ? " hit" : "") + '">'
+      + "<b>" + num(tp(v), 0) + "</b><span>" + uTemp() + "</span></span>"
+      + '<span class="switch' + (aan ? " on" : "") + '" data-warn="' + k + '"><i></i></span>'
+      + "</span></div>"
+      + '<div class="limrow">'
+      + '<button class="step" data-lim="' + k + '" data-d="-1">' + svg("i-minus") + "</button>"
+      + '<span class="limbar"><i style="width:'
+      + ((v - g.min) / (g.max - g.min) * 100) + '%"></i></span>'
+      + '<button class="step" data-lim="' + k + '" data-d="1">' + svg("i-plus") + "</button>"
+      + "</div>"
+      + '<div class="limnow">' + esc(t.now) + ": "
+      + (nu === null ? esc(t.na) : num(tp(nu), 0) + " " + uTemp()) + "</div></div>";
+  }).join("");
+  txt("limsummary", t.motor + " " + num(tp(cfg.limMotor), 0) + "° · VESC "
+    + num(tp(cfg.limEsc), 0) + "° · " + t.battery + " " + num(tp(cfg.limBatt), 0) + "°");
+}
+$("limlist").addEventListener("pointerdown", function (e) {
+  var s = e.target.closest("[data-lim]");
+  if (s) {
+    e.preventDefault();
+    var k = s.getAttribute("data-lim"), g = LIMGRENZEN[k];
+    cfg[k] = Math.max(g.min, Math.min(g.max, cfg[k] + 5 * Number(s.getAttribute("data-d"))));
+    tekenLimits(); bewaar();
+    return;
+  }
+  var w = e.target.closest("[data-warn]");
+  if (w) {
+    e.preventDefault();
+    var wk = LIMGRENZEN[w.getAttribute("data-warn")].warn;
+    cfg[wk] = !cfg[wk];
+    tekenLimits(); bewaar();
+  }
+});
+
+/* ── stepgegevens ────────────────────────────────────────────────────────── */
+/* De VESC weet poolparen, wieldiameter en overbrenging als de setup-wizard in
+   VESC Tool gedraaid is. Zo niet, dan rekent de app met de waarden uit
+   config.json — en die moet je dan wel kunnen zetten. */
+var stp = { status: "unknown", step: null, vuil: false, bezig: false };
+var STAPGRENZEN = {
+  polePairs: { min: 1, max: 40, d: 1, dec: 0 },
+  wheelDiameterM: { min: 0.08, max: 0.8, d: 0.0025, dec: 4 },
+  gearRatio: { min: 0.5, max: 30, d: 0.1, dec: 2 },
+  batteryCells: { min: 3, max: 30, d: 1, dec: 0 }
+};
+
+function stapStatusTekst() {
+  if (stp.step && stp.step.source === "hand") return { s: t.stepHand, c: "" };
+  if (stp.status === "ok") return { s: t.stepOk, c: "ok" };
+  if (stp.status === "missing") return { s: t.stepMissing, c: "bad" };
+  return { s: t.stepUnknown, c: "" };
+}
 
 function paintSetup() {
-  var st = $("setstep");
-  if (!st) return;
-  var m = stapTekst();
-  st.textContent = m.t;
-  st.className = "setstat" + (m.c ? " " + m.c : "");
-  var s2 = $("setupstat");
-  if (s2) { s2.textContent = m.lang; s2.className = "setstat wrap" + (m.c ? " " + m.c : ""); }
+  var st = stapStatusTekst();
+  var rij = $("opensetup");
+  if (rij) rij.hidden = stp.status === "ok" && (!stp.step || stp.step.source !== "hand");
+  txt("setupsub", st.s);
+  var p = $("setupstat");
+  if (p) { p.textContent = st.s; p.className = "hint" + (st.c ? " " + st.c : ""); }
 
-  var b = $("stepsave");
-  if (b) {
-    b.textContent = stp.bezig ? "Bezig…" : (stp.vuil ? "Bewaren" : "Bewaard");
-    b.style.opacity = stp.bezig || !stp.vuil ? "0.45" : "1";
-  }
+  if (!stp.step) return;
   var d = stp.step;
-  $("stwheel").textContent = toon(d.wheelDiameterM / 0.0254, 1) + "\u2033";
-  $("stpoles").textContent = String(d.polePairs);
-  $("stgear").textContent = toon(d.gearRatio, 1) + "\u00d7";
-  $("stcells").textContent = d.batteryCells ? String(d.batteryCells) : "auto";
+  var rijen = [
+    ["polePairs", t.polePairs, String(d.polePairs)],
+    ["wheelDiameterM", t.wheel, (d.wheelDiameterM / 0.0254).toFixed(1) + "″"],
+    ["gearRatio", t.gear, d.gearRatio.toFixed(1) + "×"],
+    ["batteryCells", t.cells, d.batteryCells ? String(d.batteryCells) : t.auto]
+  ];
+  $("steplist").innerHTML = rijen.map(function (r) {
+    return '<div class="stepitem"><span class="lbl">' + esc(r[1]) + "</span>"
+      + '<span class="num">' + esc(r[2]) + "</span>"
+      + '<button class="step" data-s="' + r[0] + '" data-d="-1">' + svg("i-minus") + "</button>"
+      + '<button class="step" data-s="' + r[0] + '" data-d="1">' + svg("i-plus") + "</button></div>";
+  }).join("");
+
+  txt("stepsavelbl", stp.bezig ? t.saving : (stp.vuil ? t.save : t.saved));
+  cls("stepsave", "idle", stp.bezig || !stp.vuil);
 }
 
-function fetchSetup() {
+function haalSetup() {
   return fetch("/setup", { cache: "no-store" }).then(function (r) { return r.json(); })
     .then(function (j) {
       stp.status = j.status || "unknown";
-      /* Wat je zelf staat in te typen niet onder je handen wegtrekken. */
       if (!stp.vuil && j.step) stp.step = j.step;
       paintSetup();
     })["catch"](function () {});
 }
 
-function openSetup() {
-  ["sys", "notices", "net", "settings"].forEach(function (id) { $(id).classList.remove("on"); });
-  paintSetup();
-  $("setup").classList.add("on");
-  syncNav("setuplist");
-}
-
-function bumpStep(key, dir) {
-  var g = STAP[key], d = stp.step;
-  if (key === "wheel") {
-    d.wheelDiameterM = Math.max(g.min, Math.min(g.max,
-      Math.round((d.wheelDiameterM + dir * g.d) * 10000) / 10000));
-  } else if (key === "poles") {
-    d.polePairs = Math.max(g.min, Math.min(g.max, d.polePairs + dir));
-  } else if (key === "gear") {
-    d.gearRatio = Math.max(g.min, Math.min(g.max,
-      Math.round((d.gearRatio + dir * g.d) * 100) / 100));
+$("steplist").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest("[data-s]");
+  if (!b || !stp.step) return;
+  e.preventDefault();
+  var k = b.getAttribute("data-s"), dir = Number(b.getAttribute("data-d")), g = STAPGRENZEN[k];
+  if (k === "batteryCells") {
+    /* Onder de ondergrens staat "auto": dan raadt de server het uit de
+       pakspanning, en dat is beter dan een getal waarvan je niet zeker bent. */
+    var n = (stp.step.batteryCells || g.min) + dir;
+    stp.step.batteryCells = n <= g.min ? null : Math.min(g.max, n);
   } else {
-    /* Onder de ondergrens staat "auto": dan raadt de Pi het uit de spanning,
-       en dat is beter dan een getal waarvan je niet zeker bent. */
-    var n = (d.batteryCells || g.min) + dir;
-    d.batteryCells = n <= g.min ? null : Math.min(g.max, n);
+    var v = stp.step[k] + dir * g.d;
+    stp.step[k] = Math.max(g.min, Math.min(g.max, Number(v.toFixed(g.dec))));
   }
   stp.vuil = true;
   paintSetup();
-}
-
-function saveSetup() {
+});
+$("stepsave").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
   if (stp.bezig || !stp.vuil) return;
   stp.bezig = true;
   paintSetup();
@@ -882,736 +675,353 @@ function saveSetup() {
     stp.bezig = false;
     paintSetup();
   });
-}
-
-$("setuplist").addEventListener("pointerdown", function (e) {
-  var s = e.target.closest(".step[data-s]");
-  if (s) { e.preventDefault(); bumpStep(s.dataset.s, +s.dataset.d); return; }
-  var b = e.target.closest("#stepsave");
-  if (b) { e.preventDefault(); saveSetup(); }
 });
-$("setupclose").addEventListener("pointerdown", function (e) {
-  e.preventDefault(); $("setup").classList.remove("on"); openSettings();
+$("opensetup").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); paintSetup(); openSheet("setup");
 });
-$("stepbtn").addEventListener("pointerdown", function (e) { e.preventDefault(); openSetup(); });
 
-/* ── bijwerken ─────────────────────────────────────────────────────────────
-   De service kijkt bij het opstarten of er een nieuwe versie op GitHub staat.
+/* ── bijwerken ───────────────────────────────────────────────────────────── */
+/* De service kijkt bij het opstarten of er iets nieuws op GitHub staat.
    Installeren blijft een bewuste tik: een kapotte versie die zichzelf tijdens
    het opstarten op je stuur zet, wil je niet. */
+var upd = { available: false, running: false, error: null, notes: [], repo: "", version: "", date: "" };
 
-var upd = { available: false, running: false, checked: false, text: "", cls: "", version: "—" };
+function paintUpd() {
+  var label, ico, klasse = "";
+  if (upd.running) { label = t.updInstalling; ico = "i-arrows-clockwise"; }
+  else if (upd.zoeken) { label = t.updSearching; ico = "i-arrows-clockwise"; }
+  else if (upd.error) { label = t.updFailed; ico = "i-git-branch"; }
+  else if (upd.available) { label = t.updAvailable; ico = "i-download-simple-f"; klasse = "avail"; }
+  else { label = t.updOk; ico = "i-check-circle-f"; klasse = "ok"; }
+  txt("updlabel", label);
+  icon("updicon", ico);
+  cls("updrow", "avail", klasse === "avail");
+  cls("updrow", "ok", klasse === "ok");
+  txt("updmeta", upd.available
+    ? upd.repo + " · " + upd.version
+    : (upd.error ? upd.error : t.updCurrent + ": " + (upd.current || "—") + " · GitHub"));
 
-/* Unix-tijd (seconden) → 28-07-2026 */
-function updDate(t) {
-  if (!t) return "";
-  var d = new Date(t * 1000);
+  txt("relrepo", upd.repo);
+  txt("relversion", upd.version);
+  txt("reldate", upd.date);
+  txt("rellabel", upd.running ? t.updInstalling : t.updNow + " " + upd.version);
+  icon("relicon", upd.running ? "i-arrows-clockwise" : "i-download-simple");
+  $("relnotes").innerHTML = upd.notes.length
+    ? upd.notes.map(function (c) {
+      return '<div class="note"><span class="sha">' + esc(c.sha) + "</span>"
+        + '<span class="msg">' + esc(c.msg) + "</span></div>";
+    }).join("")
+    : '<div class="empty">' + esc(t.noNotes) + "</div>";
+}
+
+function datumKort(iso) {
+  if (!iso) return "";
+  var d = new Date(iso);
+  if (isNaN(d)) return "";
   return ("0" + d.getDate()).slice(-2) + "-" + ("0" + (d.getMonth() + 1)).slice(-2)
     + "-" + d.getFullYear();
 }
-var updTimer = null;
 
-function paintUpdate() {
-  var st = $("setupd"), b = $("updbtn");
-  if (!st) return;
-  $("setver").textContent = upd.version;
-  st.textContent = upd.text;
-  st.className = "setstat" + (upd.cls ? " " + upd.cls : "");
-  b.textContent = upd.running ? "Bezig…" : (upd.available ? "Installeren" : "Zoeken");
-  b.style.opacity = upd.running ? "0.45" : "1";
-}
-
-function readUpdate(u) {
-  /* De volledige versie staat onderaan de instellingen; de rij bovenaan toont
-     alleen of er iets nieuws is. */
-  if (u.currentShort) {
-    upd.version = u.currentShort
-      + (u.branch && u.branch !== "main" ? " (" + u.branch + ")" : "")
-      + (u.installedAt ? " · " + updDate(u.installedAt) : "");
-  } else {
-    upd.version = "onbekend";
-  }
-
-  if (u.running) {
-    upd.running = true;
-    upd.text = u.runMessage ? u.runMessage + "…" : "bezig…";
-    upd.cls = "";
-  } else if (u.runState === "fout") {
-    upd.running = false;
-    upd.available = !!u.available;
-    upd.text = u.runMessage || "mislukt";
-    upd.cls = "bad";
-  } else if (u.error) {
-    upd.running = false;
-    upd.available = false;
-    upd.text = u.error;
-    upd.cls = "bad";
-  } else if (u.available) {
-    upd.running = false;
-    upd.available = true;
-    upd.text = "nieuw: " + u.latestShort;
-    upd.cls = "new";
-  } else {
-    upd.running = false;
-    upd.available = false;
-    upd.text = u.currentShort ? "actueel · " + u.currentShort : "actueel";
-    upd.cls = "";
-  }
-  upd.checked = true;
-  paintUpdate();
-}
-
-function fetchUpdate(force) {
+function haalUpdate(force) {
   return fetch("/update" + (force ? "?check=1" : ""), { cache: "no-store" })
-    .then(function (r) {
-      if (!r.ok) throw { code: r.status };
-      return r.json();
-    })
-    .then(readUpdate)
-    ["catch"](function (e) {
-      /* Tijdens de herstart aan het eind van een update is de server even weg;
-         dat is geen fout, dus laat de tekst dan staan. */
-      if (upd.running) return;
-      /* 404 betekent iets anders dan "geen netwerk": dan draait er een versie
-         van vóór deze knop, en moet je die ene keer met de hand bijwerken. */
-      upd.text = (e && e.code === 404) ? "server te oud — werk handmatig bij" : "niet bereikbaar";
-      upd.cls = "bad";
-      upd.checked = true;
-      paintUpdate();
-    });
+    .then(function (r) { return r.json(); })
+    .then(function (u) {
+      upd.running = !!u.running;
+      upd.available = !!u.available;
+      upd.error = u.error || (u.runState === "fout" ? u.runMessage : null);
+      upd.repo = u.repo || "";
+      upd.current = u.currentShort || null;
+      upd.version = u.latestShort || u.currentShort || "—";
+      upd.date = datumKort(u.latestDate);
+      upd.notes = u.notes || [];
+      upd.zoeken = false;
+      paintUpd();
+      /* Tijdens een installatie blijven kijken: de rij moet meelopen. */
+      if (upd.running) setTimeout(function () { haalUpdate(false); }, 2000);
+    })["catch"](function () { upd.zoeken = false; paintUpd(); });
 }
 
-/* Zolang er iets loopt elke 2 s kijken; anders stoppen. */
-function followUpdate() {
-  clearInterval(updTimer);
-  updTimer = setInterval(function () {
-    fetchUpdate(false).then(function () {
-      if (!upd.running) { clearInterval(updTimer); updTimer = null; }
-    });
-  }, 2000);
-}
-
-$("updbtn").addEventListener("pointerdown", function (e) {
+$("updrow").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  if (upd.available) { paintUpd(); openSheet("release"); return; }
+  upd.zoeken = true;
+  paintUpd();
+  haalUpdate(true);
+});
+$("reldo").addEventListener("pointerdown", function (e) {
   e.preventDefault();
   if (upd.running) return;
-  var b = $("updbtn");
-  b.classList.add("hit");
-  setTimeout(function () { b.classList.remove("hit"); }, 90);
-
-  if (!upd.available) {                     // zoeken
-    upd.text = "controleren…";
-    upd.cls = "";
-    paintUpdate();
-    fetchUpdate(true);
-    return;
-  }
-  upd.running = true;                       // installeren
-  upd.text = "starten…";
-  upd.cls = "";
-  paintUpdate();
-  fetch("/update", { method: "POST" })
-    .then(function (r) { return r.json()["catch"](function () { return {}; }); })
-    .then(function (res) {
-      if (res && res.error) {
-        upd.running = false;
-        upd.text = res.error;
-        upd.cls = "bad";
-        paintUpdate();
-        return;
-      }
-      followUpdate();
-    })["catch"](function () {
-      upd.running = false;
-      upd.text = "starten mislukt";
-      upd.cls = "bad";
-      paintUpdate();
-    });
+  upd.running = true;
+  paintUpd();
+  fetch("/update", { method: "POST" })["catch"](function () {})
+    ["then"](function () { setTimeout(function () { haalUpdate(false); }, 800); });
 });
 
-/* ── scrollknoppen ─────────────────────────────────────────────────────────
-   De lijsten zijn hoger dan het vlak waarin ze staan — instellingen toont ~3,5
-   van de 7 rijen — en de scrollbalk is verborgen. Twee chevrons per lijst
-   schuiven rij voor rij, zodat je niet hoeft te slepen op een rij vol knoppen.
-   Ingedrukt houden herhaalt: het verbindingsscherm kan 40 netwerken tonen. */
+/* ── verbindingen ────────────────────────────────────────────────────────── */
+var lijst = { wifi: [], bt: [] };
+var zoekt = { wifi: false, bt: false };
 
-var HOLD_START = 400;    // ms voordat het herhalen begint
-var HOLD_STEP = 120;     // ms tussen de herhalingen
-
-function navButtons(id) {
-  return [].slice.call(document.querySelectorAll('[data-scroll="' + id + '"]'));
+function tekenNet(soort) {
+  var items = lijst[soort];
+  var doel = soort === "wifi" ? "wifilist" : "btlist";
+  var h = items.map(function (n) {
+    var meta = n.active ? t.connected
+      : soort === "wifi"
+        ? (n.secured ? "WPA" : "Open") + " · " + (t[n.level >= 4 ? "strong" : n.level >= 2 ? "medium" : "weak"] || "")
+        : (n.known ? t.paired : t.nearby);
+    return '<button class="net' + (n.active ? " on" : "") + '" data-kind="' + soort
+      + '" data-id="' + esc(n.id) + '" data-sec="' + (n.secured ? "1" : "") + '"'
+      + ' data-on="' + (n.active ? "1" : "") + '">'
+      + svg(soort === "wifi" ? "i-wifi-high" : "i-bluetooth")
+      + '<span class="body"><span class="nm">' + esc(n.name) + "</span>"
+      + '<span class="meta">' + esc(meta) + "</span></span>"
+      + '<span class="state">' + svg(n.active ? "i-check-circle-f" : "i-caret-right") + "</span>"
+      + "</button>";
+  }).join("");
+  $(doel).innerHTML = h || '<div class="empty">' + esc(zoekt[soort] ? t.scanning : "—") + "</div>";
+  txt(soort === "wifi" ? "wifiscan" : "btscan", zoekt[soort] ? t.scanning : t.scan);
 }
 
-/** Verberg de knoppen als de lijst past; dim ze aan het begin en het eind. */
-function syncNav(id) {
-  var sc = $(id);
-  if (!sc) return;
-  var max = sc.scrollHeight - sc.clientHeight;
-  var can = max > 1;
-  navButtons(id).forEach(function (b) {
-    b.style.display = can ? "flex" : "none";
-    var atEnd = +b.dataset.dir < 0 ? sc.scrollTop <= 1 : sc.scrollTop >= max - 1;
-    b.classList.toggle("off", can && atEnd);
-  });
+function scan(soort) {
+  zoekt[soort] = true;
+  tekenNet(soort);
+  var u = "/net?kind=" + soort + (soort === "bt" ? "&scan=1" : "");
+  fetch(u, { cache: "no-store" }).then(function (r) { return r.json(); })
+    .then(function (j) { lijst[soort] = j.items || []; })
+    ["catch"](function () {})
+    ["then"](function () { zoekt[soort] = false; tekenNet(soort); });
 }
 
-/**
- * Spring naar de volgende of vorige rijgrens. Mikken op rijgrenzen in plaats
- * van op een vast aantal pixels, want een melding met lange tekst is hoger
- * dan de 56 px van een gewone rij.
- */
-function stepScroll(id, dir) {
-  var sc = $(id);
-  if (!sc) return;
-  var kids = sc.children;
-  var y = sc.scrollTop;
-  var target = null;
-  if (dir > 0) {
-    for (var i = 0; i < kids.length; i++) {
-      if (kids[i].offsetTop > y + 1) { target = kids[i].offsetTop; break; }
-    }
-    if (target === null) target = sc.scrollHeight;
-  } else {
-    for (var j = kids.length - 1; j >= 0; j--) {
-      if (kids[j].offsetTop < y - 1) { target = kids[j].offsetTop; break; }
-    }
-    if (target === null) target = 0;
-  }
-  // Geen behavior:"smooth" — een geanimeerde scroll van 300 ms is te zwaar
-  // voor de trage SPI-display.
-  sc.scrollTop = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, target));
-  syncNav(id);
+$("openconn").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); openSheet("conn"); scan("wifi"); scan("bt");
+});
+$("wifiscan").addEventListener("pointerdown", function (e) { e.preventDefault(); scan("wifi"); });
+$("btscan").addEventListener("pointerdown", function (e) { e.preventDefault(); scan("bt"); });
+
+function verbind(soort, id, connect, wachtwoord) {
+  return fetch("/net", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: soort, id: id, connect: connect, password: wachtwoord || undefined })
+  }).then(function (r) { return r.json().then(function (j) { return { code: r.status, j: j }; }); });
 }
 
-(function bindNav() {
-  var held = null;
-  var stop = function () {
-    if (!held) return;
-    clearTimeout(held.timer);
-    held.btn.classList.remove("hit");
-    held = null;
-  };
-  [].slice.call(document.querySelectorAll("[data-scroll]")).forEach(function (b) {
-    var id = b.dataset.scroll, dir = +b.dataset.dir;
-    b.addEventListener("pointerdown", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (b.classList.contains("off")) return;
-      stop();
-      b.classList.add("hit");
-      stepScroll(id, dir);
-      var repeat = function () {
-        stepScroll(id, dir);
-        if (b.classList.contains("off")) { stop(); return; }
-        if (held) held.timer = setTimeout(repeat, HOLD_STEP);
-      };
-      held = { btn: b, timer: setTimeout(repeat, HOLD_START) };
-    });
-    b.addEventListener("pointerup", stop);
-    b.addEventListener("pointercancel", stop);
-    b.addEventListener("pointerleave", stop);
-  });
-  ["setlist", "netlist", "noticelist"].forEach(function (id) {
-    var sc = $(id);
-    // Ook na slepen met de vinger moeten de knoppen kloppen.
-    if (sc) sc.addEventListener("scroll", function () { syncNav(id); }, { passive: true });
-  });
-})();
-
-/* ── schermtoetsenbord ─────────────────────────────────────────────────────
-   AZERTY. Chromium op desktop-Linux heeft geen eigen aanraaktoetsenbord, dus
-   zonder dit blok is een nieuw beveiligd wifi-netwerk niet te koppelen. */
-
-var SHIFT_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5L4 12h4v7h8v-7h4L12 3.5z"/></svg>';
-var BACK_SVG = '<svg viewBox="0 0 24 24" width="22" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5h13v14H8L2 12 8 5z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></svg>';
-
-/* Elke laag heeft dezelfde vorm: 10 / 10 / 6 tekens plus een brede toets aan
-   weerszijden, zodat de toetsen niet verspringen als je van laag wisselt. */
-var LAYERS = [
-  [
-    ["a", "z", "e", "r", "t", "y", "u", "i", "o", "p"],
-    ["q", "s", "d", "f", "g", "h", "j", "k", "l", "m"],
-    [{ t: "shift" }, "w", "x", "c", "v", "b", "n", { t: "back" }],
-    [{ t: "mode", to: 1, label: "?123" }, { t: "space" }, { t: "go" }]
-  ],
-  [
-    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-    ["-", "/", ":", ";", "(", ")", "€", "&", "@", "\""],
-    [{ t: "mode", to: 2, label: "#+=" }, ".", ",", "?", "!", "'", "`", { t: "back" }],
-    [{ t: "mode", to: 0, label: "ABC" }, { t: "space" }, { t: "go" }]
-  ],
-  [
-    ["[", "]", "{", "}", "<", ">", "\\", "|", "~", "^"],
-    ["%", "*", "+", "=", "_", "§", "£", "$", "°", "#"],
-    [{ t: "mode", to: 1, label: "123" }, "«", "»", "¦", "¤", "¥", "±", { t: "back" }],
-    [{ t: "mode", to: 0, label: "ABC" }, { t: "space" }, { t: "go" }]
-  ]
-];
-
-var MAX_SHOWN = 30;                 // wat er in het veld past
-var kb = { open: false, value: "", layer: 0, shift: 0, masked: true, onDone: null, confirm: "Verbind" };
-
-function kbPaint() {
-  var v = $("kbdval");
-  var s = kb.value;
-  var shown = s.length > MAX_SHOWN ? s.slice(-MAX_SHOWN) : s;
-  var lead = s.length > MAX_SHOWN ? "…" : "";
-  if (!s) {
-    v.className = "empty";
-    v.textContent = "Wachtwoord";
-  } else {
-    v.className = "";
-    v.textContent = lead + (kb.masked ? new Array(shown.length + 1).join("•") : shown);
-  }
-  $("kbdeye").classList.toggle("on", !kb.masked);
-}
-
-function kbRender() {
-  var box = $("kbdkeys");
-  box.innerHTML = "";
-  var rows = LAYERS[kb.layer];
-  for (var r = 0; r < rows.length; r++) {
-    var row = document.createElement("div");
-    row.className = "krow";
-    for (var i = 0; i < rows[r].length; i++) {
-      var spec = rows[r][i];
-      var b = document.createElement("button");
-      if (typeof spec === "string") {
-        b.className = "key";
-        b.dataset.ch = spec;
-        b.textContent = kb.shift && kb.layer === 0 ? spec.toUpperCase() : spec;
-      } else if (spec.t === "shift") {
-        b.className = "key wide" + (kb.shift ? " on" : "");
-        b.dataset.act = "shift";
-        b.innerHTML = SHIFT_SVG;
-      } else if (spec.t === "back") {
-        b.className = "key wide";
-        b.dataset.act = "back";
-        b.innerHTML = BACK_SVG;
-      } else if (spec.t === "mode") {
-        b.className = "key mode";
-        b.dataset.act = "mode";
-        b.dataset.to = String(spec.to);
-        b.textContent = spec.label;
-      } else if (spec.t === "space") {
-        b.className = "key space";
-        b.dataset.ch = " ";
-        b.textContent = "";
-      } else {
-        b.className = "key go";
-        b.dataset.act = "go";
-        b.textContent = kb.confirm;
-      }
-      row.appendChild(b);
-    }
-    box.appendChild(row);
-  }
-  kbPaint();
-}
-
-function kbType(ch) {
-  if (kb.value.length >= 63) return;      // bovengrens van een WPA-wachtwoord
-  kb.value += (kb.shift && ch.length === 1) ? ch.toUpperCase() : ch;
-  if (kb.shift === 1) { kb.shift = 0; kbRender(); return; }
-  kbPaint();
-}
-
-function kbKey(act, node) {
-  if (act === "shift") {
-    /* Tik = één hoofdletter, nog een tik = vast. */
-    kb.shift = kb.shift === 0 ? 1 : (kb.shift === 1 ? 2 : 0);
-    kbRender();
-  } else if (act === "back") {
-    kb.value = kb.value.slice(0, -1);
-    kbPaint();
-  } else if (act === "mode") {
-    kb.layer = +node.dataset.to;
-    kb.shift = 0;
-    kbRender();
-  } else if (act === "go") {
-    var done = kb.onDone, value = kb.value;
-    closeKeyboard();
-    if (done) done(value);
-  }
-}
-
-function openKeyboard(opts) {
-  kb.open = true;
-  kb.value = "";
-  kb.layer = 0;
-  kb.shift = 0;
-  kb.masked = true;
-  kb.onDone = opts.onDone || null;
-  kb.confirm = opts.confirm || "Verbind";
-  $("kbdtitle").textContent = opts.title || "Wachtwoord";
-  kbRender();
-  $("kbd").classList.add("on");
-}
-
-function closeKeyboard() {
-  kb.open = false;
-  kb.value = "";                          // het wachtwoord blijft niet hangen
-  kb.onDone = null;
-  $("kbd").classList.remove("on");
-  kbPaint();
-}
-
-$("kbdkeys").addEventListener("pointerdown", function (e) {
-  var b = e.target.closest(".key");
+function netTik(e) {
+  var b = e.target.closest(".net");
   if (!b) return;
   e.preventDefault();
-  b.classList.add("hit");
-  setTimeout(function () { b.classList.remove("hit"); }, 90);
-  if (b.dataset.act) kbKey(b.dataset.act, b);
-  else kbType(b.dataset.ch);
-});
-$("kbdclose").addEventListener("pointerdown", function (e) { e.preventDefault(); closeKeyboard(); });
-$("kbdeye").addEventListener("pointerdown", function (e) {
+  var soort = b.getAttribute("data-kind"), id = b.getAttribute("data-id");
+  if (b.getAttribute("data-on")) {
+    verbind(soort, id, false)["then"](function () { scan(soort); })["catch"](function () {});
+    return;
+  }
+  if (soort === "wifi" && b.getAttribute("data-sec")) return openPw("wifi", id, b.querySelector(".nm").textContent);
+  verbind(soort, id, true).then(function (r) {
+    if (r.code === 400 && r.j && r.j.needsPassword) return openPw(soort, id, b.querySelector(".nm").textContent);
+    scan(soort);
+  })["catch"](function () {});
+}
+$("wifilist").addEventListener("pointerdown", netTik);
+$("btlist").addEventListener("pointerdown", netTik);
+
+/* ── wachtwoord met schermtoetsenbord ────────────────────────────────────── */
+var pw = { soort: null, id: "", naam: "", tekst: "", shift: false, sym: false, toon: false, fout: false };
+
+var LETTERS = [
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+  ["z", "x", "c", "v", "b", "n", "m"]
+];
+var TEKENS = [
+  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+  ["-", "/", ":", ";", "(", ")", "€", "&", "@", "\""],
+  [".", ",", "?", "!", "'", "+", "=", "#", "%"]
+];
+
+function tekenKeys() {
+  var rijen = (pw.sym ? TEKENS : LETTERS).map(function (r) {
+    return '<div class="keyrow">' + r.map(function (ch) {
+      var lab = pw.shift && !pw.sym ? ch.toUpperCase() : ch;
+      return '<button class="key" data-k="' + esc(lab) + '">' + esc(lab) + "</button>";
+    }).join("") + "</div>";
+  });
+  rijen.push('<div class="keyrow">'
+    + '<button class="key small grey" data-k="sym" style="flex:1.6 1 0">' + (pw.sym ? "abc" : "?123") + "</button>"
+    + '<button class="key grey' + (pw.shift ? " on" : "") + '" data-k="shift">⇧</button>'
+    + '<button class="key small" data-k=" " style="flex:3 1 0">' + esc(t.space) + "</button>"
+    + '<button class="key grey" data-k="back">⌫</button>'
+    + '<button class="key ok" data-k="ok" style="flex:1.4 1 0">✓</button>'
+    + "</div>");
+  $("keyrows").innerHTML = rijen.join("");
+}
+
+function paintPw() {
+  txt("pwkind", pw.soort === "wifi" ? t.wifiPw : t.btPin);
+  txt("pwname", pw.naam);
+  txt("pwmasked", pw.toon ? pw.tekst : "•".repeat(pw.tekst.length));
+  icon("pweye", pw.toon ? "i-eye-slash" : "i-eye");
+  var h = $("pwhint");
+  if (h) { h.textContent = pw.fout ? t.pwErr : t.pwHint; h.className = "hint" + (pw.fout ? " err" : ""); }
+}
+
+function openPw(soort, id, naam) {
+  pw.soort = soort; pw.id = id; pw.naam = naam;
+  pw.tekst = ""; pw.shift = false; pw.sym = false; pw.toon = false; pw.fout = false;
+  tekenKeys(); paintPw(); openSheet("pw");
+}
+
+$("keyrows").addEventListener("pointerdown", function (e) {
+  var b = e.target.closest("[data-k]");
+  if (!b) return;
   e.preventDefault();
-  kb.masked = !kb.masked;
-  kbPaint();
+  var k = b.getAttribute("data-k");
+  if (k === "sym") { pw.sym = !pw.sym; return tekenKeys(); }
+  if (k === "shift") { pw.shift = !pw.shift; return tekenKeys(); }
+  if (k === "back") { pw.tekst = pw.tekst.slice(0, -1); return paintPw(); }
+  if (k === "ok") {
+    /* WPA wil er minstens acht; korter accepteert NetworkManager niet en dan
+       krijg je een foutmelding die nergens op slaat. */
+    if (pw.tekst.length < (pw.soort === "wifi" ? 8 : 4)) { pw.fout = true; return paintPw(); }
+    var w = pw.tekst;
+    hide("pw");
+    verbind(pw.soort, pw.id, true, w).then(function () { scan(pw.soort); })["catch"](function () {});
+    return;
+  }
+  pw.tekst = (pw.tekst + k).slice(0, 63);
+  if (pw.shift && !pw.sym) { pw.shift = false; tekenKeys(); }
+  pw.fout = false;
+  paintPw();
 });
-
-/* Hangt er een USB-toetsenbord aan tijdens het opbouwen, dan werkt dat ook. */
-document.addEventListener("keydown", function (e) {
-  if (!kb.open) return;
-  if (e.key === "Enter") { kbKey("go"); }
-  else if (e.key === "Backspace") { kbKey("back"); }
-  else if (e.key === "Escape") { closeKeyboard(); }
-  else if (e.key.length === 1) { kb.value += e.key; kbPaint(); }
-  else return;
-  e.preventDefault();
+$("pweye").addEventListener("pointerdown", function (e) {
+  e.preventDefault(); pw.toon = !pw.toon; paintPw();
 });
+$("pwcancel").addEventListener("pointerdown", function (e) { e.preventDefault(); hide("pw"); });
 
-/* ── verbindingen ──────────────────────────────────────────────────────── */
-function netStatus(it) {
-  if (net.busy === it.id) return "verbinden…";
-  if (net.error && net.error.id === it.id) return net.error.msg;
-  if (it.active) return "verbonden";
-  if (net.tab === "bt") return it.known ? "gekoppeld" : "koppelen";
-  return (it.secured && !it.known) ? "beveiligd" : "verbind";
-}
-
-function renderNet() {
-  var items = net.items[net.tab] || [];
-  var list = $("netlist");
-  var html = "";
-
-  /* Bovenaan de bluetooth-lijst een rij die zegt of we aan het zoeken zijn en
-     waarmee je opnieuw kunt zoeken. Als knop in de kop erbij paste het niet —
-     die rij heeft al twee tabs, twee scrollpijlen en een sluitknop — en hier
-     staat hij bovendien waar je kijkt als je een apparaat mist. */
-  if (net.tab === "bt") {
-    html += '<button id="btscan" class="scanrow"' + (net.scanning ? " disabled" : "") + '>'
-      + '<span class="nm"></span><span class="st"></span></button>';
-  }
-
-  if (!items.length && !net.scanning) {
-    html += '<div id="netempty"></div>';
-  } else {
-    html += items.map(function (it) {
-      return '<button data-id="' + encodeURIComponent(it.id) + '"' + (it.active ? ' class="sel"' : '') + '>'
-        + '<span class="nm"></span><span class="st"></span></button>';
-    }).join("");
-  }
-  list.innerHTML = html;
-
-  if (net.tab === "bt") {
-    var sc = $("btscan");
-    sc.classList.toggle("busy", net.scanning);
-    sc.querySelector(".nm").textContent = net.scanning ? "Zoeken naar apparaten…" : "Opnieuw zoeken";
-    sc.querySelector(".st").textContent = net.scanErr || (net.scanning ? "even geduld" : "zoek");
-  }
-  if ($("netempty")) {
-    $("netempty").textContent = net.tab === "wifi" ? "Geen netwerken gevonden" : "Niets gevonden";
-  }
-  [].slice.call(list.querySelectorAll("button[data-id]")).forEach(function (b, i) {
-    var it = items[i];
-    b.querySelector(".nm").textContent = it.name;
-    b.querySelector(".st").textContent = netStatus(it);
-  });
-  syncNav("netlist");
-}
-
-function fetchNetList(scan) {
-  var kind = net.tab;
-  var url = "/net?kind=" + kind + (scan && kind === "bt" ? "&scan=1" : "");
-  fetch(url, { cache: "no-store" }).then(function (r) {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(function (j) {
-    net.items[kind] = j.items || [];
-    if (kind === "bt") {
-      net.scanning = !!j.scanning;
-      net.scanErr = j.error || "";
-    }
-    if (net.tab === kind) { renderNet(); pollScan(); }
-  })["catch"](function () {
-    net.items[kind] = [];
-    if (kind === "bt") { net.scanning = false; net.scanErr = ""; }
-    if (net.tab === kind) renderNet();
-  });
-}
-
-/* Zoeken duurt een seconde of twaalf en apparaten komen er één voor één bij,
-   dus tijdens het zoeken halen we de lijst gewoon opnieuw op. Zodra de server
-   zegt dat hij klaar is stopt dat vanzelf. */
-function pollScan() {
-  clearTimeout(net.scanTimer);
-  net.scanTimer = null;
-  if (!net.scanning || net.tab !== "bt" || !$("net").classList.contains("on")) return;
-  net.scanTimer = setTimeout(function () { fetchNetList(false); }, 2000);
-}
-
-function stopScanPoll() {
-  clearTimeout(net.scanTimer);
-  net.scanTimer = null;
-}
-
-function openNet(tab) {
-  net.tab = tab;
-  net.scanErr = "";
-  $("net").classList.add("on");
-  $("segwifi").classList.toggle("on", tab === "wifi");
-  $("segbt").classList.toggle("on", tab === "bt");
-  stopScanPoll();
-  renderNet();
-  syncNav("netlist");              // pas meten als het scherm zichtbaar is
-  /* Bluetooth begint meteen te zoeken, net als wifi. Ook als er al iets
-     verbonden is — dat is juist het moment waarop je iets anders zoekt. */
-  fetchNetList(tab === "bt");
-}
-
-function pickNet(id) {
-  var items = net.items[net.tab] || [];
-  var it = null;
-  for (var i = 0; i < items.length; i++) if (items[i].id === id) it = items[i];
-  if (!it || net.busy) return;
-
-  if (it.active) return sendNet(it, false, null);          // verbonden → verbreken
-  /* Beveiligd en nog niet gekoppeld: eerst het wachtwoord vragen. */
-  if (net.tab === "wifi" && it.secured && !it.known) return askPassword(it);
-  sendNet(it, true, null);
-}
-
-function askPassword(it) {
-  openKeyboard({
-    title: it.name,
-    confirm: "Verbind",
-    onDone: function (pw) {
-      if (pw) sendNet(it, true, pw);
-    }
-  });
-}
-
-function sendNet(it, connect, password) {
-  var id = it.id;
-  net.busy = id;
-  net.error = null;
-  renderNet();
-  var body = { kind: net.tab, id: id, name: it.name, connect: connect };
-  if (password) body.password = password;
-  fetch("/net", {
+/* ── aan/uit ─────────────────────────────────────────────────────────────── */
+$("openpower").addEventListener("pointerdown", function (e) { e.preventDefault(); openSheet("powermenu"); });
+$("powermenu").addEventListener("pointerdown", function (e) {
+  if (e.target === this) { e.preventDefault(); hide("powermenu"); }
+});
+function stroom(actie) {
+  hide("powermenu");
+  txt("offlabel", actie === "reboot" ? t.rebooting : t.tapToWake);
+  icon("officon", actie === "reboot" ? "i-arrows-clockwise" : "i-power");
+  show("off", true);
+  fetch("/power", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  }).then(function (r) { return r.json()["catch"](function () { return {}; }); })
-    .then(function (res) {
-      net.busy = "";
-      /* Mislukt het, dan blijft dat op de rij zelf staan tot de volgende
-         poging — en gaat het toetsenbord opnieuw open als het aan het
-         wachtwoord lag. */
-      if (res && res.error) net.error = { id: id, msg: res.error };
-      fetchNetList();
-      fetchWifi();
-      fetchBt();
-      if (res && res.needsPassword && net.tab === "wifi") askPassword(it);
+    body: JSON.stringify({ action: actie })
+  })["catch"](function () {});
+}
+$("doreboot").addEventListener("pointerdown", function (e) { e.preventDefault(); stroom("reboot"); });
+$("doshutdown").addEventListener("pointerdown", function (e) { e.preventDefault(); stroom("shutdown"); });
+$("off").addEventListener("pointerdown", function (e) { e.preventDefault(); hide("off"); });
+
+/* ── instellingen ────────────────────────────────────────────────────────── */
+$("topright").addEventListener("pointerdown", function (e) { e.preventDefault(); openSheet("settings"); });
+$("openunits").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenUnits(); openSheet("units"); });
+$("openlang").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenLangs(); openSheet("lang"); });
+$("openaccent").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenAccents(); openSheet("accent"); });
+$("openlimits").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenLimits(); openSheet("limits"); });
+$("thememode").addEventListener("pointerdown", function (e) {
+  e.preventDefault();
+  cfg.theme = cfg.theme === "night" ? "day" : "night";
+  applyTheme(); bewaar();
+});
+
+function paintSettings() {
+  txt("unitslabel", isImp() ? "mph · mi · °F" : "km/h · km · °C");
+  txt("langlabel", cfg.lang.toUpperCase());
+  var dot = $("accentdot");
+  if (dot) dot.style.background = cfg.accent;
+}
+
+/* ── alles opnieuw tekenen ───────────────────────────────────────────────── */
+function paintAlles() {
+  applyTheme();
+  paintRide();
+  paintTop();
+  paintSettings();
+  tekenLimits();
+  paintSetup();
+  paintUpd();
+  tekenModi();
+  tekenAlerts();
+}
+
+/* ── draaien ─────────────────────────────────────────────────────────────── */
+/* Het ontwerp is staand, het paneeltje hangt liggend in de step. Deze functie
+   vergelijkt waarvoor de pagina getekend is met wat ze krijgt, en zet er een
+   kwartslag op als die twee niet overeenkomen. Aanraken blijft gewoon werken:
+   de browser rekent tikken door de transform heen terug. */
+function fitRotation() {
+  var root = $("root");
+  var paneelLiggend = window.innerWidth >= window.innerHeight;
+  var deg = paneelLiggend ? (cfg.rotate === 270 ? 270 : 90) : 0;
+  if (!deg) {
+    root.style.position = "relative";
+    root.style.left = "";
+    root.style.top = "";
+    root.style.transform = "";
+    return;
+  }
+  root.style.position = "absolute";
+  /* Ankeren aan wat er echt te zien is, niet aan het venster: Chromium heeft
+     een minimumbreedte en zonder window manager doet fullscreen niets, dus
+     het venster kan breder zijn dan het paneel. */
+  var sw = Math.min(window.innerWidth, (window.screen && screen.width) || window.innerWidth);
+  var sh = Math.min(window.innerHeight, (window.screen && screen.height) || window.innerHeight);
+  root.style.left = Math.round((sw - DESIGN.w) / 2) + "px";
+  root.style.top = Math.round((sh - DESIGN.h) / 2) + "px";
+  root.style.transform = "rotate(" + deg + "deg)";
+}
+window.addEventListener("resize", fitRotation);
+
+/* ── de lus ──────────────────────────────────────────────────────────────── */
+function poll() {
+  fetch("/data", { cache: "no-store" }).then(function (r) { return r.json(); })
+    .then(function (j) {
+      data = j;
+      paintRide();
+      paintTop();
+      bouwAlerts();
+      paintAlarm();
+      paintCharge();
     })["catch"](function () {
-      net.busy = "";
-      net.error = { id: id, msg: "mislukt" };
-      renderNet();
-    });
+      data.connected = false;
+      paintTop();
+    })["then"](function () { setTimeout(poll, POLL_MS); });
 }
 
-$("segwifi").addEventListener("pointerdown", function (e) { e.preventDefault(); openNet("wifi"); });
-$("segbt").addEventListener("pointerdown", function (e) { e.preventDefault(); openNet("bt"); });
-$("netclose").addEventListener("pointerdown", function (e) {
-  e.preventDefault(); stopScanPoll(); $("net").classList.remove("on");
-});
-
-/* Een tik selecteert alleen als de vinger < 10 px beweegt — scrollen
-   selecteert dus niets. */
-var nd = null;
-$("netlist").addEventListener("pointerdown", function (e) {
-  var b = e.target.closest("[data-id]");
-  if (b) { nd = { x: e.clientX, y: e.clientY, id: decodeURIComponent(b.dataset.id) }; return; }
-  var s = e.target.closest("#btscan");
-  nd = s && !s.disabled ? { x: e.clientX, y: e.clientY, scan: true } : null;
-});
-$("netlist").addEventListener("pointerup", function (e) {
-  var d = nd; nd = null;
-  if (!d || Math.abs(e.clientY - d.y) > 10 || Math.abs(e.clientX - d.x) > 10) return;
-  if (d.scan) {
-    net.scanning = true;             // meteen zichtbaar, de server bevestigt zo
-    net.scanErr = "";
-    renderNet();
-    return fetchNetList(true);
-  }
-  pickNet(d.id);
-});
-$("netlist").addEventListener("pointercancel", function () { nd = null; });
-
-/* ── render ────────────────────────────────────────────────────────────── */
-var cacheT = {}, cacheS = {};
-function txt(id, s) { if (cacheT[id] !== s) { cacheT[id] = s; $(id).textContent = s; } }
-function wide(id, pct) {
-  pct = Math.max(0, Math.min(100, pct || 0)).toFixed(0) + "%";
-  if (cacheS["w" + id] !== pct) { cacheS["w" + id] = pct; $(id).style.width = pct; }
-}
-function cls(id, c) { if (cacheS["c" + id] !== c) { cacheS["c" + id] = c; $(id).className = c; } }
-function tempCls(v) { return v >= cfg.tempCrit ? "crit" : (v >= cfg.tempWarn ? "warn" : ""); }
-function batCls(v) { return v < 10 ? "crit" : (v < 20 ? "warn" : ""); }
-function n(v, d) { return (typeof v === "number" && isFinite(v) ? v : 0).toFixed(d || 0); }
-
-/* ── cruisecontrol ─────────────────────────────────────────────────────────
-   De VESC meldt niet of hij aanstaat; de Pi leidt het af uit de hendelstand en
-   de motorstroom (src/cruise.js) en zet het in /data. Hier zijn er twee haken
-   voor de opmaak, zodat een ontwerp er zelf iets van kan maken zonder dat hier
-   vorm vastligt:
-
-     · body krijgt de klasse "cruise" zolang het aanstaat;
-     · elk element met data-cruise krijgt hidden als het uit staat.
-
-   Staat er niets met data-cruise in de opmaak, dan gebeurt er niets. */
-function paintCruise(d) {
-  var aan = !!d.cruise;
-  if (cacheS.cc !== aan) {
-    cacheS.cc = aan;
-    document.body.classList.toggle("cruise", aan);
-  }
-  /* Elke ronde langslopen in plaats van alleen bij een wisseling: dan klopt een
-     element ook als het later in de pagina komt. Er wordt alleen geschreven
-     als de stand echt anders is, dus het kost geen hertekening. */
-  [].slice.call(document.querySelectorAll("[data-cruise]")).forEach(function (e) {
-    if (e.hidden === aan) e.hidden = !aan;
+function pollNet() {
+  Promise.all([
+    fetch("/wifi", { cache: "no-store" }).then(function (r) { return r.json(); })["catch"](function () { return null; }),
+    fetch("/bt", { cache: "no-store" }).then(function (r) { return r.json(); })["catch"](function () { return null; }),
+    fetch("/modem", { cache: "no-store" }).then(function (r) { return r.json(); })["catch"](function () { return null; })
+  ]).then(function (r) {
+    if (r[0]) net.wifi = r[0];
+    if (r[1]) net.bt = r[1];
+    if (r[2]) net.modem = r[2];
+    paintTop();
   });
 }
 
-function paint() {
-  if (MODE === "demo") last = demoTick();
-  var d = last;
-  if (!d) return;
-
-  checkAlarm(d);
-  paintNotice(d);
-  paintCharge(d);
-  paintCruise(d);
-  applyTheme(false);
-
-  var nw = new Date();
-  txt("clock", ("0" + nw.getHours()).slice(-2) + ":" + ("0" + nw.getMinutes()).slice(-2));
-  txt("stxt", MODE === "live" ? "verbonden" : (MODE === "off" ? "geen vesc" : "demo"));
-  cls("dot", MODE === "live" ? "" : (MODE === "off" ? "off" : "demo"));
-
-  /* Zodra de echte VESC-data binnenkomt vervalt alles wat de demo-rit heeft
-     opgebouwd — anders staat er een verzonnen topsnelheid op het scherm.
-     De Pi bewaart de echte waarde, dus daar vallen we op terug. */
-  if (prevMode === "demo" && MODE !== "demo") {
-    topSpeed = bootTopSpeed;
-    cacheT = {}; cacheS = {};
-  }
-  prevMode = MODE;
-
-  /* Topsnelheid loopt door op elk scherm, niet alleen op het rit-scherm. */
-  if (typeof d.speed_kmh === "number" && isFinite(d.speed_kmh)) {
-    topSpeed = Math.max(topSpeed, d.speed_kmh);
-  }
-  var bp = d.battery_pct;
-
-  if (view === 0) {
-    txt("vmaxtxt", n(topSpeed));
-    txt("speed", n(d.speed_kmh));
-    wide("speedbar", d.speed_kmh / cfg.speedMax * 100);
-
-    var lvl = bp <= 15 ? " empty" : (bp <= 30 ? " low" : "");
-    cls("batcard", "card" + lvl);
-    cls("rangecard", "card" + lvl);
-    txt("bat", n(bp));
-    wide("batbar", bp);
-
-    var whkm = d.trip_km > 0.3 ? d.wh_used / d.trip_km : cfg.whPerKm;
-    var range = Math.max(0, cfg.packWh * bp / 100) / Math.max(5, whkm);
-    txt("range", n(range, 1));
-  } else if (view === 1) {
-    txt("tm", n(d.temp_motor));
-    cls("tm", "v big " + tempCls(d.temp_motor));
-    txt("tf", n(d.temp_fet));
-    cls("tf", "v big " + tempCls(d.temp_fet));
-    txt("duty", n(d.duty * 100));
-    wide("dutybar", d.duty * 100);
-    txt("im", n(d.motor_current, 1));
-    txt("ib", n(d.battery_current, 1));
-    txt("rpm", n(d.rpm));
-  } else {
-    var bc = batCls(bp);
-    txt("vv", n(d.voltage, 1));
-    txt("vc", n(d.cell_voltage, 2));
-    txt("bat2", n(bp));
-    cls("bat2", "v mid " + bc);
-    wide("bat2bar", bp);
-    cls("bat2bar", bc === "crit" ? "fill-crit" : (bc === "warn" ? "fill-warn" : ""));
-    txt("wh", n(d.wh_used));
-    txt("trip", n(d.trip_km, 1));
-    txt("whkm", d.trip_km > 0.2 ? n(d.wh_used / d.trip_km, 1) : "—");
-  }
-}
-
-/* ── start ─────────────────────────────────────────────────────────────── */
-function boot(saved) {
-  if (saved) {
-    Object.keys(cfg).forEach(function (k) {
-      if (typeof saved[k] === typeof cfg[k]) cfg[k] = saved[k];
-    });
-    if (saved.pollMs) POLL_MS = Math.max(80, saved.pollMs);
-    if (typeof saved.topSpeed === "number") { topSpeed = bootTopSpeed = saved.topSpeed; }
-  }
-  /* Staat er een andere indeling opgeslagen, dan is dit de verkeerde pagina.
-     Meteen doorsturen, vóór de timers gaan lopen. */
-  if (cfg.layout !== PAGE_LAYOUT) { location.replace(layoutFile(cfg.layout)); return; }
-
-  fitRotation();
-  window.addEventListener("resize", fitRotation);
-
-  applyTheme(true);
-  renderSettings();
-  show(cfg.start);
-
-  poll();
-  setInterval(poll, POLL_MS);
-  setInterval(paint, RENDER_MS);
-  paint();
-
-  paintUpdate();
-  fetchUpdate(false);
-  setInterval(function () { fetchUpdate(false); }, 3600000);
-
-  /* Iets vaker dan de update-controle: de status slaat pas om terwijl je rijdt,
-     en dan wil je de melding niet een uur later zien. */
-  paintSetup();
-  fetchSetup();
-  setInterval(fetchSetup, 20000);
-
-  renderModes();
-  fetchModes();
-  setInterval(fetchModes, 20000);
-
-  fetchWeather();
-  setInterval(fetchWeather, 300000);
-  fetchModem();
-  setInterval(fetchModem, 10000);
-  fetchWifi();
-  fetchBt();
-  setInterval(function () { fetchWifi(); fetchBt(); }, 10000);
-}
-
-fetch("/settings", { cache: "no-store" })
-  .then(function (r) { if (!r.ok) throw 0; return r.json(); })
-  .then(boot)["catch"](function () { boot(null); });
+/* ── starten ─────────────────────────────────────────────────────────────── */
+fetch("/settings", { cache: "no-store" }).then(function (r) { return r.json(); })
+  .then(function (s) { Object.keys(cfg).forEach(function (k) { if (s[k] != null) cfg[k] = s[k]; }); })
+  ["catch"](function () {})
+  ["then"](function () {
+    applyLang();
+    applyTheme();
+    fitRotation();
+    tekenKeys();
+    paintAlles();
+    tikKlok();
+    setInterval(tikKlok, 1000);
+    poll();
+    pollNet();
+    setInterval(pollNet, 5000);
+    haalModi();
+    haalSetup();
+    setInterval(haalSetup, 30000);
+    haalUpdate(false);
+    setInterval(function () { if (!upd.running) haalUpdate(false); }, 300000);
+  });

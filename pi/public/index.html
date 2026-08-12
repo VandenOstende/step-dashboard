@@ -2,377 +2,423 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=480,height=320,initial-scale=1,user-scalable=no">
-<title>Step Dashboard</title>
+<meta name="viewport" content="width=320,height=480,initial-scale=1,user-scalable=no">
+<title>Ride Dash</title>
 <link rel="stylesheet" href="theme.css">
 </head>
-<body data-layout="Liggend">
+<body>
+<!-- De iconen. 45 stuks uit Phosphor (MIT), door tools/build-page.js hier
+     ingezet vanuit tools/icons/. Ze staan in het bestand omdat de Pi geen
+     internet heeft; het ontwerp haalde ze van unpkg. -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+<symbol id="i-bluetooth-connected-f" viewBox="0 0 256 256"><path d="M200,176a8,8,0,0,1-3.2,6.4l-64,48A8,8,0,0,1,128,232a8,8,0,0,1-8-8V144L68.8,182.4a8,8,0,0,1-9.6-12.8L114.67,128,59.2,86.4a8,8,0,0,1,9.6-12.8L120,112V32a8,8,0,0,1,12.8-6.4l64,48a8,8,0,0,1,0,12.8L141.33,128l55.47,41.6A8,8,0,0,1,200,176ZM72,128a12,12,0,1,0-12,12A12,12,0,0,0,72,128Zm132-12a12,12,0,1,0,12,12A12,12,0,0,0,204,116Z"/></symbol>
+<symbol id="i-cell-signal-high-f" viewBox="0 0 256 256"><path d="M198.12,25.23a16,16,0,0,0-17.44,3.46l-160,160A16,16,0,0,0,32,216H192a16,16,0,0,0,16-16V40A15.94,15.94,0,0,0,198.12,25.23ZM192,200H168V64l24-24Z"/></symbol>
+<symbol id="i-check-circle-f" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm45.66,85.66-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<symbol id="i-download-simple-f" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40A8,8,0,0,0,168,96H136V32a8,8,0,0,0-16,0V96H88a8,8,0,0,0-5.66,13.66Z"/></symbol>
+<symbol id="i-gauge-f" viewBox="0 0 256 256"><path d="M240,152v24a16,16,0,0,1-16,16H115.93a4,4,0,0,1-3.24-6.35L174.27,101a8.21,8.21,0,0,0-1.37-11.3,8,8,0,0,0-11.37,1.61l-72,99.06A4,4,0,0,1,86.25,192H32a16,16,0,0,1-16-16V153.13c0-1.79,0-3.57.13-5.33a4,4,0,0,1,4-3.8H48a8,8,0,0,0,8-8.53A8.17,8.17,0,0,0,47.73,128H23.92a4,4,0,0,1-3.87-5c12-43.84,49.66-77.13,95.52-82.28a4,4,0,0,1,4.43,4V72a8,8,0,0,0,8.53,8A8.17,8.17,0,0,0,136,71.73V44.67a4,4,0,0,1,4.43-4A112.18,112.18,0,0,1,236.23,123a4,4,0,0,1-3.88,5H208.27a8.17,8.17,0,0,0-8.25,7.47,8,8,0,0,0,8,8.53h27.92a4,4,0,0,1,4,3.86C240,149.23,240,150.61,240,152Z"/></symbol>
+<symbol id="i-lightning-f" viewBox="0 0 256 256"><path d="M213.85,125.46l-112,120a8,8,0,0,1-13.69-7l14.66-73.33L45.19,143.49a8,8,0,0,1-3-13l112-120a8,8,0,0,1,13.69,7L153.18,90.9l57.63,21.61a8,8,0,0,1,3,12.95Z"/></symbol>
+<symbol id="i-warning-f" viewBox="0 0 256 256"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/></symbol>
+<symbol id="i-wifi-high-f" viewBox="0 0 256 256"><path d="M244.35,92.8l-104,125.43A15.93,15.93,0,0,1,128,224h0a15.93,15.93,0,0,1-12.31-5.77L11.65,92.8A15.65,15.65,0,0,1,8.11,80.91,15.93,15.93,0,0,1,14.28,70.1,186.67,186.67,0,0,1,128,32,186.67,186.67,0,0,1,241.72,70.1a15.93,15.93,0,0,1,6.17,10.81A15.65,15.65,0,0,1,244.35,92.8Z"/></symbol>
+<symbol id="i-arrow-counter-clockwise" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z"/></symbol>
+<symbol id="i-arrow-line-up" viewBox="0 0 256 256"><path d="M205.66,138.34a8,8,0,0,1-11.32,11.32L136,91.31V224a8,8,0,0,1-16,0V91.31L61.66,149.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0ZM216,32H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></symbol>
+<symbol id="i-arrows-clockwise" viewBox="0 0 256 256"><path d="M224,48V96a8,8,0,0,1-8,8H168a8,8,0,0,1,0-16h28.69L182.06,73.37a79.56,79.56,0,0,0-56.13-23.43h-.45A79.52,79.52,0,0,0,69.59,72.71,8,8,0,0,1,58.41,61.27a96,96,0,0,1,135,.79L208,76.69V48a8,8,0,0,1,16,0ZM186.41,183.29a80,80,0,0,1-112.47-.66L59.31,168H88a8,8,0,0,0,0-16H40a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V179.31l14.63,14.63A95.43,95.43,0,0,0,130,222.06h.53a95.36,95.36,0,0,0,67.07-27.33,8,8,0,0,0-11.18-11.44Z"/></symbol>
+<symbol id="i-battery-charging" viewBox="0 0 256 256"><path d="M200,56H32A24,24,0,0,0,8,80v96a24,24,0,0,0,24,24H200a24,24,0,0,0,24-24V80A24,24,0,0,0,200,56Zm8,120a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V80a8,8,0,0,1,8-8H200a8,8,0,0,1,8,8Zm48-80v64a8,8,0,0,1-16,0V96a8,8,0,0,1,16,0ZM138.81,123.79a8,8,0,0,1,.35,7.79l-16,32a8,8,0,0,1-14.32-7.16L119.06,136H100a8,8,0,0,1-7.16-11.58l16-32a8,8,0,1,1,14.32,7.16L112.94,120H132A8,8,0,0,1,138.81,123.79Z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 256 256"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></symbol>
+<symbol id="i-bluetooth-slash" viewBox="0 0 256 256"><path d="M221.92,210.62l-160-176A8,8,0,0,0,50.08,45.38l70.84,77.93L59.2,169.6a8,8,0,1,0,9.6,12.8L120,144v80a8,8,0,0,0,12.8,6.4l50.83-38.12,26.45,29.1a8,8,0,1,0,11.84-10.76ZM136,208V144l11.73,8.8,25.08,27.59ZM120,71.63V32a8,8,0,0,1,12.8-6.4l64,48a8,8,0,0,1,0,12.8l-33.53,25.15a8,8,0,0,1-9.6-12.8l25-18.75L136,48V71.63a8,8,0,0,1-16,0Z"/></symbol>
+<symbol id="i-bluetooth" viewBox="0 0 256 256"><path d="M196.8,169.6,141.33,128,196.8,86.4a8,8,0,0,0,0-12.8l-64-48A8,8,0,0,0,120,32v80L68.8,73.6a8,8,0,0,0-9.6,12.8L114.67,128,59.2,169.6a8,8,0,1,0,9.6,12.8L120,144v80a8,8,0,0,0,12.8,6.4l64-48a8,8,0,0,0,0-12.8ZM136,48l42.67,32L136,112Zm0,160V144l42.67,32Z"/></symbol>
+<symbol id="i-caret-left" viewBox="0 0 256 256"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></symbol>
+<symbol id="i-caret-right" viewBox="0 0 256 256"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></symbol>
+<symbol id="i-cell-signal-slash" viewBox="0 0 256 256"><path d="M88,152v48a8,8,0,0,1-16,0V152a8,8,0,0,1,16,0ZM40,184a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-8A8,8,0,0,0,40,184Zm173.92,26.62-160-176A8,8,0,1,0,42.08,45.38L112,122.29V200a8,8,0,0,0,16,0V139.89l24,26.4V200a8,8,0,0,0,16,0V183.89l34.08,37.49a8,8,0,1,0,11.84-10.76Zm-53.92-87a8,8,0,0,0,8-8V72a8,8,0,0,0-16,0v43.63A8,8,0,0,0,160,123.63Zm40,44a8,8,0,0,0,8-8V32a8,8,0,0,0-16,0V159.63A8,8,0,0,0,200,167.63Z"/></symbol>
+<symbol id="i-chart-line" viewBox="0 0 256 256"><path d="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0v94.37L90.73,98a8,8,0,0,1,10.07-.38l58.81,44.11L218.73,90a8,8,0,1,1,10.54,12l-64,56a8,8,0,0,1-10.07.38L96.39,114.29,40,163.63V200H224A8,8,0,0,1,232,208Z"/></symbol>
+<symbol id="i-circle" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Z"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 256 256"><path d="M152,96H104a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V104A8,8,0,0,0,152,96Zm-8,48H112V112h32Zm88,0H216V112h16a8,8,0,0,0,0-16H216V56a16,16,0,0,0-16-16H160V24a8,8,0,0,0-16,0V40H112V24a8,8,0,0,0-16,0V40H56A16,16,0,0,0,40,56V96H24a8,8,0,0,0,0,16H40v32H24a8,8,0,0,0,0,16H40v40a16,16,0,0,0,16,16H96v16a8,8,0,0,0,16,0V216h32v16a8,8,0,0,0,16,0V216h40a16,16,0,0,0,16-16V160h16a8,8,0,0,0,0-16Zm-32,56H56V56H200v95.87s0,.09,0,.13,0,.09,0,.13V200Z"/></symbol>
+<symbol id="i-download-simple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"/></symbol>
+<symbol id="i-eye-slash" viewBox="0 0 256 256"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l22,24.21a8,8,0,1,0,11.84-10.76Zm47.33,75.84,41.67,45.85a32,32,0,0,1-41.67-45.85ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.16,133.16,0,0,1,25,128c4.69-8.79,19.66-33.39,47.35-49.38l18,19.75a48,48,0,0,0,63.66,70l14.73,16.2A112,112,0,0,1,128,192Zm6-95.43a8,8,0,0,1,3-15.72,48.16,48.16,0,0,1,38.77,42.64,8,8,0,0,1-7.22,8.71,6.39,6.39,0,0,1-.75,0,8,8,0,0,1-8-7.26A32.09,32.09,0,0,0,134,96.57Zm113.28,34.69c-.42.94-10.55,23.37-33.36,43.8a8,8,0,1,1-10.67-11.92A132.77,132.77,0,0,0,231.05,128a133.15,133.15,0,0,0-23.12-30.77C185.67,75.19,158.78,64,128,64a118.37,118.37,0,0,0-19.36,1.57A8,8,0,1,1,106,49.79,134,134,0,0,1,128,48c34.88,0,66.57,13.26,91.66,38.35,18.83,18.83,27.3,37.62,27.65,38.41A8,8,0,0,1,247.31,131.26Z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 256 256"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></symbol>
+<symbol id="i-fan" viewBox="0 0 256 256"><path d="M233,135a60,60,0,0,0-89.62-35.45l16.39-65.44a8,8,0,0,0-3.45-8.68A60,60,0,1,0,95.69,128.91L30.82,147.44a8,8,0,0,0-5.8,7.32,60,60,0,0,0,44.42,60.66,60.52,60.52,0,0,0,15.62,2.07,60.07,60.07,0,0,0,59.88-62l48.48,46.92a8,8,0,0,0,9.25,1.35A60,60,0,0,0,233,135Zm-121-7a16,16,0,1,1,16,16A16,16,0,0,1,112,128ZM80,76a44,44,0,0,1,62.75-39.82L127.77,96A32,32,0,0,0,99.85,112.8,43.85,43.85,0,0,1,80,76Zm27,119.57a44,44,0,0,1-65.86-34.43l59.31-16.94A32,32,0,0,0,128,160l.91,0A43.82,43.82,0,0,1,107,195.57Zm106.17-23a43.92,43.92,0,0,1-13,14.14l-44.32-42.89a31.91,31.91,0,0,0-.59-32.57,44,44,0,0,1,57.91,61.32Z"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 256 256"><path d="M207.06,72.67A111.24,111.24,0,0,0,128,40h-.4C66.07,40.21,16,91,16,153.13V176a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V152A111.25,111.25,0,0,0,207.06,72.67ZM224,176H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,176H32V153.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V80a8,8,0,0,0,16,0V56.33A96.14,96.14,0,0,1,221,128H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"/></symbol>
+<symbol id="i-gear-six" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol>
+<symbol id="i-git-branch" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64ZM64,64A16,16,0,1,1,80,80,16,16,0,0,1,64,64ZM96,192a16,16,0,1,1-16-16A16,16,0,0,1,96,192ZM200,80a16,16,0,1,1,16-16A16,16,0,0,1,200,80Z"/></symbol>
+<symbol id="i-lock-simple" viewBox="0 0 256 256"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Z"/></symbol>
+<symbol id="i-minus" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128Z"/></symbol>
+<symbol id="i-moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol>
+<symbol id="i-palette" viewBox="0 0 256 256"><path d="M200.77,53.89A103.27,103.27,0,0,0,128,24h-1.07A104,104,0,0,0,24,128c0,43,26.58,79.06,69.36,94.17A32,32,0,0,0,136,192a16,16,0,0,1,16-16h46.21a31.81,31.81,0,0,0,31.2-24.88,104.43,104.43,0,0,0,2.59-24A103.28,103.28,0,0,0,200.77,53.89Zm13,93.71A15.89,15.89,0,0,1,198.21,160H152a32,32,0,0,0-32,32,16,16,0,0,1-21.31,15.07C62.49,194.3,40,164,40,128a88,88,0,0,1,87.09-88h.9a88.35,88.35,0,0,1,88,87.25A88.86,88.86,0,0,1,213.81,147.6ZM140,76a12,12,0,1,1-12-12A12,12,0,0,1,140,76ZM96,100A12,12,0,1,1,84,88,12,12,0,0,1,96,100Zm0,56a12,12,0,1,1-12-12A12,12,0,0,1,96,156Zm88-56a12,12,0,1,1-12-12A12,12,0,0,1,184,100Z"/></symbol>
+<symbol id="i-plugs" viewBox="0 0 256 256"><path d="M149.66,138.34a8,8,0,0,0-11.32,0L120,156.69,99.31,136l18.35-18.34a8,8,0,0,0-11.32-11.32L88,124.69,69.66,106.34a8,8,0,0,0-11.32,11.32L64.69,124,41.37,147.31a32,32,0,0,0,0,45.26l5.38,5.37-28.41,28.4a8,8,0,0,0,11.32,11.32l28.4-28.41,5.37,5.38a32,32,0,0,0,45.26,0L132,191.31l6.34,6.35a8,8,0,0,0,11.32-11.32L131.31,168l18.35-18.34A8,8,0,0,0,149.66,138.34Zm-52.29,65a16,16,0,0,1-22.62,0L52.69,181.25a16,16,0,0,1,0-22.62L76,135.31,120.69,180Zm140.29-185a8,8,0,0,0-11.32,0l-28.4,28.41-5.37-5.38a32.05,32.05,0,0,0-45.26,0L124,64.69l-6.34-6.35a8,8,0,0,0-11.32,11.32l80,80a8,8,0,0,0,11.32-11.32L191.31,132l23.32-23.31a32,32,0,0,0,0-45.26l-5.38-5.37,28.41-28.4A8,8,0,0,0,237.66,18.34Zm-34.35,79L180,120.69,135.31,76l23.32-23.31a16,16,0,0,1,22.62,0l22.06,22A16,16,0,0,1,203.31,97.37Z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></symbol>
+<symbol id="i-power" viewBox="0 0 256 256"><path d="M120,128V48a8,8,0,0,1,16,0v80a8,8,0,0,1-16,0Zm60.37-78.7a8,8,0,0,0-8.74,13.4C194.74,77.77,208,101.57,208,128a80,80,0,0,1-160,0c0-26.43,13.26-50.23,36.37-65.3a8,8,0,0,0-8.74-13.4C47.9,67.38,32,96.06,32,128a96,96,0,0,0,192,0C224,96.06,208.1,67.38,180.37,49.3Z"/></symbol>
+<symbol id="i-ruler" viewBox="0 0 256 256"><path d="M235.32,73.37,182.63,20.69a16,16,0,0,0-22.63,0L20.68,160a16,16,0,0,0,0,22.63l52.69,52.68a16,16,0,0,0,22.63,0L235.32,96A16,16,0,0,0,235.32,73.37ZM84.68,224,32,171.31l32-32,26.34,26.35a8,8,0,0,0,11.32-11.32L75.31,128,96,107.31l26.34,26.35a8,8,0,0,0,11.32-11.32L107.31,96,128,75.31l26.34,26.35a8,8,0,0,0,11.32-11.32L139.31,64l32-32L224,84.69Z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 256 256"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol>
+<symbol id="i-thermometer-hot" viewBox="0 0 256 256"><path d="M128,153V48a8,8,0,0,0-16,0V153a32,32,0,1,0,16,0Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,120,200Zm40-66V48a40,40,0,0,0-80,0v86a64,64,0,1,0,80,0Zm-40,98a48,48,0,0,1-27.42-87.4A8,8,0,0,0,96,138V48a24,24,0,0,1,48,0v90a8,8,0,0,0,3.42,6.56A48,48,0,0,1,120,232ZM177.3,80.77a8,8,0,0,1,2.33-11.07c15-9.79,26.87-4.75,35.51-1.06C223,72,227.76,74,235.63,68.89a8,8,0,0,1,8.74,13.41C237.88,86.53,232,88,226.69,88c-7,0-12.92-2.54-17.83-4.63C201,80,196.24,78,188.37,83.11A8,8,0,0,1,177.3,80.77Zm69.4,22.46a8,8,0,0,1-2.33,11.07C237.88,118.53,232,120,226.69,120c-7,0-12.92-2.54-17.83-4.63-7.87-3.36-12.62-5.38-20.49-.25a8,8,0,0,1-8.74-13.41c15-9.79,26.87-4.75,35.51-1.06,7.87,3.36,12.62,5.39,20.49.25A8,8,0,0,1,246.7,103.23Z"/></symbol>
+<symbol id="i-thermometer-simple" viewBox="0 0 256 256"><path d="M136,153V88a8,8,0,0,0-16,0v65a32,32,0,1,0,16,0Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,128,200Zm40-66V48a40,40,0,0,0-80,0v86a64,64,0,1,0,80,0Zm-40,98a48,48,0,0,1-27.42-87.4A8,8,0,0,0,104,138V48a24,24,0,0,1,48,0v90a8,8,0,0,0,3.42,6.56A48,48,0,0,1,128,232Z"/></symbol>
+<symbol id="i-timer" viewBox="0 0 256 256"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
+<symbol id="i-translate" viewBox="0 0 256 256"><path d="M247.15,212.42l-56-112a8,8,0,0,0-14.31,0l-21.71,43.43A88,88,0,0,1,108,126.93,103.65,103.65,0,0,0,135.69,64H160a8,8,0,0,0,0-16H104V32a8,8,0,0,0-16,0V48H32a8,8,0,0,0,0,16h87.63A87.76,87.76,0,0,1,96,116.35a87.74,87.74,0,0,1-19-31,8,8,0,1,0-15.08,5.34A103.63,103.63,0,0,0,84,127a87.55,87.55,0,0,1-52,17,8,8,0,0,0,0,16,103.46,103.46,0,0,0,64-22.08,104.18,104.18,0,0,0,51.44,21.31l-26.6,53.19a8,8,0,0,0,14.31,7.16L148.94,192h70.11l13.79,27.58A8,8,0,0,0,240,224a8,8,0,0,0,7.15-11.58ZM156.94,176,184,121.89,211.05,176Z"/></symbol>
+<symbol id="i-warning" viewBox="0 0 256 256"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></symbol>
+<symbol id="i-wifi-high" viewBox="0 0 256 256"><path d="M140,204a12,12,0,1,1-12-12A12,12,0,0,1,140,204ZM237.08,87A172,172,0,0,0,18.92,87,8,8,0,0,0,29.08,99.37a156,156,0,0,1,197.84,0A8,8,0,0,0,237.08,87ZM205,122.77a124,124,0,0,0-153.94,0A8,8,0,0,0,61,135.31a108,108,0,0,1,134.06,0,8,8,0,0,0,11.24-1.3A8,8,0,0,0,205,122.77Zm-32.26,35.76a76.05,76.05,0,0,0-89.42,0,8,8,0,0,0,9.42,12.94,60,60,0,0,1,70.58,0,8,8,0,1,0,9.42-12.94Z"/></symbol>
+<symbol id="i-wifi-slash" viewBox="0 0 256 256"><path d="M213.92,210.62a8,8,0,1,1-11.84,10.76l-52-57.15a60,60,0,0,0-57.41,7.24,8,8,0,1,1-9.42-12.93A75.43,75.43,0,0,1,128,144c1.28,0,2.55,0,3.82.1L104.9,114.49A108,108,0,0,0,61,135.31,8,8,0,0,1,49.73,134,8,8,0,0,1,51,122.77a124.27,124.27,0,0,1,41.71-21.66L69.37,75.4a155.43,155.43,0,0,0-40.29,24A8,8,0,0,1,18.92,87,171.87,171.87,0,0,1,58,62.86L42.08,45.38A8,8,0,1,1,53.92,34.62ZM128,192a12,12,0,1,0,12,12A12,12,0,0,0,128,192ZM237.08,87A172.3,172.3,0,0,0,106,49.4a8,8,0,1,0,2,15.87A158.33,158.33,0,0,1,128,64a156.25,156.25,0,0,1,98.92,35.37A8,8,0,0,0,237.08,87ZM195,135.31a8,8,0,0,0,11.24-1.3,8,8,0,0,0-1.3-11.24,124.25,124.25,0,0,0-51.73-24.2A8,8,0,1,0,150,114.24,108.12,108.12,0,0,1,195,135.31Z"/></symbol>
+<symbol id="i-x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+</svg>
+
 <div id="root">
 
+  <!-- ── titelbalk ──────────────────────────────────────────────────────── -->
   <div id="top">
     <div id="topleft">
-      <div id="outside">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 13.6V5a2 2 0 014 0v8.6a4.5 4.5 0 11-4 0z"/></svg>
-        <span id="outtemp">--&deg;</span>
-      </div>
+      <span id="link"></span>
+      <span id="linkname">D100L</span>
+      <span class="sep">·</span>
+      <span id="linksub">VESC</span>
     </div>
-    <div id="status">
-      <svg id="wifiico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke-width="1.8" stroke-linecap="round">
-        <path class="wa" data-lv="3" d="M2.5 8.5a14 14 0 0119 0" stroke="var(--track)"/>
-        <path class="wa" data-lv="2" d="M6 12.2a9 9 0 0112 0" stroke="var(--track)"/>
-        <path class="wa" data-lv="1" d="M9.4 15.8a4.2 4.2 0 015.2 0" stroke="var(--track)"/>
-        <circle id="wadot" cx="12" cy="19.4" r="1.1" fill="var(--track)" stroke="none"/>
-      </svg>
-      <svg id="btico" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
-      <div id="cellgrp">
-        <div id="sig"><span></span><span></span><span></span><span></span><span></span></div>
-        <span id="tech">--</span>
-      </div>
+    <button id="topright">
+      <svg class="ico" id="btico"><use href="#i-bluetooth-slash"></use></svg>
+      <svg class="ico" id="wifiico"><use href="#i-wifi-slash"></use></svg>
+      <span id="cellgrp">
+        <svg class="ico" id="cellico"><use href="#i-cell-signal-slash"></use></svg>
+        <span id="celltxt">--</span>
+      </span>
       <span id="clock">--:--</span>
-      <button id="statusbtn"><span id="dot"></span><span id="stxt">--</span></button>
+      <svg class="ico gear"><use href="#i-gear-six"></use></svg>
+    </button>
+  </div>
+
+  <!-- ── rijscherm ──────────────────────────────────────────────────────── -->
+  <div id="ride">
+    <div id="ridemid">
+      <div id="railleft">
+        <button id="bell"><svg class="ico" id="bellico"><use href="#i-bell"></use></svg></button>
+        <!-- De modusknoppen. app.js vult deze doos uit /modes; alleen de
+             actieve is zichtbaar en tikken loopt door de standen heen. -->
+        <div id="modes"></div>
+        <div id="cruise" data-cruise hidden><svg class="ico"><use href="#i-gauge-f"></use></svg></div>
+      </div>
+
+      <button id="speedbtn">
+        <span id="speed">0</span>
+        <span id="speedunit">km/h</span>
+      </button>
+
+      <div id="railright">
+        <div id="dutytrack"><i id="dutyfill"></i><i class="ticks"></i></div>
+        <span class="micro">Duty</span>
+      </div>
+    </div>
+
+    <div id="battrow">
+      <div class="battmain">
+        <div class="battline">
+          <span class="val"><span id="battpct">0</span><span class="u">%</span></span>
+          <span id="battva">-- V · -- A</span>
+        </div>
+        <div id="batttrack"><i id="battfill"></i></div>
+      </div>
+      <div class="vrule"></div>
+      <div class="battrange">
+        <span class="micro" data-t="range">Bereik</span>
+        <span class="val"><span id="range">0</span><span class="u" id="rangeunit">km</span></span>
+      </div>
+    </div>
+
+    <div id="cards">
+      <button id="tripcard" class="card">
+        <span class="micro" id="triplbl" data-t="trip">Trip A</span>
+        <span class="big" id="tripval">0</span>
+        <span class="sub" id="tripsub">0m</span>
+      </button>
+      <div class="card">
+        <span class="micro" data-t="odo">ODO</span>
+        <span class="big" id="odo">0</span>
+        <span class="sub"><span id="odounit">km</span> <span data-t="kmTotal">totaal</span></span>
+      </div>
+      <div class="card">
+        <span class="micro" data-t="temps">Temp.</span>
+        <span class="big" id="motortemp">0°</span>
+        <span class="sub">esc <span id="esctemp">0</span>°</span>
+      </div>
     </div>
   </div>
 
-  <button id="notice">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
-    <span id="noticetxt">--</span>
-    <span id="noticemore">alle</span>
-  </button>
-
-  <div id="panes">
-
-    <!-- 1 · RIT -->
-    <div class="pane on" id="p0">
-      <div id="speedbox">
-        <span class="k">Snelheid</span>
-        <div id="speedrow">
-          <div id="speed">0</div>
-          <div id="speedmeta">
-            <div id="speedunit">km/u</div>
-            <div id="vmaxrow">max <span id="vmaxtxt">0</span></div>
-          </div>
-        </div>
-        <div id="speedtrack"><i id="speedbar"></i></div>
+  <!-- ── meldingen ──────────────────────────────────────────────────────── -->
+  <div id="alerts" class="scrim">
+    <div class="drawer">
+      <div class="drawerhead">
+        <span class="title" data-t="notifications">Meldingen</span>
+        <span class="headright">
+          <button id="alertclear" class="link" data-t="clear">Wissen</button>
+          <button id="alertclose" class="iconbtn"><svg class="ico"><use href="#i-x"></use></svg></button>
+        </span>
       </div>
-
-      <div id="side">
-        <div class="card" id="batcard">
-          <span class="k">Batterij</span>
-          <div class="val"><span class="n" id="bat">0</span><span class="u">%</span></div>
-          <div id="battrack"><i id="batbar"></i></div>
-        </div>
-        <div class="card" id="rangecard">
-          <span class="k">Bereik</span>
-          <div class="val"><span class="n" id="range">0</span><span class="u">km</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2 · MOTOR -->
-    <div class="pane" id="p1">
-      <div id="temps">
-        <div class="card">
-          <span class="k">Motortemperatuur</span>
-          <div class="val"><span class="v big" id="tm">0</span><span class="u">&deg;C</span></div>
-        </div>
-        <div class="card">
-          <span class="k">FET-temperatuur</span>
-          <div class="val"><span class="v big" id="tf">0</span><span class="u">&deg;C</span></div>
-        </div>
-      </div>
-      <div id="motorrow">
-        <div class="card">
-          <span class="k">Duty</span>
-          <div class="val"><span class="n" id="duty">0</span><span class="u">%</span></div>
-          <div class="bar"><i id="dutybar"></i></div>
-        </div>
-        <div class="card">
-          <span class="k">Motorstroom</span>
-          <div class="val"><span class="n" id="im">0</span><span class="u">A</span></div>
-        </div>
-        <div class="card">
-          <span class="k">Accustroom</span>
-          <div class="val"><span class="n" id="ib">0</span><span class="u">A</span></div>
-        </div>
-      </div>
-      <span id="rpmhold"><span id="rpm">0</span></span>
-    </div>
-
-    <!-- 3 · ACCU -->
-    <div class="pane" id="p2">
-      <div id="packtop">
-        <div id="packbig">
-          <span class="k">Accuniveau</span>
-          <div id="packnum"><span id="bat2">0</span><span id="packpct">%</span></div>
-          <div id="cells"></div>
-        </div>
-        <div id="packlist">
-          <div class="row"><span class="lbl">Pakspanning</span>
-            <span class="v"><span id="vv">0</span><span class="u">V</span></span></div>
-          <div class="row"><span class="lbl">Per cel</span>
-            <span class="v"><span id="vc">0</span><span class="u">V</span></span></div>
-          <div class="row"><span class="lbl">Verbruikt</span>
-            <span class="v"><span id="wh">0</span><span class="u">Wh</span></span></div>
-          <div class="row"><span class="lbl">Afstand</span>
-            <span class="v"><span id="trip">0</span><span class="u">km</span></span></div>
-          <div class="row"><span class="lbl">Per kilometer</span>
-            <span class="v"><span id="whkm">0</span><span class="u">Wh</span></span></div>
-        </div>
-      </div>
-      <div id="bat2bar"></div>
+      <div id="alertlist" class="list"></div>
     </div>
   </div>
 
-  <div id="dots"><span class="on">Rit</span><span>Motor</span><span>Accu</span></div>
+  <!-- ── snelheidsmeting ────────────────────────────────────────────────── -->
+  <div id="speedsheet" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="speedsheet"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="speedDetail">Snelheidsmeting</span>
+    </div>
+    <div id="speedstats" class="list grow"></div>
+    <button id="speedreset" class="wide">
+      <svg class="ico"><use href="#i-arrow-counter-clockwise"></use></svg>
+      <span data-t="holdToReset">Resetten</span>
+    </button>
+  </div>
 
-  <!-- laden -->
+  <!-- ── aan/uit ────────────────────────────────────────────────────────── -->
+  <div id="powermenu" class="scrim bottom">
+    <div class="stack">
+      <button id="doreboot" class="row">
+        <svg class="ico accent"><use href="#i-arrows-clockwise"></use></svg>
+        <span data-t="reboot">Herstarten</span>
+      </button>
+      <button id="doshutdown" class="row danger">
+        <svg class="ico"><use href="#i-power"></use></svg>
+        <span data-t="shutdown">Uitschakelen</span>
+      </button>
+      <button class="row mid" data-close="powermenu" data-t="cancel">Annuleren</button>
+    </div>
+  </div>
+
+  <div id="off">
+    <svg class="ico big" id="officon"><use href="#i-power"></use></svg>
+    <span id="offlabel" data-t="tapToWake">Tik om te starten</span>
+  </div>
+
+  <!-- ── eenheden ───────────────────────────────────────────────────────── -->
+  <div id="units" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="units"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="units">Eenheden</span>
+    </div>
+    <div id="unitlist" class="list grow"></div>
+  </div>
+
+  <!-- ── taal ───────────────────────────────────────────────────────────── -->
+  <div id="lang" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="lang"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="language">Taal</span>
+    </div>
+    <div id="langlist" class="list grow"></div>
+  </div>
+
+  <!-- ── accentkleur ────────────────────────────────────────────────────── -->
+  <div id="accent" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="accent"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="accent">Accentkleur</span>
+    </div>
+    <div id="accentlist" class="list grow scroll"></div>
+  </div>
+
+  <!-- ── temperatuurlimieten ────────────────────────────────────────────── -->
+  <div id="limits" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="limits"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="limits">Temperatuurlimieten</span>
+    </div>
+    <div class="grow scroll">
+      <div id="limlist" class="list"></div>
+      <p class="hint" data-t="limitsHint">Bij het bereiken van een limiet verschijnt het waarschuwingsscherm.</p>
+    </div>
+  </div>
+
+  <!-- ── stepgegevens ───────────────────────────────────────────────────────
+       Geen scherm uit het ontwerp: de VESC weet poolparen, wieldiameter en
+       overbrenging meestal zelf, en dan is hier niets te doen. Weet hij ze
+       niet, dan klopt elke snelheid en elke afstand niet, en dan moet je ze
+       met de hand kunnen zetten. De rij in de instellingen verschijnt alleen
+       dan. -->
+  <div id="setup" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="setup"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="stepValues">Stepgegevens</span>
+    </div>
+    <div class="grow scroll">
+      <p id="setupstat" class="hint"></p>
+      <div id="steplist" class="list"></div>
+      <p class="hint" data-t="stepHint"></p>
+    </div>
+    <button id="stepsave" class="wide accentbtn">
+      <svg class="ico"><use href="#i-check-circle-f"></use></svg>
+      <span id="stepsavelbl" data-t="save">Bewaren</span>
+    </button>
+  </div>
+
+  <!-- ── laden ──────────────────────────────────────────────────────────── -->
   <div id="charge">
-    <div id="chargehead">
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
-      <span id="chargelabel">Laden</span>
+    <div class="chargehead">
+      <svg class="ico"><use href="#i-lightning-f"></use></svg>
+      <span id="chargetitle" data-t="charging">Opladen</span>
     </div>
-    <div id="chargepct"><span id="chargeval">0</span><span>%</span></div>
-    <div id="chargetrack"><i id="chargebar"></i></div>
-    <div id="chargeeta">tijd nog onbekend</div>
-    <div id="chargesub">--</div>
+    <div class="chargemid">
+      <div class="chargepct"><span id="chargeval">0</span><span class="u">%</span></div>
+      <div id="chargetrack"><i id="chargefill"></i></div>
+      <div class="chargesub">
+        <span><span id="chargevolts">--</span> V</span>
+        <span><span id="chargerange">--</span> <span class="chargeunit">km</span></span>
+      </div>
+    </div>
+    <div class="chargecards">
+      <div class="card">
+        <span class="micro" data-t="chargeAmp">Laadstroom</span>
+        <span class="big"><span id="chargeamps">--</span><span class="u"> A</span></span>
+      </div>
+      <div class="card">
+        <span class="micro" data-t="timeLeft">Resterend</span>
+        <span class="big" id="chargeeta">--</span>
+      </div>
+      <div class="card">
+        <span class="micro" data-t="gainRate">Winst</span>
+        <span class="big"><span id="chargegain">--</span><span class="u"> <span class="chargeunit">km</span>/min</span></span>
+      </div>
+    </div>
+    <div class="tapclose" data-t="tapClose">Tik om te sluiten</div>
   </div>
 
-  <!-- verbindingen -->
-  <div class="sheet" id="net">
-    <div id="netseg">
-      <button id="segwifi" class="on">Wi-Fi</button>
-      <button id="segbt">Bluetooth</button>
-      <button class="xbtn" data-scroll="netlist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-      <button class="xbtn" data-scroll="netlist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-      <button id="netclose"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    </div>
-    <div class="scroller" id="netlist"></div>
-  </div>
-
-  <!-- schermtoetsenbord -->
-  <div id="kbd">
-    <div id="kbdhead">
-      <div id="kbdtitle">Wachtwoord</div>
-      <button id="kbdclose"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    </div>
-    <div id="kbdfield">
-      <div id="kbdval" class="empty"></div>
-      <button id="kbdeye"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 12S5.5 5.2 12 5.2 22.4 12 22.4 12 18.5 18.8 12 18.8 1.6 12 1.6 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
-    </div>
-    <div id="kbdkeys"></div>
-  </div>
-
-  <!-- meldingen -->
-  <div class="sheet" id="notices">
-    <div class="sheethead">
-      <div class="sheettitle">Meldingen</div>
-      <div class="sheetnav">
-        <button class="xbtn" data-scroll="noticelist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-        <button class="xbtn" data-scroll="noticelist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-        <button id="noticesclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      </div>
-    </div>
-    <div class="scroller" id="noticelist"></div>
-  </div>
-
-  <!-- systeem -->
-  <div class="sheet" id="sys">
-    <div class="sheethead">
-      <div class="sheettitle">Systeem</div>
-      <button id="sysclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    </div>
-    <div class="inforows">
-      <div class="inforow"><span class="lbl">Wi-Fi</span><span class="val" id="syswifi">--</span></div>
-      <div class="inforow" id="syscellrow"><span class="lbl">Mobiel</span><span class="val" id="syscell">--</span></div>
-    </div>
-    <div class="sysbtns">
-      <button id="sysnet" class="pbtn">Verbindingen</button>
-      <button id="sysset" class="pbtn">Instellingen</button>
-      <button id="syspower" class="pbtn">Power</button>
-    </div>
-  </div>
-
-  <!-- instellingen -->
-  <div class="sheet" id="settings">
-    <div class="sheethead">
-      <div class="sheettitle">Instellingen</div>
-      <div class="sheetnav">
-        <button class="xbtn" data-scroll="setlist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-        <button class="xbtn" data-scroll="setlist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-        <button id="setclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      </div>
-    </div>
-    <div class="scroller" id="setlist">
-      <div class="setrow stack">
-        <span class="lbl">Update</span>
-        <div class="line">
-          <span class="setstat" id="setupd">controleren…</span>
-          <button id="updbtn" class="rowbtn">Zoeken</button>
-        </div>
-      </div>
-      <div class="setrow stack"><span class="lbl">Step</span>
-        <div class="line">
-          <span class="setstat" id="setstep">kijken…</span>
-          <button id="stepbtn" class="rowbtn">Instellen</button>
-        </div>
-      </div>
-      <!-- De modusknoppen komen uit config.json; app.js vult deze doos. Staan
-           er geen rijmodi aan, dan verdwijnt de hele rij. Zet je ergens anders
-           in de opmaak een <button class="seg mode" data-mode="ECO">, dan doet
-           die net zo goed mee — de afhandeling is gedelegeerd. -->
-      <div class="setrow" id="moderow" hidden><span class="lbl">Rijmodus</span>
-        <div id="modes" class="line"></div>
-      </div>
-      <div class="setrow"><span class="lbl">Thema</span>
-        <button class="seg" data-theme="Auto">Auto</button>
-        <button class="seg" data-theme="Licht">Licht</button>
-        <button class="seg" data-theme="Donker">Donker</button>
-      </div>
-      <div class="setrow"><span class="lbl">Indeling</span>
-        <button class="seg lay" data-lay="Liggend">Liggend</button>
-        <button class="seg lay" data-lay="Staand">Staand</button>
-      </div>
-      <div class="setrow"><span class="lbl">Kwartslag</span>
-        <button class="seg rot" data-rot="90">90&deg;</button>
-        <button class="seg rot" data-rot="270">270&deg;</button>
-      </div>
-      <div class="setrow"><span class="lbl">Temp waarschuwing</span>
-        <button class="step" data-k="tempWarn" data-d="-5">&minus;</button>
-        <span class="setval" id="setwarn">70&deg;</span>
-        <button class="step" data-k="tempWarn" data-d="5">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Temp kritiek</span>
-        <button class="step" data-k="tempCrit" data-d="-5">&minus;</button>
-        <span class="setval" id="setcrit">90&deg;</span>
-        <button class="step" data-k="tempCrit" data-d="5">+</button>
-      </div>
-      <!-- Bij een kapotte of ontbrekende motorsensor onderdrukt dit de
-           motortemperatuur-meldingen en het alarm. De FET-bewaking blijft
-           altijd staan: die zit in de controller zelf en is wél te vertrouwen. -->
-      <div class="setrow"><span class="lbl">Motormelding</span>
-        <button class="seg mt" data-mt="1">Aan</button>
-        <button class="seg mt" data-mt="0">Uit</button>
-      </div>
-      <div class="setrow"><span class="lbl">Helderheid</span>
-        <button class="step bright" data-d="-10">&minus;</button>
-        <span class="setval wide" id="setbright">80 %</span>
-        <button class="step bright" data-d="10">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Startscherm</span>
-        <button class="seg start" data-i="0">Rit</button>
-        <button class="seg start" data-i="1">Motor</button>
-        <button class="seg start" data-i="2">Accu</button>
-      </div>
-      <div class="setrow"><span class="lbl">Topsnelheid</span>
-        <button id="toprst" class="rowbtn">Reset</button>
-      </div>
-      <div class="setrow"><span class="lbl">Rit-teller</span>
-        <button id="triprst" class="rowbtn">Reset</button>
-      </div>
-      <div class="setrow stack"><span class="lbl">Versie</span>
-        <span class="setstat" id="setver">—</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- step instellen -->
-  <div class="sheet" id="setup">
-    <div class="sheethead">
-      <span class="sheettitle">Step instellen</span>
-      <div class="sheetnav">
-        <button class="xbtn" data-scroll="setuplist" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
-        <button class="xbtn" data-scroll="setuplist" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
-        <button id="setupclose" class="xbtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      </div>
-    </div>
-    <div class="scroller" id="setuplist">
-      <div class="setrow stack"><span class="lbl">Wat de VESC weet</span>
-        <span class="setstat wrap" id="setupstat">kijken…</span>
-      </div>
-      <div class="setrow"><span class="lbl">Wielmaat</span>
-        <button class="step" data-s="wheel" data-d="-1">&minus;</button>
-        <span class="setval wide" id="stwheel">10,0&quot;</span>
-        <button class="step" data-s="wheel" data-d="1">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Poolparen</span>
-        <button class="step" data-s="poles" data-d="-1">&minus;</button>
-        <span class="setval" id="stpoles">15</span>
-        <button class="step" data-s="poles" data-d="1">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Overbrenging</span>
-        <button class="step" data-s="gear" data-d="-1">&minus;</button>
-        <span class="setval wide" id="stgear">1,0&times;</span>
-        <button class="step" data-s="gear" data-d="1">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Accucellen</span>
-        <button class="step" data-s="cells" data-d="-1">&minus;</button>
-        <span class="setval wide" id="stcells">auto</span>
-        <button class="step" data-s="cells" data-d="1">+</button>
-      </div>
-      <div class="setrow"><span class="lbl">Opslaan in config.json</span>
-        <button id="stepsave" class="rowbtn">Bewaren</button>
-      </div>
-      <div class="setrow stack"><span class="lbl">Uitleg</span>
-        <span class="setstat wrap" id="setuphelp">Alleen nodig als de setup-wizard van VESC Tool nooit gedraaid heeft. Weet de VESC het zelf, dan vult de app dit tijdens het rijden in.</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- aan/uit -->
-  <div id="power">
-    <div id="powerhead">
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
-      <span>Aan / uit</span>
-    </div>
-    <div id="powerbtns">
-      <button id="powreboot" class="powbtn">
-        <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v5h-5"/></svg>
-        <span class="powname">Opnieuw opstarten</span>
-        <span class="powsub">reboot</span>
-      </button>
-      <button id="powshutdown" class="powbtn crit">
-        <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 11-12.8 0"/></svg>
-        <span class="powname">Afsluiten</span>
-        <span class="powsub">shutdown</span>
-      </button>
-    </div>
-    <div id="powermsg"></div>
-    <button id="powerclose">Annuleren</button>
-  </div>
-
-  <!-- alarm -->
+  <!-- ── temperatuuralarm ───────────────────────────────────────────────── -->
   <div id="alarm">
-    <div id="alarmhead">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.5L1.8 21h20.4L12 3.5z"/><path d="M12 9.5v5.2M12 17.6v.1"/></svg>
-      <div id="alarmtitle">Waarschuwing</div>
+    <div class="alarmhead">
+      <svg class="ico"><use href="#i-warning"></use></svg>
+      <span data-t="warning">WARNING</span>
     </div>
-    <div id="alarmmsg">Motortemperatuur te hoog</div>
-    <button id="alarmclose">Sluiten</button>
+    <p id="alarmmsg"></p>
+    <button id="alarmack" data-t="confirm">BEVESTIGEN</button>
+  </div>
+
+  <!-- ── release-notities ───────────────────────────────────────────────── -->
+  <div id="release" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="release"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="titlecol">
+        <span class="micro" id="relrepo">--</span>
+        <span class="title" id="relversion">--</span>
+      </span>
+      <span class="micro" id="reldate"></span>
+    </div>
+    <div id="relnotes" class="list grow scroll"></div>
+    <button id="reldo" class="wide accentbtn">
+      <svg class="ico" id="relicon"><use href="#i-download-simple"></use></svg>
+      <span id="rellabel">--</span>
+    </button>
+  </div>
+
+  <!-- ── wachtwoord met schermtoetsenbord ───────────────────────────────── -->
+  <div id="pw" class="sheet">
+    <div class="sheethead">
+      <button id="pwcancel" class="back"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="titlecol">
+        <span class="micro" id="pwkind">--</span>
+        <span class="title" id="pwname">--</span>
+      </span>
+    </div>
+    <div id="pwfield">
+      <svg class="ico"><use href="#i-lock-simple"></use></svg>
+      <span id="pwmasked"></span>
+      <button id="pweye" class="iconbtn"><svg class="ico"><use href="#i-eye"></use></svg></button>
+    </div>
+    <p class="hint" id="pwhint"></p>
+    <div class="spacer"></div>
+    <div id="keyrows"></div>
+  </div>
+
+  <!-- ── verbindingen ───────────────────────────────────────────────────── -->
+  <div id="conn" class="sheet">
+    <div class="sheethead">
+      <button class="back" data-close="conn"><svg class="ico"><use href="#i-caret-left"></use></svg></button>
+      <span class="title" data-t="connections">Verbindingen</span>
+    </div>
+    <div class="grow scroll">
+      <div class="grouphead">
+        <span class="micro"><svg class="ico"><use href="#i-wifi-high"></use></svg> Wi-Fi</span>
+        <button id="wifiscan" class="chip" data-t="scan">Scan</button>
+      </div>
+      <div id="wifilist" class="list"></div>
+      <div class="grouphead">
+        <span class="micro"><svg class="ico"><use href="#i-bluetooth"></use></svg> Bluetooth</span>
+        <button id="btscan" class="chip" data-t="scan">Scan</button>
+      </div>
+      <div id="btlist" class="list"></div>
+    </div>
+  </div>
+
+  <!-- ── instellingen ───────────────────────────────────────────────────── -->
+  <div id="settings" class="sheet">
+    <div class="sheethead">
+      <span class="title" data-t="settings">Instellingen</span>
+      <button class="iconbtn right" data-close="settings"><svg class="ico"><use href="#i-x"></use></svg></button>
+    </div>
+
+    <div class="grow scroll setlist">
+      <button id="updrow" class="row">
+        <svg class="ico" id="updicon"><use href="#i-git-branch"></use></svg>
+        <span class="rowtext">
+          <span id="updlabel">--</span>
+          <span class="sub" id="updmeta">--</span>
+        </span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <button id="opensetup" class="row" hidden>
+        <svg class="ico accent"><use href="#i-gauge"></use></svg>
+        <span class="rowtext">
+          <span data-t="stepValues">Stepgegevens</span>
+          <span class="sub" id="setupsub">--</span>
+        </span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <div class="pair">
+        <button id="openconn" class="row">
+          <svg class="ico accent"><use href="#i-wifi-high"></use></svg>
+          <span class="ell" data-t="connections">Verbindingen</span>
+        </button>
+        <button id="openpower" class="row danger">
+          <svg class="ico"><use href="#i-power"></use></svg>
+          <span class="ell" data-t="power">Uitschakelen</span>
+        </button>
+      </div>
+
+      <div class="pair">
+        <button id="openaccent" class="row">
+          <svg class="ico accent"><use href="#i-palette"></use></svg>
+          <span class="ell" data-t="accent">Accentkleur</span>
+          <span id="accentdot" class="dot"></span>
+        </button>
+        <button id="thememode" class="row">
+          <svg class="ico accent" id="themeicon"><use href="#i-sun"></use></svg>
+          <span class="ell" id="themelabel">Dag</span>
+          <span id="themeswitch" class="switch"><i></i></span>
+        </button>
+      </div>
+
+      <button id="openunits" class="row">
+        <svg class="ico accent"><use href="#i-ruler"></use></svg>
+        <span class="ell" data-t="units">Eenheden</span>
+        <span class="sub" id="unitslabel">km/h · km · °C</span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <button id="openlang" class="row">
+        <svg class="ico accent"><use href="#i-translate"></use></svg>
+        <span class="ell" data-t="language">Taal</span>
+        <span class="sub" id="langlabel">NL</span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+
+      <button id="openlimits" class="row">
+        <svg class="ico accent"><use href="#i-thermometer-simple"></use></svg>
+        <span class="rowtext">
+          <span data-t="limits">Temperatuurlimieten</span>
+          <span class="sub" id="limsummary">--</span>
+        </span>
+        <svg class="ico faint"><use href="#i-caret-right"></use></svg>
+      </button>
+    </div>
   </div>
 
 </div>
 
+<script src="i18n.js"></script>
 <script src="app.js"></script>
-<script>
-"use strict";
-/* Alleen de cellenrij op het accuscherm tekent deze pagina zelf; app.js zet
-   tekst en breedtes, geen losse blokjes. */
-(function () {
-  var CELLEN = 13;
-  var box = document.getElementById("cells");
-  if (box) for (var i = 0; i < CELLEN; i++) box.appendChild(document.createElement("i"));
-
-  function teken() {
-    var d = window.last;
-    if (!d || !box) return;
-    var bp = d.battery_pct || 0;
-    var kl = bp < 10 ? "crit" : (bp < 20 ? "warn" : "on");
-    var vol = Math.round(bp / 100 * CELLEN);
-    for (var i = 0; i < box.children.length; i++) box.children[i].className = i < vol ? kl : "";
-  }
-  function start() { teken(); setInterval(teken, 160); }
-  if (window.last) start(); else setTimeout(start, 300);
-})();
-</script>
 </body>
 </html>

@@ -21,65 +21,94 @@ and I want to decide myself what goes on that screen.
 
 ### What it does
 
-Three screens: **Ride** (big speed, battery percentage, estimated range),
-**Motor** (temperatures, duty, currents) and **Battery** (pack voltage, cell
-voltage, Wh, distance, Wh/km). Tapping the screen moves to the next one; the
-three dots at the bottom show where you are.
+One screen while you ride: the speed big in the middle, the battery underneath
+it, and three cards with trip, odometer and temperatures. On the left rail sit
+the notification bell and the riding mode, on the right the duty bar. Everything
+else is a layer that slides over it.
+
+Tap the speed and you get the readout — current, top, average, and a timer for
+the trip. Tap the trip card and it flips to consumption in Wh/km. Tap the top
+bar and you're in the settings.
 
 Beyond that:
 
-- If the motor or the FETs get too hot, a warning fills the whole screen. It
-  blinks three times and then stays until you tap it away.
-- Faults, low battery and excessive duty show up in the top bar, which cycles
-  through them when there's more than one. Tapping opens the full list.
-- The theme follows the clock: light between 07:30 and 18:00, dark outside that.
-- Joining a Wi-Fi network needs no keyboard — there's one on screen (AZERTY).
-- Lists that don't fit — settings, connections, notifications — have a pair of
-  chevrons in their header that step through them a row at a time. Hold one down
-  and it keeps going. Dragging with a finger still works; the buttons are there
-  because on a 3.5" screen nothing tells you there's more below.
-- The Bluetooth tab searches for devices nearby, the same way the Wi-Fi tab
-  scans — including while something is already connected.
-- Two layouts: landscape 480 × 320 and portrait 320 × 480. Settings → Layout
-  switches between them and the choice survives a reboot.
-- Settings for thresholds, brightness, start screen, and resetting the trip
-  counter and top speed.
+- **Four languages.** Dutch, English, French and German. Switching takes effect
+  immediately, mid-ride, without a restart.
+- **Metric or imperial.** km/h · km · °C, or mph · mi · °F — everywhere at once,
+  including the temperature limits.
+- **Eight accent colours**, and a day and a night theme.
+- **Three temperature limits** — motor, controller, battery — each with its own
+  switch, so a dead sensor doesn't have to mean a screen full of red. Reach a
+  limit with its switch on and a warning fills the screen. It blinks seven times
+  and stays until you acknowledge it, and it only comes back once everything has
+  been five degrees below the limit.
+- Faults, a nearly empty battery and a motor warming up show up as
+  notifications. The bell colours and blinks; tapping it opens the drawer. They
+  clear themselves when the cause is gone.
+- Joining a Wi-Fi network needs no keyboard — there's one on screen, with shift,
+  a symbol layer and an eye to reveal what you typed.
 - **Cruise control shows up on screen.** The VESC doesn't report it, so the Pi
   infers it — throttle released while the motor keeps pulling and the speed
   holds. Only works with an ADC throttle, and only ever claims it when it's
   sure.
-- **ECO and SPORT.** With `modes.enabled` on in `config.json`, a row of buttons
-  appears that sets the VESC's limits — current, speed, duty, watts. It goes to
-  the controller's working memory, never to flash, and the scale can only go
-  down, never up.
-- If the VESC doesn't know how the scooter is put together, the notification
-  bar says so and takes you to **Settings → Step**, where you can fill in wheel
-  size, pole pairs, gearing and cell count yourself. Does it know? Then the app
-  copies the values off it while you ride and writes them into `config.json`.
-- On boot it checks whether a newer version is on GitHub. If there is, the
-  notification bar says so — tap it and you land straight in the settings, on
-  the row that installs it.
+- **ECO and SPORT.** With `modes.enabled` on in `config.json`, a button appears
+  next to the speed that sets the VESC's limits — current, speed, duty, watts.
+  It goes to the controller's working memory, never to flash, and the scale can
+  only go down, never up.
+- If the VESC doesn't know how the scooter is put together, an extra row appears
+  in the settings where you can fill in wheel size, pole pairs, gearing and cell
+  count yourself. Does it know? Then the app copies the values off it while you
+  ride and writes them into `config.json`, and the row stays hidden.
+- On boot it checks whether a newer version is on GitHub. If there is, the top
+  row of the settings blinks. Tapping it shows the actual commits between what's
+  running and what's ready, and a button to install.
 - Plug in the charger and a charging screen appears: percentage, a bar, and an
   estimate of how much longer it needs. Tap it away if it's in the way.
-- System → Power gives a fullscreen REBOOT / SHUTDOWN screen, so you can put
-  the Pi down properly instead of pulling the plug.
+- Settings → Power gives reboot and shutdown, so you can put the Pi down
+  properly instead of pulling the plug.
+
+What the VESC doesn't measure, the app doesn't invent. Battery temperature is
+the clearest case: there's no sensor input for it on the controller, so the
+limit is there and the reading says **n/a**.
 
 Everything runs locally. No internet needed, no CDNs, no external fonts — the
 scooter is often out of range and it should just work.
+
+### The screens
+
+| | | |
+|---|---|---|
+| ![Riding](pi/docs/ui/01-rijden.png) | ![Riding at night](pi/docs/ui/02-rijden-nacht.png) | ![Settings](pi/docs/ui/03-instellingen.png) |
+| Riding, day | The same, night | Settings |
+| ![Temperature limits](pi/docs/ui/04-limieten.png) | ![Accent colour](pi/docs/ui/05-accentkleur.png) | ![Language](pi/docs/ui/06-taal.png) |
+| Temperature limits | Accent colour | Language |
+| ![Connections](pi/docs/ui/07-verbindingen.png) | ![Password](pi/docs/ui/08-wachtwoord.png) | ![Speed readout](pi/docs/ui/09-snelheidsmeting.png) |
+| Connections | On-screen keyboard | Speed readout |
+| ![Notifications](pi/docs/ui/10-meldingen.png) | ![Charging](pi/docs/ui/11-laden.png) | ![Warning](pi/docs/ui/12-waarschuwing.png) |
+| Notifications | Charging | Temperature warning |
+| ![Release notes](pi/docs/ui/13-release.png) | ![Scooter values](pi/docs/ui/14-stepgegevens.png) | ![On the panel](pi/docs/ui/15-op-het-paneel.png) |
+| What's in the update | Scooter values | As it hangs on the bars |
+
+These are the real pages, taken from the design environment with
+`node tools/shots.js` — not mock-ups.
 
 ### Hardware
 
 - Raspberry Pi 4 (4 GB, though 2 GB is plenty)
 - VESC controller over USB — mine is a Flipsky Mini MK5
-- 3.5" SPI touchscreen, 480 × 320 — portrait works too, see Layout below
+- 3.5" SPI touchscreen, 480 × 320 — the page turns itself, see below
 - Optional: a 5G dongle, for the signal bars in the top bar
 
-The interface uses the Nocturne design language: a dark blue ground, a purple
-accent, flat cards with a 1 px border, and dots at the bottom instead of a tab
-strip. A light theme comes with it, on the clock.
+The interface is Ride Dash, drawn in Claude Design and rebuilt here as plain
+HTML and CSS. Portrait 320 × 480, one flat surface with cards on it, a 1 px
+border and no fills, and one accent colour that runs through everything you can
+tap. Day and night are two palettes of the same shape. The 45 icons are
+Phosphor (MIT), baked into the page as one SVG sprite — the Pi has no internet
+and nothing may come from a CDN.
 
-The display is slow, so the UI repaints about 6 times a second and only touches
-the pixels that actually changed. No animations, no transitions.
+Inter is the typeface. `install.sh` installs it (`fonts-inter`); without it the
+UI falls back to system-ui, which is readable but pushes the digits out of their
+columns.
 
 ### Installing
 
@@ -112,27 +141,22 @@ That makes the whole install doable offline.
 
 The SPI driver for the display is out of scope here; it differs per brand. Make
 sure your screen works *before* you enable the kiosk — the UI is built for
-exactly 480 × 320 (or 320 × 480) and doesn't scroll.
+exactly 320 × 480 and doesn't scroll (except inside the lists that need it).
 
-### Layout
+### One page, and it turns itself
 
-Settings → **Layout** switches between landscape (480 × 320) and portrait
-(320 × 480). Both show the same data; the portrait one stacks it in a single
-column, puts the button rows underneath each other instead of side by side, and
-moves the keyboard to the bottom of the screen where your thumb already is. The choice is stored on the Pi, so the kiosk comes back up in the
-layout you left it in.
-
-The page rotates itself. Your screen is bolted to the handlebars in one
-position, so the panel stays 480 × 320 whichever layout you pick — the portrait
-page notices that and turns a quarter turn so it fills the panel. Mount the
-screen upright and it reads correctly. **Rotation** in the settings picks which
-way round (90° or 270°), for whichever way you hung it.
+The UI is portrait, 320 × 480. Your screen is bolted to the handlebars in one
+position — usually landscape — so the page notices that the panel doesn't match
+what it was drawn for and puts a quarter turn on itself. **Rotation** in
+`state.json` picks which way round (90° or 270°), for whichever way you hung it.
 
 Nothing is changed at the OS level. `display_rotate` and friends differ per
 driver and per Pi OS release, and one wrong line in `config.txt` gets you a
 black screen with no way back in. Touch keeps working — the browser maps taps
 back through the rotation itself.
 
+There used to be two layouts, landscape and portrait, switchable in the
+settings. Ride Dash is one page; that setting is gone.
 ### Reading the VESC
 
 This took me the most digging, so for anyone building the same thing:
@@ -172,9 +196,12 @@ works it out from the erpm and the tachometer.
 | `weather.*` | coordinates for the outside temperature; empty = look them up by IP |
 | `system.*` | the backlight path, if the automatic search doesn't find it |
 
-`state.json` in `/var/lib/step-dashboard/` belongs to the service: your settings,
-the top speed and the zero point of the trip counter. The UI stores nothing
-itself — the Pi does that.
+`state.json` in `/var/lib/step-dashboard/` belongs to the service: language,
+units, accent colour, day or night, the three temperature limits with their
+switches, the top speed, the odometer and the zero point of the trip counter.
+The UI stores nothing itself — no localStorage, because the kiosk profile is
+disposable and because a setting you can't read from anywhere else isn't much
+of a setting.
 
 ### Endpoints
 
@@ -185,12 +212,12 @@ The page talks to a handful of endpoints on the same origin:
 | `GET /data` | speed, battery, temperatures, charging state — every 150 ms |
 | `GET/POST /settings` | store settings |
 | `POST /reset-trip`, `/reset-top` | zero the counters |
-| `POST /backlight` | screen brightness |
+| `POST /backlight` | screen brightness — no button in the UI for it at the moment |
 | `POST /power` | reboot or shut down |
 | `GET/POST /setup` | does the VESC know the scooter, and filling it in yourself |
 | `GET /modes`, `POST /mode` | the riding modes, and switching between them |
 | `GET /wifi`, `/bt`, `/modem` | top-bar status via nmcli, bluetoothctl, mmcli |
-| `GET /weather` | outside temperature |
+| `GET /weather` | outside temperature — served, but Ride Dash has nowhere to put it |
 | `GET/POST /net` | list networks and devices, search, and connect |
 | `GET/POST /update` | compare the version with GitHub, and update |
 
@@ -230,10 +257,10 @@ standing still, a configured and an unconfigured VESC both report zero.
 
 - **It knows** → the app reads the values off it during the ride and writes them
   into `config.json` (`step.source` becomes `"vesc"`). Nothing to do.
-- **It doesn't** → the notification bar says *Step niet ingesteld*. Tap it and
-  you land in **Step instellen**, with wheel size, pole pairs, gearing and cell
-  count. Saving writes them to `config.json` with `step.source` `"hand"`, and
-  the app never writes over that again.
+- **It doesn't** → an extra row appears in the settings, **Scooter values**,
+  with wheel size, pole pairs, gearing and cell count. Saving writes them to
+  `config.json` with `step.source` `"hand"`, and the app never writes over that
+  again. The row is only there when it's needed.
 - **Not yet visible** → you haven't ridden since the last start. Nothing is
   reported and nothing is written.
 
@@ -308,9 +335,11 @@ with the erpm computed from `step.*`.
 
 ### Updating
 
-Settings → top row. It shows which version is running; **Search** checks GitHub
-and **Install** fetches the new one and restarts the service. That last part
-takes about half a minute, during which the screen reloads.
+Settings → top row. It shows which version is running; tapping it checks GitHub.
+Is there something new, then the row blinks and tapping it opens the release
+screen: the actual commits between what's running and what's ready, pulled from
+GitHub's compare API, with the install button underneath. Installing takes about
+half a minute, during which the screen reloads.
 
 Under the hood it pulls a fresh clone into a temporary directory and runs
 `install/install.sh` from there. Your `config.json` and stored settings survive.
@@ -333,16 +362,26 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 85 tests: VESC protocol, CRC, framing, the conversions
+npm test     # 102 tests: VESC protocol, CRC, framing, the conversions, the UI contract
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — the UI with faked hardware
 ```
 
-Without a VESC attached, `/data` reports `connected: false`, the dot in the top
-bar turns red and the notification bar reads *Geen VESC-verbinding*. Open `pi/public/index.html` directly in a browser
-and there's no server at all — after three failed attempts the UI falls back to a
-simulated ride, which is handy for working on the looks without dragging the
-scooter along.
+The design environment is the real page with faked hardware behind it: sliders
+for speed, battery and temperatures, ready-made situations (charging, fault,
+low battery, hot motor), and a frame at true size. One button shows it portrait
+as drawn, the other shows it at 480 × 320 the way it hangs on the bars, turning
+itself. Save a file in `public/` and the frame reloads.
+
+Without a VESC attached, `/data` reports `connected: false` and the dot in the
+top bar turns red; the page keeps working and shows zeroes.
+
+The page is built from its parts, so after changing the markup or the icons:
+
+```bash
+node tools/build-page.js    # tools/page.html + tools/icons/*.svg → public/index.html
+node tools/shots.js         # the screenshots in docs/ui/ (needs playwright)
+```
 
 ### Still to do
 
@@ -350,13 +389,16 @@ scooter along.
   assumption. The Pi would have to track that, since the UI isn't allowed to
   store anything.
 - Hidden networks (typing an SSID yourself) in the connection screen.
-- The clock drifts without internet. An RTC module or `fake-hwclock` is needed,
-  otherwise the automatic theme is wrong too.
+- The clock drifts without internet. An RTC module or `fake-hwclock` would fix
+  it.
+- Brightness. The old UI had a control for it; Ride Dash doesn't have a place
+  for one yet. The endpoint and the stored setting are still there.
 
 ### Where it came from
 
-The design was first made as a clickable prototype in Claude Design; those files
-are still in `project/`. The working version lives in `pi/`.
+The design was made as a clickable prototype in Claude Design; those files are
+still in `project/`, including `Ride Dash.dc.html`, which is what the current
+interface was built from. The working version lives in `pi/`.
 
 ### A note on language
 
@@ -382,64 +424,94 @@ een houder — en ik wil zelf bepalen wat er op dat scherm staat.
 
 ### Wat het doet
 
-Drie schermen: **Rit** (snelheid groot, accupercentage, geschat bereik),
-**Motor** (temperaturen, duty, stromen) en **Accu** (spanning, celspanning,
-Wh, afstand, Wh/km). Tikken op het scherm gaat naar het volgende; de drie
-puntjes onderaan laten zien waar je zit.
+Eén scherm tijdens het rijden: de snelheid groot in het midden, de accu
+eronder, en drie kaarten met trip, kilometerstand en temperaturen. Links staan
+de meldingsbel en de rijmodus, rechts de duty-balk. Al de rest is een laag die
+eroverheen schuift.
+
+Tik op de snelheid en je krijgt de meting — huidig, maximum, gemiddeld, en een
+timer voor de rit. Tik op de trip-kaart en hij klapt om naar het verbruik in
+Wh/km. Tik op de bovenbalk en je zit in de instellingen.
 
 Verder:
 
-- Wordt de motor of de FET te warm, dan vult een waarschuwing het hele scherm.
-  Hij knippert drie keer en blijft dan staan tot je hem wegtikt.
-- Storingen, lage accu en te hoge duty verschijnen in de bovenbalk, die
-  doorloopt als er meerdere zijn. Tikken opent de volledige lijst.
-- Het thema volgt de klok: licht tussen 07:30 en 18:00, daarbuiten donker.
-- Twee indelingen: liggend 480 × 320 en staand 320 × 480. Instellingen →
-  Indeling wisselt ertussen, en die keuze overleeft een herstart.
-- Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm (AZERTY).
-- Lijsten die niet passen — instellingen, verbindingen, meldingen — hebben twee
-  chevrons in hun kop die er rij voor rij doorheen schuiven. Ingedrukt houden
-  loopt door. Slepen met je vinger kan gewoon nog; de knoppen zijn er omdat op
-  een 3,5"-scherm niets verraadt dat er meer onder staat.
-- Het bluetooth-tabblad zoekt naar apparaten in de buurt, net zoals het
-  wifi-tabblad scant — ook als er al iets verbonden is.
-- Instellingen voor drempels, helderheid, startscherm en het resetten van de
-  ritteller en topsnelheid.
+- **Vier talen.** Nederlands, Engels, Frans en Duits. Wisselen werkt meteen,
+  onderweg, zonder herstart.
+- **Metrisch of imperiaal.** km/h · km · °C, of mph · mi · °F — overal
+  tegelijk, ook in de temperatuurlimieten.
+- **Acht accentkleuren**, en een dag- en een nachtthema.
+- **Drie temperatuurlimieten** — motor, controller, accu — elk met een eigen
+  schakelaar, zodat een kapotte sensor niet meteen een scherm vol rood
+  betekent. Bereik je een limiet met zijn schakelaar aan, dan vult een
+  waarschuwing het hele scherm. Hij knippert zeven keer en blijft staan tot je
+  bevestigt, en komt pas terug als alles vijf graden onder de limiet is geweest.
+- Storingen, een bijna lege accu en een motor die warm wordt komen als melding
+  binnen. De bel kleurt en knippert; tikken opent de lade. Ze verdwijnen vanzelf
+  als de oorzaak weg is.
+- Wifi verbinden kan zonder toetsenbord, er zit er een op het scherm — met
+  shift, een tekenlaag en een oogje om te zien wat je typte.
 - **Cruisecontrol komt op het scherm.** De VESC meldt het niet, dus de Pi leidt
   het af: gas los terwijl de motor blijft trekken en de snelheid vlak blijft.
   Werkt alleen met een ADC-gashendel, en beweert het alleen als het zeker is.
 - **ECO en SPORT.** Staat `modes.enabled` aan in `config.json`, dan verschijnt
-  er een rij knoppen die de grenzen van de VESC zet — stroom, snelheid, duty,
-  vermogen. Het gaat naar het werkgeheugen van de controller, nooit naar flash,
-  en de schaal kan alleen omlaag, nooit omhoog.
-- Weet de VESC niet hoe de step in elkaar zit, dan zegt de meldingsbalk dat en
-  brengt hij je naar **Instellingen → Step**, waar je wielmaat, poolparen,
-  overbrenging en het aantal cellen zelf invult. Weet hij het wel, dan kijkt de
-  app het tijdens het rijden van hem af en schrijft het in `config.json`.
+  er naast de snelheid een knop die de grenzen van de VESC zet — stroom,
+  snelheid, duty, vermogen. Het gaat naar het werkgeheugen van de controller,
+  nooit naar flash, en de schaal kan alleen omlaag, nooit omhoog.
+- Weet de VESC niet hoe de step in elkaar zit, dan komt er een extra rij in de
+  instellingen waar je wielmaat, poolparen, overbrenging en het aantal cellen
+  zelf invult. Weet hij het wel, dan kijkt de app het tijdens het rijden van hem
+  af, schrijft het in `config.json`, en blijft die rij verborgen.
 - Bij het opstarten kijkt hij of er een nieuwe versie op GitHub staat. Is die
-  er, dan zegt de meldingsbalk dat — tik erop en je staat meteen in de
-  instellingen, op de rij die hem installeert.
+  er, dan knippert de bovenste rij in de instellingen. Tikken laat de echte
+  commits zien tussen wat er draait en wat er klaarligt, met een knop om te
+  installeren.
 - Hang je de lader eraan, dan verschijnt een laadscherm: percentage, een balk,
   en een schatting hoelang het nog duurt. Wegtikken kan als het in de weg zit.
-- Systeem → Power geeft een volledig scherm met REBOOT en SHUTDOWN, zodat je de
-  Pi netjes kunt neerleggen in plaats van de stekker eruit te trekken.
+- Instellingen → Uitschakelen geeft herstarten en uitschakelen, zodat je de Pi
+  netjes kunt neerleggen in plaats van de stekker eruit te trekken.
+
+Wat de VESC niet meet, verzint de app niet. De accutemperatuur is het
+duidelijkste geval: de controller heeft er geen ingang voor, dus de limiet staat
+er wel en bij de waarde staat **n.v.t.**
 
 Alles draait lokaal. Geen internet nodig, geen CDN's, geen externe fonts — de
 step staat vaak buiten bereik en dan moet het gewoon werken.
+
+### De schermen
+
+| | | |
+|---|---|---|
+| ![Rijden](pi/docs/ui/01-rijden.png) | ![Rijden 's nachts](pi/docs/ui/02-rijden-nacht.png) | ![Instellingen](pi/docs/ui/03-instellingen.png) |
+| Rijden, dag | Hetzelfde, nacht | Instellingen |
+| ![Temperatuurlimieten](pi/docs/ui/04-limieten.png) | ![Accentkleur](pi/docs/ui/05-accentkleur.png) | ![Taal](pi/docs/ui/06-taal.png) |
+| Temperatuurlimieten | Accentkleur | Taal |
+| ![Verbindingen](pi/docs/ui/07-verbindingen.png) | ![Wachtwoord](pi/docs/ui/08-wachtwoord.png) | ![Snelheidsmeting](pi/docs/ui/09-snelheidsmeting.png) |
+| Verbindingen | Schermtoetsenbord | Snelheidsmeting |
+| ![Meldingen](pi/docs/ui/10-meldingen.png) | ![Laden](pi/docs/ui/11-laden.png) | ![Waarschuwing](pi/docs/ui/12-waarschuwing.png) |
+| Meldingen | Laden | Temperatuurwaarschuwing |
+| ![Release](pi/docs/ui/13-release.png) | ![Stepgegevens](pi/docs/ui/14-stepgegevens.png) | ![Op het paneel](pi/docs/ui/15-op-het-paneel.png) |
+| Wat er in de update zit | Stepgegevens | Zoals het op het stuur hangt |
+
+Dit zijn de echte pagina's, gemaakt in de designomgeving met
+`node tools/shots.js` — geen mock-ups.
 
 ### Hardware
 
 - Raspberry Pi 4 (4 GB, maar 2 GB is ruim genoeg)
 - VESC-controller via USB — bij mij een Flipsky Mini MK5
-- 3,5" SPI-touchscreen, 480 × 320 — staand kan ook, zie Indeling hieronder
+- 3,5" SPI-touchscreen, 480 × 320 — de pagina draait zichzelf, zie hieronder
 - Optioneel: 5G-dongle, voor de bereikbalkjes in de topbalk
 
-De interface volgt de vormtaal Nocturne: donkerblauwe ondergrond, paars accent,
-platte kaarten met een rand van 1 px en puntjes onderaan in plaats van een
-tabstrip. Er hoort een licht thema bij, dat de klok volgt.
+De interface is Ride Dash, getekend in Claude Design en hier nagebouwd in gewone
+HTML en CSS. Staand 320 × 480, één vlakke ondergrond met kaarten erop, een rand
+van 1 px en geen vullingen, en één accentkleur die door alles loopt wat je kunt
+aantikken. Dag en nacht zijn twee paletten van dezelfde vorm. De 45 iconen zijn
+Phosphor (MIT) en staan als één SVG-sprite in de pagina gebakken — de Pi heeft
+geen internet en er mag niets van een CDN komen.
 
-Het schermpje is traag, dus de UI ververst zo'n 6× per seconde en raakt alleen
-de pixels aan die echt veranderen. Geen animaties, geen transities.
+Inter is het lettertype. `install.sh` installeert het (`fonts-inter`); zonder
+valt de UI terug op system-ui, wat leesbaar is maar de cijfers uit hun kolommen
+duwt.
 
 ### Installeren
 
@@ -471,28 +543,24 @@ mag, want de VESC meldt zich als CDC-ACM-apparaat en de baudrate doet er dan
 toch niet toe. Zo is de hele installatie offline te doen.
 
 De SPI-driver van het schermpje valt hierbuiten, die verschilt per merk. Zorg
-dat je scherm werkt vóór je de kiosk aanzet; de UI is precies op 480 × 320 (of
-320 × 480) gemaakt en scrollt niet.
+dat je scherm werkt vóór je de kiosk aanzet; de UI is precies op 320 × 480
+gemaakt en scrollt niet, behalve binnen de lijsten die dat nodig hebben.
 
-### Indeling
+### Eén pagina, en hij draait zichzelf
 
-Instellingen → **Indeling** wisselt tussen liggend (480 × 320) en staand
-(320 × 480). Allebei tonen ze dezelfde gegevens; de staande zet alles in één
-kolom, zet de knoppenrijen onder elkaar in plaats van naast elkaar, en schuift
-het toetsenbord naar de onderkant van het scherm, waar je duim toch al is. De keuze staat op de Pi, dus de
-kiosk komt terug in de indeling waarin je hem verliet.
-
-De pagina draait zichzelf. Je schermpje zit in één stand op het stuur
-geschroefd, dus het paneel blijft 480 × 320 welke indeling je ook kiest — de
-staande pagina merkt dat en zet er een kwartslag op zodat hij het paneel vult.
-Hang het scherm rechtop en het staat goed. Met **Kwartslag** in de instellingen
-kies je welke kant op (90° of 270°), voor hoe jij hem opgehangen hebt.
+De UI is staand, 320 × 480. Jouw schermpje zit in één stand op het stuur
+geschroefd — meestal liggend — dus de pagina merkt dat het paneel niet past bij
+waarvoor hij getekend is en zet er een kwartslag op. Met **Kwartslag** in
+`state.json` kies je welke kant op (90° of 270°), voor hoe jij hem opgehangen
+hebt.
 
 Er verandert niets aan het besturingssysteem. `display_rotate` en soortgelijke
 verschillen per driver en per Pi-OS, en één verkeerde regel in `config.txt`
 geeft je een zwart scherm zonder weg terug. Aanraken blijft werken — de browser
 rekent tikken zelf door de draaiing heen terug.
 
+Er waren twee indelingen, liggend en staand, om te kiezen in de instellingen.
+Ride Dash is één pagina; die instelling is weg.
 ### De VESC uitlezen
 
 Dit kostte me het meeste uitzoekwerk, dus voor wie hetzelfde wil bouwen:
@@ -532,9 +600,11 @@ de app rekent het dan zelf uit uit de erpm en de tachometer.
 | `weather.*` | coördinaten voor de buitentemperatuur; leeg = zelf opzoeken via het IP-adres |
 | `system.*` | het backlight-pad, als hij het zelf niet vindt |
 
-`state.json` in `/var/lib/step-dashboard/` is van de service: je instellingen,
-de topsnelheid en het nulpunt van de ritteller. De UI slaat zelf niks op, dat
-doet de Pi.
+`state.json` in `/var/lib/step-dashboard/` is van de service: taal, eenheden,
+accentkleur, dag of nacht, de drie temperatuurlimieten met hun schakelaars, de
+topsnelheid, de kilometerstand en het nulpunt van de ritteller. De UI slaat zelf
+niks op — geen localStorage, want het kioskprofiel is wegwerpbaar en een
+instelling die je nergens anders kunt uitlezen is niet echt een instelling.
 
 ### Endpoints
 
@@ -545,12 +615,12 @@ De pagina praat met een handvol endpoints op dezelfde origin:
 | `GET /data` | snelheid, accu, temperaturen, laadstatus — elke 150 ms |
 | `GET/POST /settings` | instellingen bewaren |
 | `POST /reset-trip`, `/reset-top` | tellers op nul |
-| `POST /backlight` | schermhelderheid |
+| `POST /backlight` | schermhelderheid — er zit op dit moment geen knop voor in de UI |
 | `POST /power` | herstarten of afsluiten |
 | `GET/POST /setup` | weet de VESC hoe de step in elkaar zit, en zelf invullen |
 | `GET /modes`, `POST /mode` | de rijmodi, en ertussen wisselen |
 | `GET /wifi`, `/bt`, `/modem` | topbalk-status via nmcli, bluetoothctl, mmcli |
-| `GET /weather` | buitentemperatuur |
+| `GET /weather` | buitentemperatuur — wordt geleverd, maar Ride Dash heeft er geen plek voor |
 | `GET/POST /net` | netwerken en apparaten tonen, zoeken en verbinden |
 | `GET/POST /update` | versie vergelijken met GitHub, en bijwerken |
 
@@ -591,10 +661,10 @@ stilstaand melden een ingestelde en een niet-ingestelde VESC allebei nul.
 
 - **Hij weet het** → de app kijkt de waarden tijdens het rijden van hem af en
   schrijft ze in `config.json` (`step.source` wordt `"vesc"`). Niets te doen.
-- **Hij weet het niet** → de meldingsbalk zegt *Step niet ingesteld*. Tik erop
-  en je staat in **Step instellen**, met wielmaat, poolparen, overbrenging en
-  het aantal cellen. Bewaren zet ze in `config.json` met `step.source` `"hand"`,
-  en daar schrijft de app nooit meer overheen.
+- **Hij weet het niet** → er komt een extra rij in de instellingen,
+  **Stepgegevens**, met wielmaat, poolparen, overbrenging en het aantal cellen.
+  Bewaren zet ze in `config.json` met `step.source` `"hand"`, en daar schrijft de
+  app nooit meer overheen. Die rij staat er alleen als hij nodig is.
 - **Nog niet te zien** → je hebt sinds de laatste start niet gereden. Er wordt
   niets gemeld en niets weggeschreven.
 
@@ -671,9 +741,11 @@ commando 48, met de erpm die wij uitrekenen uit `step.*`.
 
 ### Bijwerken
 
-Instellingen → bovenste rij. Daar staat welke versie draait; **Zoeken** kijkt bij
-GitHub en **Installeren** haalt de nieuwe binnen en herstart de service. Dat
-laatste duurt een halve minuut, waarin het scherm even herlaadt.
+Instellingen → bovenste rij. Daar staat welke versie draait; tikken kijkt bij
+GitHub. Staat er iets nieuws, dan knippert de rij en opent tikken het
+release-scherm: de echte commits tussen wat er draait en wat er klaarligt,
+opgehaald met de compare-API van GitHub, met de installeerknop eronder.
+Installeren duurt een halve minuut, waarin het scherm even herlaadt.
 
 Onder water haalt hij een verse kloon in een tijdelijke map en draait daar
 `install/install.sh` uit. Je `config.json` en je opgeslagen instellingen blijven
@@ -696,29 +768,43 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 85 tests: VESC-protocol, CRC, framing, de omrekeningen
+npm test     # 102 tests: VESC-protocol, CRC, framing, de omrekeningen, het UI-contract
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — de UI met nagemaakte hardware
 ```
 
-Zonder VESC eraan meldt `/data` `connected: false`, kleurt de stip in de
-topbalk rood en zegt de meldingsbalk *Geen VESC-verbinding*. Open je `pi/public/index.html` los in een browser, dan
-is er helemaal geen server en valt de UI na drie mislukte pogingen terug op een
-gesimuleerde rit — handig om aan het uiterlijk te werken zonder de step erbij te
-halen.
+De designomgeving is de echte pagina met nagemaakte hardware erachter: schuiven
+voor snelheid, accu en temperaturen, kant-en-klare situaties (laden, storing,
+lage accu, hete motor), en een frame op ware grootte. De ene knop laat hem
+staand zien zoals hij getekend is, de andere op 480 × 320 zoals hij op het stuur
+hangt, met de draai erin. Sla een bestand in `public/` op en het frame herlaadt.
+
+Zonder VESC eraan meldt `/data` `connected: false` en kleurt de stip in de
+topbalk rood; de pagina blijft gewoon werken en toont nullen.
+
+De pagina wordt uit zijn onderdelen gebouwd, dus na een wijziging in de opmaak
+of de iconen:
+
+```bash
+node tools/build-page.js    # tools/page.html + tools/icons/*.svg → public/index.html
+node tools/shots.js         # de schermafdrukken in docs/ui/ (heeft playwright nodig)
+```
 
 ### Nog te doen
 
 - Het verbruik over meerdere ritten leren in plaats van de vaste Wh/km als
   aanname. De Pi zou dat moeten bijhouden, want de UI mag niks opslaan.
 - Verborgen netwerken (zelf een SSID intypen) in het verbindingsscherm.
-- De klok loopt fout zonder internet. Een RTC-module of `fake-hwclock` is nodig,
-  anders klopt ook het automatische thema niet.
+- De klok loopt fout zonder internet. Een RTC-module of `fake-hwclock` lost dat
+  op.
+- Helderheid. De oude UI had er een knop voor; in Ride Dash is er nog geen plek
+  voor. Het endpoint en de bewaarde instelling staan er nog.
 
 ### Herkomst
 
-Het ontwerp is eerst als klikbaar prototype gemaakt in Claude Design; die
-bestanden staan nog in `project/`. De werkende versie staat in `pi/`.
+Het ontwerp is als klikbaar prototype gemaakt in Claude Design; die bestanden
+staan nog in `project/`, met daarbij `Ride Dash.dc.html` — daar is de huidige
+interface uit gebouwd. De werkende versie staat in `pi/`.
 
 ### Over de taal
 

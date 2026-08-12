@@ -425,6 +425,7 @@ class Vesc extends EventEmitter {
       wattHoursCharged: v.wattHoursCharged,
       ampHours: v.ampHours,
       tachometer: v.tachometer,
+      tachometerAbs: v.tachometerAbs,
       fault: faultName(v.fault),
       // uit COMM_GET_VALUES_SETUP, als de firmware die ondersteunt
       speedMs: s ? s.speedMs : null,

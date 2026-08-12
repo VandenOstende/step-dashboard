@@ -25,6 +25,16 @@ done
 command -v bluetoothctl >/dev/null || echo "   let op: bluetoothctl ontbreekt (bluez)"
 command -v mmcli        >/dev/null || echo "   let op: mmcli ontbreekt (modemmanager) — mobiel bereik blijft leeg"
 
+# Inter is het lettertype van het ontwerp. Zonder valt de UI terug op
+# system-ui — leesbaar, maar de cijfers staan dan niet in even brede kolommen
+# en de maatvoering schuift. Het staat in Debian, dus we halen het gewoon op.
+if ! fc-list 2>/dev/null | grep -qi "Inter"; then
+  echo "→ lettertype Inter installeren"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends fonts-inter \
+    || echo "   let op: fonts-inter installeren lukte niet — de UI valt terug op system-ui"
+  command -v fc-cache >/dev/null && fc-cache -f >/dev/null 2>&1 || true
+fi
+
 echo "→ code naar $DEST"
 mkdir -p "$DEST"
 for d in src public install tools; do
@@ -36,7 +46,8 @@ cp "$SRC/package.json" "$DEST/"
 # De designomgeving is gereedschap voor op je eigen computer: hij zet een
 # tweede webserver op met nagemaakte hardware erachter. Op de step heeft dat
 # niets te zoeken, dus die gaat er na het kopiëren weer uit.
-rm -f "$DEST/tools/design.js" "$DEST/tools/design.html"
+rm -f "$DEST/tools/design.js" "$DEST/tools/design.html" "$DEST/tools/shots.js"
+rm -rf "$DEST/tools/icons"
 
 # Welke commit staat er nu? De updater vergelijkt dit met GitHub.
 COMMIT=$(git -C "$SRC/.." rev-parse HEAD 2>/dev/null || echo "")

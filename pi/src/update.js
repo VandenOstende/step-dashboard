@@ -23,11 +23,17 @@ const CHECK_CACHE_MS = 10 * 60 * 1000;
 const STATUS_FILE = "/var/lib/step-dashboard/update-status.json";
 const UPDATER = "/usr/local/sbin/step-update";
 
+/** https://github.com/eigenaar/repo.git → eigenaar/repo */
+function slugFor(repo) {
+  const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(repo || "");
+  return m ? m[1] + "/" + m[2] : null;
+}
+
 /** https://github.com/eigenaar/repo.git → https://api.github.com/repos/eigenaar/repo */
 function apiUrlFor(repo, branch) {
-  const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(repo || "");
-  if (!m) return null;
-  return "https://api.github.com/repos/" + m[1] + "/" + m[2]
+  const slug = slugFor(repo);
+  if (!slug) return null;
+  return "https://api.github.com/repos/" + slug
     + "/commits/" + encodeURIComponent(branch || "main");
 }
 
@@ -96,18 +102,54 @@ class Updater {
     return this.pending;
   }
 
+  /**
+   * De commits tussen wat er staat en wat er klaarligt — dat is wat het
+   * release-scherm toont. GitHub levert ze met de compare-API; die geeft ze in
+   * chronologische volgorde, dus het nieuwste komt hier bovenaan te staan.
+   * Lukt het niet, dan is het geen fout: dan is er gewoon geen lijst.
+   */
+  async notes(base, head) {
+    const slug = slugFor(this.cfg.repo);
+    if (!slug || !base || !head || base === head) return [];
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const res = await fetch(
+        "https://api.github.com/repos/" + slug + "/compare/" + base + "..." + head,
+        {
+          signal: ctrl.signal,
+          headers: { "Accept": "application/vnd.github+json", "User-Agent": "step-dashboard" }
+        }
+      );
+      if (!res.ok) return [];
+      const j = await res.json();
+      if (!j || !Array.isArray(j.commits)) return [];
+      return j.commits.slice(-30).reverse().map((c) => ({
+        sha: (c.sha || "").slice(0, 6),
+        msg: ((c.commit && c.commit.message) || "").split("\n")[0]
+      }));
+    } catch {
+      return [];
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Alles wat de UI moet weten, in één object. */
   async status(force) {
     const cur = this.installed();
     const run = this.progress();
     const out = {
+      repo: slugFor(this.cfg.repo) || "",
       current: cur ? cur.commit : null,
       currentShort: cur ? cur.commit.slice(0, 7) : null,
       installedAt: cur ? cur.at : null,
       branch: cur ? cur.branch : null,
       latest: null,
       latestShort: null,
+      latestDate: null,
       message: null,
+      notes: [],
       available: false,
       running: !!(run && (run.state === "bezig" || run.state === "herstarten")),
       runState: run ? run.state : null,
@@ -120,10 +162,12 @@ class Updater {
       const rem = await this.remote(force);
       out.latest = rem.commit;
       out.latestShort = rem.commit.slice(0, 7);
+      out.latestDate = rem.date || null;
       out.message = rem.message;
       // Zonder bekende huidige versie kunnen we niets vergelijken; dan is
       // "bijwerken" nog steeds mogelijk, maar we beweren niet dat het nodig is.
       out.available = !!(cur && rem.commit !== cur.commit);
+      if (out.available) out.notes = await this.notes(cur.commit, rem.commit);
     } catch (err) {
       out.error = err.name === "AbortError" ? "geen antwoord van GitHub" : err.message;
       this.lastError = out.error;

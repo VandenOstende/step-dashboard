@@ -52,6 +52,24 @@ class Telemetry {
     this.state = state;
     this.cells = cfg.step.batteryCells || null;
     this.warnedNoSetup = false;
+
+    /* Kilometerstand en rijtijd. De VESC heeft geen kilometerteller die een
+       herstart overleeft — zijn tachometer begint bij nul zodra de controller
+       opnieuw opstart. Daarom telt deze klasse zelf op: elke meting levert een
+       stukje bij, en het totaal gaat naar state.json. */
+    this.odoM = (state.data.odo && state.data.odo.meters) || 0;
+    this.lastAbs = null;
+    this.tripSec = (state.trip && state.trip.seconds) || 0;
+    this.lastTick = null;
+    this.lastSave = 0;
+  }
+
+  /** Afgelegde meters volgens de absolute tachometer, ongeacht de richting. */
+  _absMeters(snap) {
+    const raw = typeof snap.tachometerAbs === "number"
+      ? snap.tachometerAbs
+      : Math.abs(snap.tachometer || 0);
+    return this._distanceFromTacho(raw);
   }
 
   /** Meters afgelegd volgens de tachometer, als de VESC zelf niets meldt. */
@@ -72,7 +90,10 @@ class Telemetry {
   /** Nulpunt van de rit-teller op de huidige stand zetten. */
   resetTrip(snap) {
     const raw = snap ? this._raw(snap) : { distanceM: 0, wattHours: 0 };
-    this.state.patch({ trip: { distanceM: raw.distanceM, wattHours: raw.wattHours, valid: true } });
+    this.tripSec = 0;
+    this.state.patch({
+      trip: { distanceM: raw.distanceM, wattHours: raw.wattHours, valid: true, seconds: 0 }
+    });
   }
 
   _raw(snap) {
@@ -89,8 +110,9 @@ class Telemetry {
       speed_kmh: 0, rpm: 0, erpm: 0, duty: 0,
       battery_pct: 0, voltage: 0, cell_voltage: 0,
       motor_current: 0, battery_current: 0, power_w: 0,
-      temp_motor: 0, temp_fet: 0,
-      wh_used: 0, trip_km: 0,
+      temp_motor: 0, temp_fet: 0, temp_batt: null,
+      wh_used: 0, trip_km: 0, trip_s: Math.round(this.tripSec || 0),
+      avg_kmh: 0, odo_km: (this.odoM || 0) / 1000,
       fault: null
     };
   }
@@ -139,6 +161,34 @@ class Telemetry {
     const tripKm = Math.max(0, (raw.distanceM - b.distanceM) / 1000);
     const whUsed = Math.max(0, raw.wattHours - b.wattHours);
 
+    /* Kilometerstand: het stukje dat er sinds de vorige meting bij kwam.
+       Loopt de absolute tachometer terug, dan is de VESC herstart en begint
+       het tellen opnieuw vanaf die stand — de opgetelde stand blijft staan. */
+    const nu = Date.now();
+    const abs = this._absMeters(snap);
+    if (this.lastAbs === null || abs < this.lastAbs - 1) this.lastAbs = abs;
+    this.odoM += Math.max(0, abs - this.lastAbs);
+    this.lastAbs = abs;
+
+    /* Rijtijd voor Timer A en de gemiddelde snelheid: alleen tellen als de
+       step ook echt rijdt. De sprong aftoppen op twee seconden houdt een
+       hapering in de lus of een geschorst tabblad uit de teller. */
+    if (this.lastTick !== null && speedKmh > 1) {
+      this.tripSec += Math.min(2, (nu - this.lastTick) / 1000);
+    }
+    this.lastTick = nu;
+
+    /* Wegschrijven gaat met tien seconden tussenpauze. state.patch() stelt
+       het schrijven een halve seconde uit; bij elke meting patchen betekent
+       dat het nooit gebeurt zolang je rijdt. */
+    if (nu - this.lastSave > 10000) {
+      this.lastSave = nu;
+      this.state.patch({
+        odo: { meters: Math.round(this.odoM) },
+        trip: { seconds: Math.round(this.tripSec) }
+      });
+    }
+
     const erpm = snap.erpm || 0;
     return {
       connected: true,
@@ -154,8 +204,15 @@ class Telemetry {
       power_w: (snap.currentIn || 0) * vIn,
       temp_motor: snap.tempMotor || 0,
       temp_fet: snap.tempFet || 0,
+      /* De VESC meet de accutemperatuur niet — er zit geen ingang voor op de
+         controller. Liever niets dan een verzonnen getal: de UI zet er n.v.t.
+         neer en het alarm laat deze limiet met rust. */
+      temp_batt: null,
       wh_used: whUsed,
       trip_km: tripKm,
+      trip_s: Math.round(this.tripSec),
+      avg_kmh: this.tripSec > 5 ? tripKm / (this.tripSec / 3600) : 0,
+      odo_km: this.odoM / 1000,
       fault: snap.fault || null
     };
   }
