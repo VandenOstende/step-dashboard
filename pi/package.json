@@ -10,6 +10,8 @@
   "scripts": {
     "start": "node src/server.js",
     "design": "node tools/design.js",
+    "bench": "node tools/bench.js",
+    "shots": "node tools/shots.js",
     "probe": "node tools/vesc-probe.js",
     "test": "node tools/selftest.js"
   }

@@ -58,9 +58,12 @@ for (const r of [/\$\("([^"]+)"\)/g, /getElementById\("([^"]+)"\)/g,
   for (const m of js.matchAll(r)) ids.add(m[1]);
 }
 const have = new Set([...uit.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
-/* Deze maakt app.js zelf aan of ze horen bij de sprite. */
-const DYNAMIC = new Set(["root"]);
-const missing = [...ids].filter((i) => !have.has(i) && !DYNAMIC.has(i) && !i.startsWith("i-"));
+/* Deze maakt app.js zelf aan. De vier regels van de snelheidsmeting worden
+   één keer opgebouwd en daarna alleen nog bijgevuld; hun ids ontstaan dus in
+   JavaScript en niet in de opmaak. */
+const DYNAMIC = [/^root$/, /^st[lvu]\d+$/];
+const missing = [...ids].filter((i) =>
+  !have.has(i) && !DYNAMIC.some((r) => r.test(i)) && !i.startsWith("i-"));
 
 /* ── controle: bestaat elk icoon dat aangeroepen wordt? ──────────────────── */
 /* Een verkeerde naam levert een leeg vierkantje op: de <use> wijst nergens

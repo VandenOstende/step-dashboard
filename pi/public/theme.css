@@ -95,7 +95,6 @@ p{margin:0}
 #link{
   width:7px;height:7px;border-radius:50%;flex:none;
   background:var(--link);box-shadow:0 0 6px var(--link);
-  animation:linkBlink 1.1s steps(1,end) infinite;
 }
 #top .sep,#linksub{color:var(--faint)}
 #topright{display:flex;align-items:center;gap:8px;margin-top:9px;cursor:pointer}
@@ -122,9 +121,9 @@ p{margin:0}
 #bell{cursor:pointer}
 #bell .ico{width:19px;height:19px;color:var(--faint)}
 /* Een melding kleurt de bel en laat hem knipperen. data-lvl komt uit app.js. */
-#bell[data-lvl="warn"]{border-color:#eee0c6;background:rgba(184,121,31,.1);animation:bellBlink 1s ease-in-out infinite}
+#bell[data-lvl="warn"]{border-color:#eee0c6;background:rgba(184,121,31,.1)}
 #bell[data-lvl="warn"] .ico{color:var(--amber)}
-#bell[data-lvl="err"]{border-color:#eed2d0;background:rgba(194,69,63,.1);animation:bellBlink 1s ease-in-out infinite}
+#bell[data-lvl="err"]{border-color:#eed2d0;background:rgba(194,69,63,.1)}
 #bell[data-lvl="err"] .ico{color:var(--red)}
 
 #cruise{border-color:var(--accent);background:var(--accent-soft)}
@@ -162,9 +161,15 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 
 #railright{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px}
 #dutytrack{position:relative;width:12px;height:132px;border-radius:99px;background:var(--track);overflow:hidden}
+/* Schalen, niet meten. Een hoogte in procenten laat de browser opnieuw
+   layouten; een transform gaat langs layout heen. En géén transitie: de
+   waarde komt al ruim zes keer per seconde binnen, dus er valt niets te
+   verzachten — een transitie van een kwart seconde zou betekenen dat deze
+   balk permanent staat te animeren, en dat is precies wat een SPI-schermpje
+   niet aankan. */
 #dutyfill{
-  position:absolute;left:0;right:0;bottom:0;height:0;
-  border-radius:99px;background:var(--accent);transition:height .25s linear;
+  position:absolute;left:0;right:0;bottom:0;height:100%;transform-origin:bottom;
+  transform:scaleY(0);border-radius:99px;background:var(--accent);
 }
 #dutyfill.hot{background:var(--orange)}
 #dutyfill.max{background:var(--red)}
@@ -180,7 +185,7 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
   border:1px solid var(--border);border-radius:10px;background:var(--surface);
   box-shadow:var(--shadow);
 }
-#battrow.low{border-color:var(--orange);animation:bellBlink 1.2s ease-in-out infinite}
+#battrow.low{border-color:var(--orange)}
 .battmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .battline{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
 .battline .val{flex:1;min-width:0;display:flex;align-items:baseline;gap:3px}
@@ -191,7 +196,10 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
   font-variant-numeric:tabular-nums;letter-spacing:.02em;
 }
 #batttrack{height:6px;border-radius:99px;background:var(--track);overflow:hidden}
-#battfill{display:block;height:100%;width:0;border-radius:99px;background:var(--batt);transition:width .3s linear}
+#battfill{
+  display:block;height:100%;width:100%;transform-origin:left;transform:scaleX(0);
+  border-radius:99px;background:var(--batt);
+}
 .vrule{width:1px;height:34px;flex:none;background:linear-gradient(180deg,transparent,var(--border),transparent)}
 .battrange{text-align:right;flex:none}
 .battrange .micro{letter-spacing:.14em}
@@ -226,6 +234,8 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
    er bovenop ligt, en dan verdwijnt het toetsenbord onder de netwerklijst. */
 .sheet{
   position:absolute;inset:0;z-index:8;display:none;
+  /* Een wijziging binnen een laag hoeft de rest van de pagina niet te raken. */
+  contain:layout style;
   flex-direction:column;gap:12px;padding:10px 12px 12px;
   background:var(--ground);
 }
@@ -438,13 +448,16 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
   flex:none;display:flex;align-items:center;gap:8px;
   font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
 }
-.chargehead .ico{width:18px;height:18px;color:var(--charge);animation:bellBlink 1.2s ease-in-out infinite}
+.chargehead .ico{width:18px;height:18px;color:var(--charge)}
 .chargemid{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .chargepct{display:flex;align-items:baseline;gap:6px}
 #chargeval{font-weight:500;font-size:104px;line-height:1;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--charge)}
 .chargepct .u{font-size:22px;color:var(--dim)}
 #chargetrack{height:8px;border-radius:99px;background:var(--track);overflow:hidden}
-#chargefill{display:block;height:100%;width:0;border-radius:99px;background:var(--charge);transition:width .4s linear}
+#chargefill{
+  display:block;height:100%;width:100%;transform-origin:left;transform:scaleX(0);
+  border-radius:99px;background:var(--charge);
+}
 .chargesub{display:flex;align-items:baseline;justify-content:space-between;font-size:12px;color:var(--faint)}
 .chargecards{flex:none;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .chargecards .card{padding:9px 10px}
@@ -530,14 +543,29 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 /* ── instellingen ────────────────────────────────────────────────────────── */
 #settings{z-index:5;gap:14px}
 .setlist{display:flex;flex-direction:column;gap:14px}
-#updrow.avail{border-color:var(--accent);animation:bellBlink 1.1s ease-in-out infinite}
+#updrow.avail{border-color:var(--accent)}
 #updrow.avail #updicon{color:var(--accent)}
 #updrow.ok #updicon{color:var(--green)}
 #updicon{color:var(--dim)}
 
-/* ── beweging ────────────────────────────────────────────────────────────── */
+/* ── knipperen ───────────────────────────────────────────────────────────── */
+/* Niet met @keyframes. Een oneindige CSS-animatie laat Chromium elke frame de
+   stijl van dat element opnieuw uitrekenen — ook een animatie met steps(), en
+   ook als er verder niets verandert. Op deze pagina kostte alleen het stipje
+   in de bovenbalk al negentien stijlherberekeningen per seconde, dag en nacht.
+
+   In plaats daarvan zet app.js twee keer per seconde .dim om op een handvol
+   elementen. Welke daarvan dan echt dimt bepaalt de CSS hieronder, zodat het
+   omzetten onvoorwaardelijk mag: twee stijlwijzigingen per seconde in plaats
+   van honderdtwintig. */
+#link.dim{opacity:.15}
+#bell[data-lvl].dim{opacity:.35}
+#battrow.low.dim{opacity:.35}
+#updrow.avail.dim{opacity:.35}
+#chargeico.dim{opacity:.35}
+
+/* ── beweging die vanzelf ophoudt ────────────────────────────────────────── */
+/* Deze drie lopen één keer af en blijven dus niet op de achtergrond tikken. */
 @keyframes alertIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@keyframes bellBlink{0%,100%{opacity:1}50%{opacity:.35}}
 @keyframes warnBlink{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes ackIn{from{opacity:0}to{opacity:1}}
-@keyframes linkBlink{0%,45%{opacity:1}55%,100%{opacity:.15}}

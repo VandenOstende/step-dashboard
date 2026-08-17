@@ -1121,7 +1121,9 @@ await atest("status meldt dat er een installatie loopt", async () => {
       for (const m of js.matchAll(r)) ids.add(m[1]);
     }
     const heeft = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
-    const weg = [...ids].filter((i) => !heeft.has(i) && i !== "root");
+    /* root en de ids van de snelheidsmeting maakt app.js zelf aan. */
+    const zelf = [/^root$/, /^st[lvu]\d+$/];
+    const weg = [...ids].filter((i) => !heeft.has(i) && !zelf.some((r) => r.test(i)));
     assert.deepStrictEqual(weg, [], "ontbreekt in index.html: " + weg.join(", "));
   });
 

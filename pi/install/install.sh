@@ -46,7 +46,7 @@ cp "$SRC/package.json" "$DEST/"
 # De designomgeving is gereedschap voor op je eigen computer: hij zet een
 # tweede webserver op met nagemaakte hardware erachter. Op de step heeft dat
 # niets te zoeken, dus die gaat er na het kopiëren weer uit.
-rm -f "$DEST/tools/design.js" "$DEST/tools/design.html" "$DEST/tools/shots.js"
+rm -f "$DEST/tools/design.js" "$DEST/tools/design.html" "$DEST/tools/shots.js" "$DEST/tools/bench.js"
 rm -rf "$DEST/tools/icons"
 
 # Welke commit staat er nu? De updater vergelijkt dit met GitHub.

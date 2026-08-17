@@ -37,6 +37,7 @@ src/server.js        the HTTP server
 install/step-update  the script that updates as root
 tools/design.js      design environment: the UI with faked hardware
 tools/shots.js       the screenshots in docs/ui/
+tools/bench.js       how much work the UI makes the browser do
 tools/vesc-probe.js  seeing what your VESC has to say
 tools/selftest.js    tests, no hardware needed
 ```
@@ -436,6 +437,72 @@ design and are worth knowing before you move something:
   trip card says "Ø VERBRUIK" when you tap it — running over beats an ellipsis,
   because the word stays readable.
 
+### Light enough for the panel
+
+The screen on the handlebars hangs off SPI. Every repaint has to be pushed
+over that bus, so what matters isn't how fast the Pi is — it's how often the
+browser decides something changed. `tools/bench.js` measures exactly that, by
+reading Chromium's own counters through the devtools protocol:
+
+```bash
+node tools/design.js &
+node tools/bench.js
+```
+
+The design as it came out of Claude Design was, measured while riding, doing
+**62 style recalculations and 39 layouts per second**. Turning things off one
+at a time showed where that came from:
+
+| | style/s | layout/s |
+|---|---|---|
+| as designed | 62 | 39 |
+| without animations | 38 | 36 |
+| without transitions | 60 | 4 |
+| without both | 4 | 4 |
+
+So the actual work — read the data, write it to the screen — is those 4. The
+other 58 were decoration running in a loop. Three changes fixed it:
+
+- **The bars scale, they don't measure.** The duty bar animated `height` and
+  the battery bar `width`, both in percent. Those are layout properties: every
+  step makes the browser lay the page out again. They're
+  `transform: scaleY()` / `scaleX()` now, which skips layout entirely — and the
+  transition is gone with them. Data arrives 6.7 times a second; a quarter-second
+  transition on top of that means the bar is *permanently* animating, which is
+  the one thing an SPI display can't afford.
+- **Blinking comes from a timer, not from `@keyframes`.** An infinite CSS
+  animation makes Chromium recalculate that element's style every frame, even
+  with `steps()`, even when nothing changes. The blinking dot in the top bar
+  alone cost 19 recalculations a second, around the clock. `app.js` now toggles
+  a `.dim` class on five elements twice a second, and the CSS decides which of
+  them actually dims — two style changes a second instead of a hundred and
+  twenty.
+- **Nothing is painted that you can't see.** With a full-screen sheet open, the
+  ride screen underneath used to keep updating at 6.7 Hz. `show()` tracks which
+  layers are open; `paintRide()` returns immediately when one covers it, and
+  paints once when the last one closes. The speed readout is the exception —
+  it covers the ride screen but its own numbers keep running, so it's built
+  once and only refilled after that.
+
+On top of that, every style write goes through a guard that skips it when the
+value hasn't changed. Setting `style.width` to the same string still marks the
+element dirty.
+
+Measured again afterwards:
+
+| | style/s | layout/s |
+|---|---|---|
+| riding | 8 | 4 |
+| riding with a notification | 2 | 2 |
+| charging | 2 | 2 |
+| settings open | 2 | 2 |
+| standing still | 2 | 2 |
+
+One warning about the tool: an earlier version counted frames with
+`requestAnimationFrame`, which keeps the browser awake and then measures its
+own presence — it reported a confident 60 fps in every situation. It counts
+nothing but Chromium's own metrics now.
+
 ### The design environment
 
 ```bash
@@ -603,6 +670,7 @@ src/server.js        de HTTP-server
 install/step-update  het script dat als root bijwerkt
 tools/design.js      designomgeving: de UI met nagemaakte hardware
 tools/shots.js       de schermafdrukken in docs/ui/
+tools/bench.js       hoeveel werk de UI de browser geeft
 tools/vesc-probe.js  kijken wat je VESC vertelt
 tools/selftest.js    tests, zonder hardware
 ```
@@ -1011,6 +1079,72 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   rand; het is nu **ODO**, in alle vier de talen. Loopt er toch nog iets over —
   de trip-kaart zegt "Ø VERBRUIK" als je erop tikt — dan is overlopen beter dan
   afkappen, want het woord blijft leesbaar.
+
+### Licht genoeg voor het schermpje
+
+Het scherm op het stuur hangt aan SPI. Elke hertekening moet over die bus, dus
+wat telt is niet hoe snel de Pi is maar hoe vaak de browser besluit dat er iets
+veranderd is. `tools/bench.js` meet precies dat, door de tellers van Chromium
+zelf uit te lezen via het devtools-protocol:
+
+```bash
+node tools/design.js &
+node tools/bench.js
+```
+
+Het ontwerp zoals het uit Claude Design kwam deed, gemeten tijdens het rijden,
+**62 stijlherberekeningen en 39 layouts per seconde**. Stuk voor stuk uitzetten
+liet zien waar dat vandaan kwam:
+
+| | stijl/s | layout/s |
+|---|---|---|
+| zoals ontworpen | 62 | 39 |
+| zonder animaties | 38 | 36 |
+| zonder transities | 60 | 4 |
+| zonder allebei | 4 | 4 |
+
+Het echte werk — de data lezen en op het scherm zetten — is dus die 4. De
+andere 58 waren opsmuk die in een lus doorliep. Drie wijzigingen losten het op:
+
+- **De balken schalen, ze meten niet.** De duty-balk animeerde `height` en de
+  accubalk `width`, allebei in procenten. Dat zijn layout-eigenschappen: elke
+  stap laat de browser de pagina opnieuw indelen. Het zijn nu
+  `transform: scaleY()` en `scaleX()`, wat langs layout heen gaat — en de
+  transitie is meteen weg. De data komt 6,7 keer per seconde binnen; een
+  transitie van een kwart seconde daarbovenop betekent dat die balk *permanent*
+  staat te animeren, en dat is het enige wat een SPI-schermpje niet kan hebben.
+- **Knipperen komt uit een timer, niet uit `@keyframes`.** Een oneindige
+  CSS-animatie laat Chromium elke frame de stijl van dat element opnieuw
+  uitrekenen, ook met `steps()`, ook als er niets verandert. Alleen het
+  knipperende stipje in de bovenbalk kostte negentien herberekeningen per
+  seconde, dag en nacht. `app.js` zet nu twee keer per seconde een `.dim`-klasse
+  om op vijf elementen, en de CSS bepaalt welke daarvan echt dimt — twee
+  stijlwijzigingen per seconde in plaats van honderdtwintig.
+- **Er wordt niets getekend wat je niet ziet.** Met een scherm eroverheen liep
+  het rijscherm eronder gewoon door op 6,7 Hz. `show()` houdt bij welke lagen
+  open staan; `paintRide()` keert meteen terug zodra er een overheen ligt, en
+  tekent één keer als de laatste dichtgaat. De snelheidsmeting is de
+  uitzondering — die dekt het rijscherm af maar zijn eigen cijfers moeten
+  meelopen, dus die wordt één keer opgebouwd en daarna alleen nog bijgevuld.
+
+Daarbovenop gaat elke stijlwijziging door een controle die hem overslaat als de
+waarde niet veranderd is. `style.width` op dezelfde tekenreeks zetten markeert
+het element namelijk alsnog als vuil.
+
+Daarna opnieuw gemeten:
+
+| | stijl/s | layout/s |
+|---|---|---|
+| rijden | 8 | 4 |
+| rijden met een melding | 2 | 2 |
+| laden | 2 | 2 |
+| instellingen open | 2 | 2 |
+| stilstaand | 2 | 2 |
+
+Eén waarschuwing over het gereedschap: een eerdere versie telde frames met
+`requestAnimationFrame`, en die lus houdt de browser zelf wakker en meet dan
+zijn eigen aanwezigheid — hij meldde in elke situatie stellig 60 fps. Hij telt
+nu niets anders dan de tellers van Chromium.
 
 ### De designomgeving
 

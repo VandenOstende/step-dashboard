@@ -21,8 +21,48 @@
 function $(id) { return document.getElementById(id); }
 function txt(id, v) { var e = $(id); if (e && e.textContent !== v) e.textContent = v; }
 function cls(id, name, on) { var e = $(id); if (e) e.classList.toggle(name, !!on); }
-function show(id, on) { var e = $(id); if (e) e.classList.toggle("open", on !== false); }
+/* Welke lagen openstaan wordt bijgehouden, niet elke keer opgezocht: de
+   tekenlus vraagt het zeven keer per seconde. */
+var lagen = {};
+function show(id, on) {
+  var e = $(id);
+  if (!e) return;
+  var aan = on !== false;
+  var was = !!lagen[id];
+  e.classList.toggle("open", aan);
+  if (aan) lagen[id] = 1; else delete lagen[id];
+  /* Gaat het laatste afdekkende scherm dicht, dan staat het rijscherm nog op
+     de waarden van voor het openen. Eén keer bijwerken, meteen. */
+  if (was && !aan && DEKT_AF[id] && !bedekt()) paintRide();
+}
 function hide(id) { show(id, false); }
+
+/* Schermen die het rijscherm helemaal afdekken. Staat er zo een open, dan
+   hoeft eronder niets bijgewerkt te worden — dat scheelt op het stuur een
+   hertekening per meting van iets wat je toch niet ziet. */
+var DEKT_AF = {
+  settings: 1, conn: 1, units: 1, lang: 1, accent: 1, limits: 1,
+  release: 1, pw: 1, speedsheet: 1, setup: 1, off: 1, charge: 1, alarm: 1
+};
+function bedekt() {
+  for (var k in lagen) if (DEKT_AF[k]) return true;
+  return false;
+}
+
+/* Een stijl alleen schrijven als hij verandert. De browser merkt het element
+   anders toch als vuil aan, ook bij dezelfde waarde. */
+function stijl(el, naam, waarde) {
+  if (!el) return;
+  if (el["_" + naam] === waarde) return;
+  el["_" + naam] = waarde;
+  el.style[naam] = waarde;
+}
+var wortelWaarden = {};
+function wortel(naam, waarde) {
+  if (wortelWaarden[naam] === waarde) return;
+  wortelWaarden[naam] = waarde;
+  document.documentElement.style.setProperty(naam, waarde);
+}
 function icon(id, naam) {
   var e = $(id); if (!e) return;
   var u = e.querySelector("use");
@@ -140,8 +180,8 @@ function mmss(sec) {
 }
 
 function paintRide() {
+  if (bedekt()) return;
   var d = data;
-  var st = document.documentElement.style;
 
   /* Snelheid. De VESC uit? Dan 0 en niet n.v.t. — nul is hier de waarheid. */
   txt("speed", num(d2(d.speed_kmh || 0), 0));
@@ -150,18 +190,16 @@ function paintRide() {
 
   /* Duty. Wat de VESC meldt is al 0..1. */
   var duty = Math.max(0, Math.min(1, d.duty || 0));
-  var df = $("dutyfill");
-  if (df) df.style.height = (duty * 100).toFixed(0) + "%";
+  stijl($("dutyfill"), "transform", "scaleY(" + duty.toFixed(3) + ")");
   cls("dutyfill", "hot", duty > 0.85 && duty <= 0.95);
   cls("dutyfill", "max", duty > 0.95);
 
   /* Accu. */
   var pct = Math.max(0, Math.min(100, d.battery_pct || 0));
-  st.setProperty("--batt", battKleur(pct));
+  wortel("--batt", battKleur(pct));
   txt("battpct", num(pct, 0));
   txt("battva", (num(d.voltage, 1) || "--") + " V · " + (num(Math.abs(d.battery_current || 0), 0) || "--") + " A");
-  var bf = $("battfill");
-  if (bf) bf.style.width = Math.max(2, pct) + "%";
+  stijl($("battfill"), "transform", "scaleX(" + (Math.max(2, pct) / 100).toFixed(3) + ")");
   cls("battrow", "low", pct <= 20);
 
   /* Bereik: wat er nog in het pak zit, gedeeld door het verbruik per km.
@@ -204,8 +242,7 @@ function paintRide() {
 var net = { wifi: null, bt: null, modem: null };
 
 function paintTop() {
-  var st = document.documentElement.style;
-  st.setProperty("--link", data.connected ? "#2f9e5f" : "#c2453f");
+  wortel("--link", data.connected ? "#2f9e5f" : "#c2453f");
 
   var w = net.wifi && net.wifi.connected;
   icon("wifiico", w ? "i-wifi-high-f" : "i-wifi-slash");
@@ -224,6 +261,20 @@ function paintTop() {
 function tikKlok() {
   var d = new Date();
   txt("clock", d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0"));
+}
+
+/* Knipperen. Vroeger deed CSS dit met @keyframes, maar een oneindige animatie
+   laat de browser elke frame de stijl van dat element opnieuw uitrekenen —
+   ook als er niets verandert. Alleen het stipje in de bovenbalk kostte zo
+   negentien stijlherberekeningen per seconde.
+
+   Nu zet deze timer twee keer per seconde .dim om op vijf elementen. Welke
+   daarvan zichtbaar dimt bepaalt theme.css, dus dit mag onvoorwaardelijk. */
+var KNIPPERT = ["link", "bell", "battrow", "updrow", "chargeico"];
+var dimAan = false;
+function knipper() {
+  dimAan = !dimAan;
+  for (var i = 0; i < KNIPPERT.length; i++) cls(KNIPPERT[i], "dim", dimAan);
 }
 
 /* ── meldingen ───────────────────────────────────────────────────────────── */
@@ -340,6 +391,7 @@ $("alarmack").addEventListener("pointerdown", function (e) {
 /* Het laadscherm komt vanzelf op zodra de server ziet dat de spanning stijgt
    terwijl de step stilstaat, en gaat weg als dat stopt. Wegtikken mag ook. */
 var laadWeg = false;
+var laadEenheden = null;
 
 function paintCharge() {
   var d = data;
@@ -351,8 +403,7 @@ function paintCharge() {
   document.documentElement.style.setProperty("--charge", vol ? "#3f8b52" : cfg.accent);
   txt("chargetitle", vol ? t.chargeFull : t.charging);
   txt("chargeval", num(pct, 0));
-  var f = $("chargefill");
-  if (f) f.style.width = Math.max(2, pct) + "%";
+  stijl($("chargefill"), "transform", "scaleX(" + (Math.max(2, pct) / 100).toFixed(3) + ")");
   txt("chargevolts", num(d.voltage, 1) || "--");
 
   var whLeft = pct / 100 * cfg.packWh;
@@ -367,8 +418,11 @@ function paintCharge() {
     : a === null ? t.na
       : (a * (d.voltage || 0) / 60 / cfg.whPerKm * (isImp() ? 0.621371 : 1)).toFixed(2));
 
-  var eh = document.querySelectorAll(".chargeunit");
-  for (var i = 0; i < eh.length; i++) eh[i].textContent = uDist();
+  if (!laadEenheden) laadEenheden = document.querySelectorAll(".chargeunit");
+  var eenheid = uDist();
+  for (var i = 0; i < laadEenheden.length; i++) {
+    if (laadEenheden[i].textContent !== eenheid) laadEenheden[i].textContent = eenheid;
+  }
   show("charge", true);
 }
 $("charge").addEventListener("pointerdown", function (e) {
@@ -383,20 +437,35 @@ $("tripcard").addEventListener("pointerdown", function (e) {
   e.preventDefault(); tripView = tripView ? 0 : 1; paintRide();
 });
 
-function tekenSpeedStats() {
-  var d = data;
-  var rij = [
-    ["i-gauge", t.current, num(d2(d.speed_kmh || 0), 0), uSpeed(), "var(--ink)"],
-    ["i-arrow-line-up", t.topSpeed, num(d2(d.top_kmh || 0), 0), uSpeed(), "#c2453f"],
-    ["i-chart-line", t.avgSpeed, num(d2(d.avg_kmh || 0), 0), uSpeed(), "var(--accent)"],
-    ["i-timer", "Timer A", mmss(d.trip_s), "", "var(--ink)"]
-  ];
-  $("speedstats").innerHTML = rij.map(function (r) {
-    return '<div class="stat"><span style="color:' + r[4] + '">' + svg(r[0]) + "</span>"
-      + '<span class="lbl">' + esc(r[1]) + "</span>"
-      + '<span class="num"><b style="color:' + r[4] + '">' + esc(r[2]) + "</b>"
-      + '<span>' + esc(r[3]) + "</span></span></div>";
+/* De vier regels worden één keer opgebouwd en daarna alleen nog bijgevuld.
+   Dit scherm staat open terwijl je rijdt, dus de cijfers moeten meelopen —
+   maar de HTML zeven keer per seconde opnieuw samenstellen zou hier het
+   duurste van de hele app zijn. */
+var STATS = [
+  ["i-gauge", "current", "var(--ink)"],
+  ["i-arrow-line-up", "topSpeed", "#c2453f"],
+  ["i-chart-line", "avgSpeed", "var(--accent)"],
+  ["i-timer", null, "var(--ink)"]
+];
+var statsGebouwd = false;
+
+function bouwSpeedStats() {
+  $("speedstats").innerHTML = STATS.map(function (r, i) {
+    return '<div class="stat"><span style="color:' + r[2] + '">' + svg(r[0]) + "</span>"
+      + '<span class="lbl" id="stl' + i + '"></span>'
+      + '<span class="num"><b style="color:' + r[2] + '" id="stv' + i + '"></b>'
+      + '<span id="stu' + i + '"></span></span></div>';
   }).join("");
+  statsGebouwd = true;
+}
+
+function tekenSpeedStats() {
+  if (!statsGebouwd) bouwSpeedStats();
+  var d = data, e = uSpeed();
+  txt("stl0", t.current); txt("stv0", num(d2(d.speed_kmh || 0), 0)); txt("stu0", e);
+  txt("stl1", t.topSpeed); txt("stv1", num(d2(d.top_kmh || 0), 0)); txt("stu1", e);
+  txt("stl2", t.avgSpeed); txt("stv2", num(d2(d.avg_kmh || 0), 0)); txt("stu2", e);
+  txt("stl3", "Timer A"); txt("stv3", mmss(d.trip_s)); txt("stu3", "");
 }
 $("speedreset").addEventListener("pointerdown", function (e) {
   e.preventDefault();
@@ -985,6 +1054,9 @@ function poll() {
       bouwAlerts();
       paintAlarm();
       paintCharge();
+      /* De snelheidsmeting dekt het rijscherm af, maar de cijfers erin lopen
+         wel mee zolang hij openstaat. */
+      if (lagen.speedsheet) tekenSpeedStats();
     })["catch"](function () {
       data.connected = false;
       paintTop();
@@ -1016,6 +1088,7 @@ fetch("/settings", { cache: "no-store" }).then(function (r) { return r.json(); }
     paintAlles();
     tikKlok();
     setInterval(tikKlok, 1000);
+    setInterval(knipper, 550);
     poll();
     pollNet();
     setInterval(pollNet, 5000);

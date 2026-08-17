@@ -110,6 +110,13 @@ Inter is the typeface. `install.sh` installs it (`fonts-inter`); without it the
 UI falls back to system-ui, which is readable but pushes the digits out of their
 columns.
 
+The display is slow — it hangs off SPI, so every repaint has to be pushed over
+that bus. So the UI paints only what actually changed, has no transitions on
+anything that updates while you ride, no CSS animation that runs forever, and
+doesn't paint the ride screen at all while something covers it. `npm run bench`
+measures it; the numbers and the reasoning are in
+[`pi/README.md`](pi/README.md#light-enough-for-the-panel).
+
 ### Installing
 
 On Raspberry Pi OS:
@@ -512,6 +519,13 @@ geen internet en er mag niets van een CDN komen.
 Inter is het lettertype. `install.sh` installeert het (`fonts-inter`); zonder
 valt de UI terug op system-ui, wat leesbaar is maar de cijfers uit hun kolommen
 duwt.
+
+Het schermpje is traag — het hangt aan SPI, dus elke hertekening moet over die
+bus. Daarom tekent de UI alleen wat echt veranderd is, staat er geen transitie
+op iets dat tijdens het rijden bijwerkt, loopt er geen CSS-animatie eeuwig door,
+en wordt het rijscherm helemaal niet getekend zolang er iets overheen ligt.
+`npm run bench` meet het; de cijfers en de redenering staan in
+[`pi/README.md`](pi/README.md#licht-genoeg-voor-het-schermpje).
 
 ### Installeren
 
