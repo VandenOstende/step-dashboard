@@ -1017,6 +1017,16 @@ function stroom(actie) {
   fetch("/power", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: actie })
+  }).then(function (r) { return r.json(); }).then(function (j) {
+    /* Zegt de server expliciet nee — geen rechten, commando mislukt — dan gaat
+       de machine helemaal niet uit en is "Tik om te starten" een leugen. Dan
+       liever de waarheid op het scherm. Valt de verbinding weg zonder
+       antwoord, dan is dat juist het bewijs dat het afsluiten begonnen is, en
+       daarvoor is de catch hieronder: niets doen. */
+    if (j && j.ok === false) {
+      txt("offlabel", t.powerFail);
+      icon("officon", "i-warning");
+    }
   })["catch"](function () {});
 }
 $("doreboot").addEventListener("click", function (e) { e.preventDefault(); stroom("reboot"); });

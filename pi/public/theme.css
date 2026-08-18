@@ -319,6 +319,9 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 .row.mid{justify-content:center;font-size:14px;color:var(--dim)}
 .row.on{border-color:var(--accent)}
 .row .dot{width:16px;height:16px;flex:none;border-radius:50%;background:var(--accent)}
+/* Indrukken moet je zien, overal — anders is een gemiste tik pas merkbaar
+   doordat er niets gebeurt. */
+.row:active,.net:active,.pick:active,.wide:active,.alert:active{background:var(--accent-soft)}
 .pair{display:flex;gap:8px}
 .pair .row{flex:1;min-width:0;gap:7px;padding:13px 10px;font-size:13px}
 .pair .row .ico{width:19px;height:19px}
@@ -409,6 +412,10 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 /* ── aan/uit ─────────────────────────────────────────────────────────────── */
 #powermenu{z-index:11;background:rgba(10,11,18,.62);align-items:flex-end;padding:12px}
 #powermenu .stack{width:100%;display:flex;flex-direction:column;gap:8px}
+/* De spleten tussen Herstarten, Uitschakelen en Annuleren horen bij de
+   dichtstbijzijnde knop — een tik ertussen viel in het niets. */
+#powermenu .row{position:relative}
+#powermenu .row::after{content:"";position:absolute;inset:-5px 0}
 #doshutdown{border-color:var(--red)}
 
 #off{

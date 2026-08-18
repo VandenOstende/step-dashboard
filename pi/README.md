@@ -418,6 +418,13 @@ The screen is the confirmation. Another "are you sure" on a touchscreen only
 makes it more annoying, not safer — and you're two taps away from it starting on
 the ride screen.
 
+If the command is refused — missing sudo rule, broken install — the off screen
+says so ("Failed — tap to go back") instead of showing "Tap to wake" while the
+machine quietly keeps running. A connection that dies without an answer is the
+opposite case: that is what shutting down looks like, and the screen stays as
+it is. The gaps between Reboot, Shutdown and Cancel also belong to the nearest
+button now — a tap between two rows used to land on nothing.
+
 ### Sizing on 320 × 480
 
 Portrait is 320 px wide, and that decides a lot. The numbers below come from the
@@ -1238,6 +1245,14 @@ andere. Er is dus geen tekenreeks die van de browser tot aan sudo doorloopt.
 Het scherm is zelf de bevestiging. Nog een "weet je het zeker" erbij maakt het
 op een aanraakscherm alleen maar irritanter, niet veiliger — en je bent er pas
 na twee tikken vanaf het rijscherm.
+
+Weigert het commando — sudo-regel weg, installatie kapot — dan zegt het
+uit-scherm dat ook ("Niet gelukt — tik om terug te gaan") in plaats van "Tik om
+te starten" te tonen terwijl de machine stilletjes doordraait. Een verbinding
+die zonder antwoord wegvalt is het omgekeerde geval: zo ziet afsluiten er nou
+eenmaal uit, en dan blijft het scherm gewoon staan. De spleten tussen
+Herstarten, Uitschakelen en Annuleren horen nu ook bij de dichtstbijzijnde
+knop — een tik tussen twee rijen landde eerst op niets.
 
 ### Maatvoering op 320 × 480
 
