@@ -464,7 +464,16 @@ design and are worth knowing before you move something:
   past the top-left screen edge, so the whole corner closes the sheet, and a
   corner is the easiest thing there is to hit on a touchscreen. The `Scan` chips
   use a `::after` overlay for the same reason; the topmost one is clipped by its
-  scroll box, so that one grows from 21 to 27 px instead of 34.
+  scroll box, so that one grows from 21 to 27 px instead of 34. After the back
+  button, every control got the same sweep — `tools/raakvlak.js` walks all
+  fourteen screens and measures, via `elementFromPoint`, how big the area is
+  that actually answers a tap. The bell, the status icons, the mode button, the
+  ± steppers, the switches and the Clear link all grew to ≥ 44 px in at least
+  one direction without moving a pixel. Two things stay small because physics
+  says so: the keyboard keys (ten columns on 296 px is 25–28 px a key — but the
+  5 px gaps between them now belong to the nearest key instead of to nobody)
+  and whatever borders directly on another button, where the space simply runs
+  out and every pixel already belongs to someone.
 - **A tap that lands has to look different from one that misses.** There was no
   `:active` anywhere in this UI, so the only way you learned you had missed was
   that the screen stayed put — and then you tapped again. `.back`, `.iconbtn`
@@ -1266,7 +1275,16 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   sluit het scherm, en een hoek is het makkelijkste doel dat er op een
   aanraakscherm bestaat. De `Scan`-knopjes doen hetzelfde met een `::after`; de
   bovenste wordt door zijn scrollvak afgeknipt en gaat daarom van 21 naar 27 px
-  in plaats van 34.
+  in plaats van 34. Na de terugknop is elke knop dezelfde ronde langsgegaan —
+  `tools/raakvlak.js` loopt alle veertien schermen af en meet met
+  `elementFromPoint` hoe groot het vlak is dat werkelijk op een tik antwoordt.
+  De bel, de statusicoontjes, de modusknop, de plus/min-knoppen, de
+  schakelaars en de Wissen-link groeiden allemaal naar ≥ 44 px in minstens één
+  richting zonder een pixel te verschuiven. Twee dingen blijven klein omdat de
+  natuurkunde dat zegt: de toetsen (tien kolommen op 296 px is 25–28 px per
+  toets — maar de spleten van 5 px ertussen horen nu bij de dichtstbijzijnde
+  toets in plaats van bij niemand) en alles wat direct aan een andere knop
+  grenst, waar de ruimte simpelweg op is en elke pixel al van iemand is.
 - **Een tik die raakt moet er anders uitzien dan een tik die mist.** Er stond
   nergens een `:active` in deze UI, dus je merkte alleen dat je ernaast zat
   doordat het scherm bleef staan — en dan tikte je nog een keer. `.back`,
