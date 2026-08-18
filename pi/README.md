@@ -452,6 +452,23 @@ design and are worth knowing before you move something:
   it's **ODO** now, in all four languages. Where something still overflows — the
   trip card says "Ø VERBRUIK" when you tap it — running over beats an ellipsis,
   because the word stays readable.
+- **What listens is bigger than what you see.** The back arrow and the close
+  cross are 20 px icons, and on a 3.5" panel that is a target of one and a half
+  millimetres — smaller than the fingertip meant to hit it. The rest of the UI
+  never had that problem: a `.row` is 46 px tall, `.wide` 44, the bell 38. The
+  fix keeps the drawing where it was and grows only the area that listens:
+  `padding: 12px 16px` with `margin: -12px -16px`, which makes a 52 × 44 px
+  target and takes the same number back out of the layout. The icon does not
+  move by a pixel — `tools/shots.js` proves it, four of the fifteen screenshots
+  come out byte-identical. Side effect worth having: on `.back` the area runs
+  past the top-left screen edge, so the whole corner closes the sheet, and a
+  corner is the easiest thing there is to hit on a touchscreen. The `Scan` chips
+  use a `::after` overlay for the same reason; the topmost one is clipped by its
+  scroll box, so that one grows from 21 to 27 px instead of 34.
+- **A tap that lands has to look different from one that misses.** There was no
+  `:active` anywhere in this UI, so the only way you learned you had missed was
+  that the screen stayed put — and then you tapped again. `.back`, `.iconbtn`
+  and `.chip` now go to `--surface` while pressed.
 
 ### Light enough for the panel
 
@@ -499,7 +516,12 @@ other 58 were decoration running in a loop. Three changes fixed it:
   notification, low battery, update or charge is pending. The VESC dot doesn't
   blink at all any more: it's solid green when the link is there and red when it
   isn't, which says the same thing. Blinking means something again, and a normal
-  ride has none of it.
+  ride has none of it. "Nearly empty" also requires there to *be* a reading:
+  with no VESC `telemetry.offline()` reports 0 %, and 0 % without a measurement
+  is not an empty battery — it used to set `.low` and blink forever on a
+  workbench with nothing plugged in. The bell and the battery row sit in the
+  ride screen, so the timer skips them while a sheet covers it; the update row
+  and the charging bolt live *inside* a sheet and keep going.
 - **Nothing is painted that you can't see.** With a full-screen sheet open, the
   ride screen underneath used to keep updating at 6.7 Hz. `show()` tracks which
   layers are open; `paintRide()` returns immediately when one covers it, and
@@ -1231,6 +1253,24 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   rand; het is nu **ODO**, in alle vier de talen. Loopt er toch nog iets over —
   de trip-kaart zegt "Ø VERBRUIK" als je erop tikt — dan is overlopen beter dan
   afkappen, want het woord blijft leesbaar.
+- **Wat luistert is groter dan wat je ziet.** De terugpijl en het sluitkruisje
+  zijn icoontjes van 20 px, en op een paneel van 3,5" is dat een doel van
+  anderhalve millimeter — kleiner dan de vingertop die het moet raken. De rest
+  van de UI had dat probleem nooit: een `.row` is 46 px hoog, `.wide` 44, de bel
+  38. De oplossing laat de tekening staan waar hij stond en vergroot alleen het
+  vlak dat luistert: `padding: 12px 16px` met `margin: -12px -16px`, wat een
+  aanraakvlak van 52 × 44 px oplevert en datzelfde getal weer uit de opmaak
+  haalt. Het icoontje verschuift geen pixel — `tools/shots.js` bewijst het, vier
+  van de vijftien afdrukken komen er byte-identiek uit. Bijeffect dat je wil: bij
+  `.back` loopt het vlak door tot voorbij de linkerbovenhoek, dus de hele hoek
+  sluit het scherm, en een hoek is het makkelijkste doel dat er op een
+  aanraakscherm bestaat. De `Scan`-knopjes doen hetzelfde met een `::after`; de
+  bovenste wordt door zijn scrollvak afgeknipt en gaat daarom van 21 naar 27 px
+  in plaats van 34.
+- **Een tik die raakt moet er anders uitzien dan een tik die mist.** Er stond
+  nergens een `:active` in deze UI, dus je merkte alleen dat je ernaast zat
+  doordat het scherm bleef staan — en dan tikte je nog een keer. `.back`,
+  `.iconbtn` en `.chip` gaan tijdens het indrukken naar `--surface`.
 
 ### Licht genoeg voor het schermpje
 
@@ -1278,7 +1318,13 @@ andere 58 waren opsmuk die in een lus doorliep. Drie wijzigingen losten het op:
   om — en slaat ook dát over als er geen melding, lege accu, update of laadbeurt
   is. Het stipje van de VESC knippert helemaal niet meer: het staat vast groen
   als de verbinding er is en rood als hij weg is, en dat zegt hetzelfde.
-  Knipperen betekent weer iets, en op een gewone rit gebeurt het niet.
+  Knipperen betekent weer iets, en op een gewone rit gebeurt het niet. "Bijna
+  leeg" vraagt bovendien of er *wel* iets gemeten wordt: zonder VESC meldt
+  `telemetry.offline()` 0 %, en 0 % zonder meting is geen lege accu — dat zette
+  `.low` en knipperde eeuwig door op een werkbank waar niets aan hangt. De bel
+  en de accurij liggen in het rijscherm, dus de timer slaat ze over zolang er
+  een scherm overheen ligt; de updaterij en het laadicoontje liggen juist ín
+  zo'n scherm en gaan wel door.
 - **Er wordt niets getekend wat je niet ziet.** Met een scherm eroverheen liep
   het rijscherm eronder gewoon door op 6,7 Hz. `show()` houdt bij welke lagen
   open staan; `paintRide()` keert meteen terug zodra er een overheen ligt, en

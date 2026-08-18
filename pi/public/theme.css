@@ -266,11 +266,21 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 }
 .sheethead .titlecol .title{font-size:16px}
 .sheethead .titlecol .micro{font-size:10px;letter-spacing:.14em}
-.back{cursor:pointer;color:var(--dim);flex:none}
-.back .ico{width:20px;height:20px}
-.iconbtn{cursor:pointer;color:var(--dim);flex:none}
-.iconbtn .ico{width:20px;height:20px}
-.iconbtn.right{margin-left:auto}
+/* Terug en sluiten. Het icoontje is 20 px, en dat is op dit schermpje anderhalve
+   millimeter — kleiner dan de vingertop die het moet raken. De padding maakt er
+   een aanraakvlak van 52 x 44 px van; de negatieve marge haalt datzelfde getal
+   weer uit de opmaak, zodat de kop op de pixel blijft staan waar hij stond. Bij
+   .back loopt het vlak links en boven door tot voorbij de schermrand, dus de
+   hele linkerbovenhoek sluit het scherm — het makkelijkste doel dat er is. */
+.back,.iconbtn{
+  cursor:pointer;color:var(--dim);flex:none;
+  display:flex;align-items:center;justify-content:center;
+  padding:12px 16px;margin:-12px -16px;border-radius:9px;
+}
+.back .ico,.iconbtn .ico{width:20px;height:20px}
+/* Een tik die mist en een tik die raakt zagen er precies hetzelfde uit; je
+   merkte pas dat je ernaast zat doordat het scherm bleef staan. */
+.back:active,.iconbtn:active{background:var(--surface);color:var(--ink)}
 .link{
   font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--accent-ink);cursor:pointer;padding:2px 6px;border-radius:5px;
@@ -313,10 +323,15 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
   font-size:14px;letter-spacing:.06em;
 }
 .accentbtn .ico{width:17px;height:17px}
+/* Zelfde verhaal als bij .back: de rand blijft waar hij was, alleen het
+   aanraakvlak wordt hoger. */
 .chip{
   font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);
   cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:7px;
+  position:relative;
 }
+.chip::after{content:"";position:absolute;inset:-8px -4px}
+.chip:active{background:var(--surface)}
 .switch{
   width:38px;height:22px;flex:none;border-radius:99px;position:relative;cursor:pointer;
   background:var(--track);border:1px solid var(--border);transition:background .18s;

@@ -194,7 +194,10 @@ function paintRide() {
   txt("battpct", num(pct, 0));
   txt("battva", (num(d.voltage, 1) || "--") + " V · " + (num(Math.abs(d.battery_current || 0), 0) || "--") + " A");
   stijl($("battfill"), "transform", "scaleX(" + (Math.max(2, pct) / 100).toFixed(3) + ")");
-  cls("battrow", "low", pct <= 20);
+  /* Alleen "bijna leeg" zeggen als er ook echt een accu gemeten wordt. Zonder
+     VESC meldt telemetry.offline() 0 %, en dat is geen lege accu maar geen
+     meting — de rij oranje laten knipperen zou daar een leugen van maken. */
+  cls("battrow", "low", !!d.connected && pct <= 20);
 
   /* Bereik: wat er nog in het pak zit, gedeeld door het verbruik per km.
      Beide staan in de instellingen; de VESC weet ze niet. */
@@ -270,8 +273,14 @@ function tikKlok() {
    Het stipje van de VESC knippert daarom niet meer. Het staat vast groen als de
    verbinding er is en rood als hij weg is; dat zegt hetzelfde, en de klok en het
    snelheidscijfer laten wel zien dat de pagina nog leeft. */
-var KNIPPERT = ["bell", "battrow", "updrow", "chargeico"];
+/* De bel en de accurij liggen in het rijscherm en verdwijnen onder elk scherm
+   dat opengaat; die hoeven daar niet te staan knipperen waar niemand kijkt.
+   De updaterij en het laadicoontje liggen juist ín zo'n scherm en moeten dan
+   juist wel doorgaan. Dezelfde regel als paintRide() volgt. */
+var KNIPPERT_ONDER = ["bell", "battrow"];
+var KNIPPERT_BOVEN = ["updrow", "chargeico"];
 var dimAan = false;
+var onderGedimd = false;
 
 function ietsTeMelden() {
   var b = $("bell"), r = $("battrow"), u = $("updrow");
@@ -287,7 +296,17 @@ function knipper() {
      worden. Dit is de stille toestand waarin de UI helemaal stilvalt. */
   if (!aan && !dimAan) return;
   dimAan = aan ? !dimAan : false;
-  for (var i = 0; i < KNIPPERT.length; i++) cls(KNIPPERT[i], "dim", dimAan);
+
+  var i;
+  for (i = 0; i < KNIPPERT_BOVEN.length; i++) cls(KNIPPERT_BOVEN[i], "dim", dimAan);
+
+  /* Onder een open scherm één keer opruimen, en daarna niets meer. Zonder dat
+     opruimen staan de bel en de accurij gedimd te wachten tot het scherm weer
+     dichtgaat. */
+  var onder = bedekt() ? false : dimAan;
+  if (onder === onderGedimd && bedekt()) return;
+  onderGedimd = onder;
+  for (i = 0; i < KNIPPERT_ONDER.length; i++) cls(KNIPPERT_ONDER[i], "dim", onder);
 }
 
 /* ── meldingen ───────────────────────────────────────────────────────────── */
