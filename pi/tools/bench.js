@@ -35,6 +35,16 @@ const SITUATIES = [
 const TEL = ["RecalcStyleCount", "LayoutCount", "RecalcStyleDuration",
              "LayoutDuration", "ScriptDuration", "TaskDuration"];
 
+/* Van een schone stand vertrekken. Zonder dit meet je restjes van de vorige
+   proef mee — een blijven staan "update beschikbaar" laat de UI knipperen en
+   dat verdubbelt de uitslag. */
+const SCHOON = {
+  rotate: 90, theme: "day", lang: "nl", units: "metric", accent: "#4f9e63",
+  mode: "SPORT", limMotor: 120, limEsc: 110, limBatt: 70,
+  warnMotor: true, warnEsc: true, warnBatt: true,
+  packWh: 1147, whPerKm: 18, speedMax: 35, bright: 80
+};
+
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 320, height: 480 } });
@@ -51,6 +61,9 @@ const TEL = ["RecalcStyleCount", "LayoutCount", "RecalcStyleDuration",
   const rijen = [];
   for (const s of SITUATIES) {
     await page.request.post(BASIS + "/design/state", { data: { preset: s.preset } });
+    await page.request.post(BASIS + "/design/state", {
+      data: { patch: { settings: SCHOON, update: { available: false, message: "" } } }
+    });
     await page.goto(BASIS + "/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1500);
     if (s.open) await page.click(s.open, { force: true });

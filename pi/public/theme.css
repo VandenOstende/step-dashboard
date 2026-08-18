@@ -110,8 +110,18 @@ p{margin:0}
 /* ── rijscherm ───────────────────────────────────────────────────────────── */
 #ride{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
 
-#ridemid{flex:1;min-height:0;display:flex;align-items:center;gap:10px}
-#railleft{flex:none;display:flex;flex-direction:column;align-items:center;gap:8px}
+/* De duty-balk stond hier rechts en is weg — hij veranderde als enige bij
+   elke meting en was daarmee het drukste element op het scherm, en de waarde
+   zei weinig dat de snelheid niet al zei. De duty staat nog wel in /data.
+
+   Daarom staat de bel-kolom nu absoluut in de linkermarge in plaats van in de
+   rij: zonder tegenwicht rechts zou het grote cijfer anders 24 px uit het
+   midden van het scherm hangen. */
+#ridemid{flex:1;min-height:0;position:relative;display:flex;align-items:center}
+#railleft{
+  position:absolute;left:0;top:0;bottom:0;z-index:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+}
 
 #bell,#cruise{
   width:38px;height:38px;flex:none;
@@ -159,24 +169,6 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 #speed.sport{color:var(--red)}
 #speedunit{margin-top:8px;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--dim)}
 
-#railright{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px}
-#dutytrack{position:relative;width:12px;height:132px;border-radius:99px;background:var(--track);overflow:hidden}
-/* Schalen, niet meten. Een hoogte in procenten laat de browser opnieuw
-   layouten; een transform gaat langs layout heen. En géén transitie: de
-   waarde komt al ruim zes keer per seconde binnen, dus er valt niets te
-   verzachten — een transitie van een kwart seconde zou betekenen dat deze
-   balk permanent staat te animeren, en dat is precies wat een SPI-schermpje
-   niet aankan. */
-#dutyfill{
-  position:absolute;left:0;right:0;bottom:0;height:100%;transform-origin:bottom;
-  transform:scaleY(0);border-radius:99px;background:var(--accent);
-}
-#dutyfill.hot{background:var(--orange)}
-#dutyfill.max{background:var(--red)}
-#dutytrack .ticks{
-  position:absolute;inset:0;
-  background:repeating-linear-gradient(to bottom,var(--tick) 0 1px,transparent 1px 13.2px);
-}
 .micro{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 
 /* ── accu ────────────────────────────────────────────────────────────────── */
@@ -554,11 +546,12 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
    ook als er verder niets verandert. Op deze pagina kostte alleen het stipje
    in de bovenbalk al negentien stijlherberekeningen per seconde, dag en nacht.
 
-   In plaats daarvan zet app.js twee keer per seconde .dim om op een handvol
-   elementen. Welke daarvan dan echt dimt bepaalt de CSS hieronder, zodat het
-   omzetten onvoorwaardelijk mag: twee stijlwijzigingen per seconde in plaats
-   van honderdtwintig. */
-#link.dim{opacity:.15}
+   In plaats daarvan zet app.js .dim om op een handvol elementen, twee keer per
+   seconde en alleen zolang er iets te melden is. Is er niets aan de hand, dan
+   schrijft hij niets en staat het scherm helemaal stil.
+
+   Het stipje van de VESC staat daarom vast: groen als de verbinding er is, rood
+   als hij weg is. Knipperen betekent nu weer iets. */
 #bell[data-lvl].dim{opacity:.35}
 #battrow.low.dim{opacity:.35}
 #updrow.avail.dim{opacity:.35}

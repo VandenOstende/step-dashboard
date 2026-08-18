@@ -427,8 +427,12 @@ design and are worth knowing before you move something:
   tall. That looks like a mistake and isn't: it's what pushes the unit down and
   keeps the number optically centred in the space above the battery.
 - `#speedbtn` is a flex item with `min-width: 0`. Without that the 132 px digits
-  set the minimum width of the whole row and the bell and the duty bar get pushed
+  set the minimum width of the whole row and everything beside them gets pushed
   off the screen. That is exactly what happened the first time.
+- **The bell column is absolutely positioned**, not a flex item. The design had a
+  duty bar on the right to balance it; that bar is gone, and in the flex row the
+  big number would then sit 24 px off the centre of the screen. Out of the flow,
+  the number is centred on the panel and the bell floats in the left margin.
 - **The keys** are ten per row on 296 px, so about 26 px wide, and 52 px tall.
   Narrow, but there's height to spare and you aim with your thumb vertically.
 - **The card labels** get about nine characters at 11 px with `.14em` of
@@ -463,20 +467,27 @@ at a time showed where that came from:
 So the actual work — read the data, write it to the screen — is those 4. The
 other 58 were decoration running in a loop. Three changes fixed it:
 
-- **The bars scale, they don't measure.** The duty bar animated `height` and
-  the battery bar `width`, both in percent. Those are layout properties: every
-  step makes the browser lay the page out again. They're
-  `transform: scaleY()` / `scaleX()` now, which skips layout entirely — and the
-  transition is gone with them. Data arrives 6.7 times a second; a quarter-second
-  transition on top of that means the bar is *permanently* animating, which is
-  the one thing an SPI display can't afford.
-- **Blinking comes from a timer, not from `@keyframes`.** An infinite CSS
-  animation makes Chromium recalculate that element's style every frame, even
-  with `steps()`, even when nothing changes. The blinking dot in the top bar
-  alone cost 19 recalculations a second, around the clock. `app.js` now toggles
-  a `.dim` class on five elements twice a second, and the CSS decides which of
-  them actually dims — two style changes a second instead of a hundred and
-  twenty.
+- **The bars scale, they don't measure.** The duty bar animated `height` and the
+  battery bar `width`, both in percent. Those are layout properties: every step
+  makes the browser lay the page out again. What's left uses
+  `transform: scaleX()`, which skips layout entirely — and the transition is gone
+  with it. Data arrives 6.7 times a second; a quarter-second transition on top of
+  that means the bar is *permanently* animating, which is the one thing an SPI
+  display can't afford.
+- **The duty bar is gone.** Duty is a float that changes on every single
+  measurement, so it was the one element that wrote to the screen 6.7 times a
+  second no matter what — halving the style recalculations all by itself. Speed,
+  battery and the temperatures move far more slowly and mostly write nothing.
+  It's still in `/data` if it ever needs to come back.
+- **Blinking comes from a timer, and only when there's something to say.** An
+  infinite CSS animation makes Chromium recalculate that element's style every
+  frame, even with `steps()`, even when nothing changes. The blinking dot in the
+  top bar alone cost 19 recalculations a second, around the clock. `app.js` now
+  toggles a `.dim` class twice a second — and skips even that when no
+  notification, low battery, update or charge is pending. The VESC dot doesn't
+  blink at all any more: it's solid green when the link is there and red when it
+  isn't, which says the same thing. Blinking means something again, and a normal
+  ride has none of it.
 - **Nothing is painted that you can't see.** With a full-screen sheet open, the
   ride screen underneath used to keep updating at 6.7 Hz. `show()` tracks which
   layers are open; `paintRide()` returns immediately when one covers it, and
@@ -488,15 +499,24 @@ On top of that, every style write goes through a guard that skips it when the
 value hasn't changed. Setting `style.width` to the same string still marks the
 element dirty.
 
-Measured again afterwards:
+Measured again afterwards — 62 and 39 became 2 and 2, and standing still the
+page does nothing at all:
 
 | | style/s | layout/s |
 |---|---|---|
-| riding | 8 | 4 |
+| riding | 2 | 2 |
 | riding with a notification | 2 | 2 |
 | charging | 2 | 2 |
-| settings open | 2 | 2 |
-| standing still | 2 | 2 |
+| settings open | 0 | 0 |
+| standing still | 0 | 0 |
+
+What's left is what actually changes. Watching the DOM for twenty seconds of
+riding: the `V · A` line writes 1.1 times a second and the speed 0.9, because
+those are the two numbers that genuinely move. Battery percent, the
+temperatures, the odometer, trip and range wrote nothing at all in that window —
+they're whole numbers that change every twenty seconds or so. Everything is
+*read* 6.7 times a second, all of it from the same `/data` request; the screen
+only follows where the value moved.
 
 One warning about the tool: an earlier version counted frames with
 `requestAnimationFrame`, which keeps the browser awake and then measures its
@@ -1070,8 +1090,13 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   hoog. Dat ziet eruit als een vergissing en is het niet: het is wat de eenheid
   omlaag duwt en het cijfer optisch midden in de ruimte boven de accu houdt.
 - `#speedbtn` is een flexitem met `min-width: 0`. Zonder dat bepalen de cijfers
-  van 132 px de minimumbreedte van de hele rij en worden de bel en de duty-balk
-  van het scherm geduwd. Precies dat gebeurde de eerste keer.
+  van 132 px de minimumbreedte van de hele rij en wordt alles ernaast van het
+  scherm geduwd. Precies dat gebeurde de eerste keer.
+- **De bel-kolom staat absoluut**, niet als flexitem. In het ontwerp gaf de
+  duty-balk rechts er tegenwicht aan; die balk is weg, en in de flexrij zou het
+  grote cijfer dan 24 px uit het midden van het scherm hangen. Uit de stroom
+  gehaald staat het cijfer midden op het paneel en zweeft de bel in de
+  linkermarge.
 - **De toetsen** zijn er tien per rij op 296 px, dus zo'n 26 px breed, en 52 px
   hoog. Smal, maar er is hoogte over en met je duim mik je verticaal.
 - **De kaartlabels** hebben ruimte voor zo'n negen tekens op 11 px met `.14em`
@@ -1108,18 +1133,25 @@ andere 58 waren opsmuk die in een lus doorliep. Drie wijzigingen losten het op:
 
 - **De balken schalen, ze meten niet.** De duty-balk animeerde `height` en de
   accubalk `width`, allebei in procenten. Dat zijn layout-eigenschappen: elke
-  stap laat de browser de pagina opnieuw indelen. Het zijn nu
-  `transform: scaleY()` en `scaleX()`, wat langs layout heen gaat — en de
-  transitie is meteen weg. De data komt 6,7 keer per seconde binnen; een
-  transitie van een kwart seconde daarbovenop betekent dat die balk *permanent*
-  staat te animeren, en dat is het enige wat een SPI-schermpje niet kan hebben.
-- **Knipperen komt uit een timer, niet uit `@keyframes`.** Een oneindige
-  CSS-animatie laat Chromium elke frame de stijl van dat element opnieuw
-  uitrekenen, ook met `steps()`, ook als er niets verandert. Alleen het
+  stap laat de browser de pagina opnieuw indelen. Wat er over is gebruikt
+  `transform: scaleX()`, wat langs layout heen gaat — en de transitie is meteen
+  weg. De data komt 6,7 keer per seconde binnen; een transitie van een kwart
+  seconde daarbovenop betekent dat die balk *permanent* staat te animeren, en
+  dat is het enige wat een SPI-schermpje niet kan hebben.
+- **De duty-balk is weg.** Duty is een kommagetal dat bij élke meting verandert,
+  dus dat was het enige element dat hoe dan ook 6,7 keer per seconde naar het
+  scherm schreef — goed voor de helft van alle stijlherberekeningen, in zijn
+  eentje. Snelheid, accu en de temperaturen bewegen veel trager en schrijven
+  meestal niets. Hij staat nog wel in `/data`, mocht hij ooit terug moeten.
+- **Knipperen komt uit een timer, en alleen als er iets te melden is.** Een
+  oneindige CSS-animatie laat Chromium elke frame de stijl van dat element
+  opnieuw uitrekenen, ook met `steps()`, ook als er niets verandert. Alleen het
   knipperende stipje in de bovenbalk kostte negentien herberekeningen per
   seconde, dag en nacht. `app.js` zet nu twee keer per seconde een `.dim`-klasse
-  om op vijf elementen, en de CSS bepaalt welke daarvan echt dimt — twee
-  stijlwijzigingen per seconde in plaats van honderdtwintig.
+  om — en slaat ook dát over als er geen melding, lege accu, update of laadbeurt
+  is. Het stipje van de VESC knippert helemaal niet meer: het staat vast groen
+  als de verbinding er is en rood als hij weg is, en dat zegt hetzelfde.
+  Knipperen betekent weer iets, en op een gewone rit gebeurt het niet.
 - **Er wordt niets getekend wat je niet ziet.** Met een scherm eroverheen liep
   het rijscherm eronder gewoon door op 6,7 Hz. `show()` houdt bij welke lagen
   open staan; `paintRide()` keert meteen terug zodra er een overheen ligt, en
@@ -1131,15 +1163,24 @@ Daarbovenop gaat elke stijlwijziging door een controle die hem overslaat als de
 waarde niet veranderd is. `style.width` op dezelfde tekenreeks zetten markeert
 het element namelijk alsnog als vuil.
 
-Daarna opnieuw gemeten:
+Daarna opnieuw gemeten — 62 en 39 werden 2 en 2, en stilstaand doet de pagina
+helemaal niets meer:
 
 | | stijl/s | layout/s |
 |---|---|---|
-| rijden | 8 | 4 |
+| rijden | 2 | 2 |
 | rijden met een melding | 2 | 2 |
 | laden | 2 | 2 |
-| instellingen open | 2 | 2 |
-| stilstaand | 2 | 2 |
+| instellingen open | 0 | 0 |
+| stilstaand | 0 | 0 |
+
+Wat er overblijft is wat er echt verandert. Twintig seconden rijden met een
+MutationObserver erop: de regel `V · A` schrijft 1,1 keer per seconde en de
+snelheid 0,9, want dat zijn de twee getallen die echt bewegen. Het accupercentage,
+de temperaturen, de kilometerstand, de trip en het bereik schreven in dat venster
+niets — dat zijn hele getallen die om de twintig seconden een stap doen. Alles
+wordt 6,7 keer per seconde *gelezen*, allemaal uit hetzelfde `/data`-verzoek; het
+scherm volgt alleen waar de waarde is opgeschoven.
 
 Eén waarschuwing over het gereedschap: een eerdere versie telde frames met
 `requestAnimationFrame`, en die lus houdt de browser zelf wakker en meet dan

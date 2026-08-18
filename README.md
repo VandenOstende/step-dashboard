@@ -23,8 +23,8 @@ and I want to decide myself what goes on that screen.
 
 One screen while you ride: the speed big in the middle, the battery underneath
 it, and three cards with trip, odometer and temperatures. On the left rail sit
-the notification bell and the riding mode, on the right the duty bar. Everything
-else is a layer that slides over it.
+the notification bell and the riding mode. Everything else is a layer that
+slides over it.
 
 Tap the speed and you get the readout — current, top, average, and a timer for
 the trip. Tap the trip card and it flips to consumption in Wh/km. Tap the top
@@ -433,8 +433,7 @@ een houder — en ik wil zelf bepalen wat er op dat scherm staat.
 
 Eén scherm tijdens het rijden: de snelheid groot in het midden, de accu
 eronder, en drie kaarten met trip, kilometerstand en temperaturen. Links staan
-de meldingsbel en de rijmodus, rechts de duty-balk. Al de rest is een laag die
-eroverheen schuift.
+de meldingsbel en de rijmodus. Al de rest is een laag die eroverheen schuift.
 
 Tik op de snelheid en je krijgt de meting — huidig, maximum, gemiddeld, en een
 timer voor de rit. Tik op de trip-kaart en hij klapt om naar het verbruik in

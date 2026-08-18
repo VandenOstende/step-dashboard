@@ -188,12 +188,6 @@ function paintRide() {
   txt("speedunit", uSpeed());
   cls("speed", "sport", (cfg.mode || "").toUpperCase() === "SPORT");
 
-  /* Duty. Wat de VESC meldt is al 0..1. */
-  var duty = Math.max(0, Math.min(1, d.duty || 0));
-  stijl($("dutyfill"), "transform", "scaleY(" + duty.toFixed(3) + ")");
-  cls("dutyfill", "hot", duty > 0.85 && duty <= 0.95);
-  cls("dutyfill", "max", duty > 0.95);
-
   /* Accu. */
   var pct = Math.max(0, Math.min(100, d.battery_pct || 0));
   wortel("--batt", battKleur(pct));
@@ -264,16 +258,35 @@ function tikKlok() {
 }
 
 /* Knipperen. Vroeger deed CSS dit met @keyframes, maar een oneindige animatie
-   laat de browser elke frame de stijl van dat element opnieuw uitrekenen —
-   ook als er niets verandert. Alleen het stipje in de bovenbalk kostte zo
-   negentien stijlherberekeningen per seconde.
+   laat de browser elke frame de stijl van dat element opnieuw uitrekenen, ook
+   als er niets verandert. Alleen het stipje in de bovenbalk kostte zo negentien
+   stijlherberekeningen per seconde.
 
-   Nu zet deze timer twee keer per seconde .dim om op vijf elementen. Welke
-   daarvan zichtbaar dimt bepaalt theme.css, dus dit mag onvoorwaardelijk. */
-var KNIPPERT = ["link", "bell", "battrow", "updrow", "chargeico"];
+   Nu doet één timer het, en alleen als er iets te melden valt. Is er niets aan
+   de hand, dan gebeurt er letterlijk niets meer op het scherm zolang de step
+   stilstaat — en heeft knipperen zijn betekenis terug: het gebeurt alleen als
+   het je aandacht wil.
+
+   Het stipje van de VESC knippert daarom niet meer. Het staat vast groen als de
+   verbinding er is en rood als hij weg is; dat zegt hetzelfde, en de klok en het
+   snelheidscijfer laten wel zien dat de pagina nog leeft. */
+var KNIPPERT = ["bell", "battrow", "updrow", "chargeico"];
 var dimAan = false;
+
+function ietsTeMelden() {
+  var b = $("bell"), r = $("battrow"), u = $("updrow");
+  return !!(b && b.dataset.lvl)
+    || !!(r && r.classList.contains("low"))
+    || !!(u && u.classList.contains("avail"))
+    || !!lagen.charge;
+}
+
 function knipper() {
-  dimAan = !dimAan;
+  var aan = ietsTeMelden();
+  /* Niets aan de hand en niets gedimd: dan hoeft er ook niets geschreven te
+     worden. Dit is de stille toestand waarin de UI helemaal stilvalt. */
+  if (!aan && !dimAan) return;
+  dimAan = aan ? !dimAan : false;
   for (var i = 0; i < KNIPPERT.length; i++) cls(KNIPPERT[i], "dim", dimAan);
 }
 
