@@ -155,7 +155,14 @@ function applyTheme() {
    één. Dat is waarom Instellingen → Taal → terug weer bij Instellingen komt. */
 function openSheet(id) { show(id, true); }
 
-document.addEventListener("pointerdown", function (e) {
+/* Tikken gebeurt op click en niet op pointerdown. Click vuurt pas bij het
+   loslaten, en de browser slikt hem in zodra de vinger onderweg gescrold
+   heeft — precies het verschil tussen een tik en een veeg. Op pointerdown was
+   dat verschil er niet: een veegbeweging die op een rij begon, activeerde die
+   rij op het moment van aanraken, nog voor het scrollen kon beginnen. Alleen
+   het toetsenbord blijft op pointerdown: typen hoort op de aanslag te
+   reageren, en in het toetsenbord valt niets te scrollen. */
+document.addEventListener("click", function (e) {
   var c = e.target.closest("[data-close]");
   if (c) { e.preventDefault(); hide(c.getAttribute("data-close")); }
 });
@@ -369,15 +376,15 @@ function tekenAlerts() {
   $("alertlist").innerHTML = h;
 }
 
-$("bell").addEventListener("pointerdown", function (e) { e.preventDefault(); openSheet("alerts"); });
-$("alertclose").addEventListener("pointerdown", function (e) { e.preventDefault(); hide("alerts"); });
-$("alertclear").addEventListener("pointerdown", function (e) {
+$("bell").addEventListener("click", function (e) { e.preventDefault(); openSheet("alerts"); });
+$("alertclose").addEventListener("click", function (e) { e.preventDefault(); hide("alerts"); });
+$("alertclear").addEventListener("click", function (e) {
   e.preventDefault();
   alerts.forEach(function (a) { negeer[a.key] = true; });
   bouwAlerts.vorige = null;
   bouwAlerts();
 });
-$("alertlist").addEventListener("pointerdown", function (e) {
+$("alertlist").addEventListener("click", function (e) {
   var x = e.target.closest("[data-drop]");
   if (!x) return;
   e.preventDefault();
@@ -385,7 +392,7 @@ $("alertlist").addEventListener("pointerdown", function (e) {
   bouwAlerts.vorige = null;
   bouwAlerts();
 });
-$("alerts").addEventListener("pointerdown", function (e) {
+$("alerts").addEventListener("click", function (e) {
   if (e.target === this) { e.preventDefault(); hide("alerts"); }
 });
 
@@ -415,7 +422,7 @@ function paintAlarm() {
   txt("alarmmsg", t[raak[3]] + " " + num(tp(raak[2]), 0) + uTemp() + " " + t.coolDown);
   show("alarm", true);
 }
-$("alarmack").addEventListener("pointerdown", function (e) {
+$("alarmack").addEventListener("click", function (e) {
   e.preventDefault(); alarmAck = true; hide("alarm");
 });
 
@@ -457,15 +464,15 @@ function paintCharge() {
   }
   show("charge", true);
 }
-$("charge").addEventListener("pointerdown", function (e) {
+$("charge").addEventListener("click", function (e) {
   e.preventDefault(); laadWeg = true; hide("charge");
 });
 
 /* ── snelheidsmeting ─────────────────────────────────────────────────────── */
-$("speedbtn").addEventListener("pointerdown", function (e) {
+$("speedbtn").addEventListener("click", function (e) {
   e.preventDefault(); tekenSpeedStats(); openSheet("speedsheet");
 });
-$("tripcard").addEventListener("pointerdown", function (e) {
+$("tripcard").addEventListener("click", function (e) {
   e.preventDefault(); tripView = tripView ? 0 : 1; paintRide();
 });
 
@@ -499,7 +506,7 @@ function tekenSpeedStats() {
   txt("stl2", t.avgSpeed); txt("stv2", num(d2(d.avg_kmh || 0), 0)); txt("stu2", e);
   txt("stl3", "Timer A"); txt("stv3", mmss(d.trip_s)); txt("stu3", "");
 }
-$("speedreset").addEventListener("pointerdown", function (e) {
+$("speedreset").addEventListener("click", function (e) {
   e.preventDefault();
   fetch("/reset-top", { method: "POST" })["catch"](function () {});
   fetch("/reset-trip", { method: "POST" })["catch"](function () {});
@@ -539,7 +546,7 @@ function tekenModi() {
   }
 }
 
-$("modes").addEventListener("pointerdown", function (e) {
+$("modes").addEventListener("click", function (e) {
   var b = e.target.closest(".mode");
   if (!b || !modi.list.length) return;
   e.preventDefault();
@@ -593,7 +600,7 @@ function tekenUnits() {
       + '<span class="nm">' + esc(u.nm) + "</span>" + vink(aan) + "</button>";
   }).join("");
 }
-$("unitlist").addEventListener("pointerdown", function (e) {
+$("unitlist").addEventListener("click", function (e) {
   var b = e.target.closest("[data-unit]");
   if (!b) return;
   e.preventDefault();
@@ -615,7 +622,7 @@ function tekenLangs() {
       + '<span class="nm">' + esc(l.nm) + "</span>" + vink(aan) + "</button>";
   }).join("");
 }
-$("langlist").addEventListener("pointerdown", function (e) {
+$("langlist").addEventListener("click", function (e) {
   var b = e.target.closest("[data-lang]");
   if (!b) return;
   e.preventDefault();
@@ -632,7 +639,7 @@ function tekenAccents() {
       + '<span class="nm">' + esc(a[cfg.lang] || a.en) + "</span>" + vink(aan) + "</button>";
   }).join("");
 }
-$("accentlist").addEventListener("pointerdown", function (e) {
+$("accentlist").addEventListener("click", function (e) {
   var b = e.target.closest("[data-accent]");
   if (!b) return;
   e.preventDefault();
@@ -671,7 +678,7 @@ function tekenLimits() {
   txt("limsummary", t.motor + " " + num(tp(cfg.limMotor), 0) + "° · VESC "
     + num(tp(cfg.limEsc), 0) + "° · " + t.battery + " " + num(tp(cfg.limBatt), 0) + "°");
 }
-$("limlist").addEventListener("pointerdown", function (e) {
+$("limlist").addEventListener("click", function (e) {
   var s = e.target.closest("[data-lim]");
   if (s) {
     e.preventDefault();
@@ -744,7 +751,7 @@ function haalSetup() {
     })["catch"](function () {});
 }
 
-$("steplist").addEventListener("pointerdown", function (e) {
+$("steplist").addEventListener("click", function (e) {
   var b = e.target.closest("[data-s]");
   if (!b || !stp.step) return;
   e.preventDefault();
@@ -761,7 +768,7 @@ $("steplist").addEventListener("pointerdown", function (e) {
   stp.vuil = true;
   paintSetup();
 });
-$("stepsave").addEventListener("pointerdown", function (e) {
+$("stepsave").addEventListener("click", function (e) {
   e.preventDefault();
   if (stp.bezig || !stp.vuil) return;
   stp.bezig = true;
@@ -777,7 +784,7 @@ $("stepsave").addEventListener("pointerdown", function (e) {
     paintSetup();
   });
 });
-$("opensetup").addEventListener("pointerdown", function (e) {
+$("opensetup").addEventListener("click", function (e) {
   e.preventDefault(); paintSetup(); openSheet("setup");
 });
 
@@ -842,14 +849,14 @@ function haalUpdate(force) {
     })["catch"](function () { upd.zoeken = false; paintUpd(); });
 }
 
-$("updrow").addEventListener("pointerdown", function (e) {
+$("updrow").addEventListener("click", function (e) {
   e.preventDefault();
   if (upd.available) { paintUpd(); openSheet("release"); return; }
   upd.zoeken = true;
   paintUpd();
   haalUpdate(true);
 });
-$("reldo").addEventListener("pointerdown", function (e) {
+$("reldo").addEventListener("click", function (e) {
   e.preventDefault();
   if (upd.running) return;
   upd.running = true;
@@ -893,11 +900,11 @@ function scan(soort) {
     ["then"](function () { zoekt[soort] = false; tekenNet(soort); });
 }
 
-$("openconn").addEventListener("pointerdown", function (e) {
+$("openconn").addEventListener("click", function (e) {
   e.preventDefault(); openSheet("conn"); scan("wifi"); scan("bt");
 });
-$("wifiscan").addEventListener("pointerdown", function (e) { e.preventDefault(); scan("wifi"); });
-$("btscan").addEventListener("pointerdown", function (e) { e.preventDefault(); scan("bt"); });
+$("wifiscan").addEventListener("click", function (e) { e.preventDefault(); scan("wifi"); });
+$("btscan").addEventListener("click", function (e) { e.preventDefault(); scan("bt"); });
 
 function verbind(soort, id, connect, wachtwoord) {
   return fetch("/net", {
@@ -921,8 +928,8 @@ function netTik(e) {
     scan(soort);
   })["catch"](function () {});
 }
-$("wifilist").addEventListener("pointerdown", netTik);
-$("btlist").addEventListener("pointerdown", netTik);
+$("wifilist").addEventListener("click", netTik);
+$("btlist").addEventListener("click", netTik);
 
 /* ── wachtwoord met schermtoetsenbord ────────────────────────────────────── */
 var pw = { soort: null, id: "", naam: "", tekst: "", shift: false, sym: false, toon: false, fout: false };
@@ -992,14 +999,14 @@ $("keyrows").addEventListener("pointerdown", function (e) {
   pw.fout = false;
   paintPw();
 });
-$("pweye").addEventListener("pointerdown", function (e) {
+$("pweye").addEventListener("click", function (e) {
   e.preventDefault(); pw.toon = !pw.toon; paintPw();
 });
-$("pwcancel").addEventListener("pointerdown", function (e) { e.preventDefault(); hide("pw"); });
+$("pwcancel").addEventListener("click", function (e) { e.preventDefault(); hide("pw"); });
 
 /* ── aan/uit ─────────────────────────────────────────────────────────────── */
-$("openpower").addEventListener("pointerdown", function (e) { e.preventDefault(); openSheet("powermenu"); });
-$("powermenu").addEventListener("pointerdown", function (e) {
+$("openpower").addEventListener("click", function (e) { e.preventDefault(); openSheet("powermenu"); });
+$("powermenu").addEventListener("click", function (e) {
   if (e.target === this) { e.preventDefault(); hide("powermenu"); }
 });
 function stroom(actie) {
@@ -1012,17 +1019,17 @@ function stroom(actie) {
     body: JSON.stringify({ action: actie })
   })["catch"](function () {});
 }
-$("doreboot").addEventListener("pointerdown", function (e) { e.preventDefault(); stroom("reboot"); });
-$("doshutdown").addEventListener("pointerdown", function (e) { e.preventDefault(); stroom("shutdown"); });
-$("off").addEventListener("pointerdown", function (e) { e.preventDefault(); hide("off"); });
+$("doreboot").addEventListener("click", function (e) { e.preventDefault(); stroom("reboot"); });
+$("doshutdown").addEventListener("click", function (e) { e.preventDefault(); stroom("shutdown"); });
+$("off").addEventListener("click", function (e) { e.preventDefault(); hide("off"); });
 
 /* ── instellingen ────────────────────────────────────────────────────────── */
-$("topright").addEventListener("pointerdown", function (e) { e.preventDefault(); openSheet("settings"); });
-$("openunits").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenUnits(); openSheet("units"); });
-$("openlang").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenLangs(); openSheet("lang"); });
-$("openaccent").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenAccents(); openSheet("accent"); });
-$("openlimits").addEventListener("pointerdown", function (e) { e.preventDefault(); tekenLimits(); openSheet("limits"); });
-$("thememode").addEventListener("pointerdown", function (e) {
+$("topright").addEventListener("click", function (e) { e.preventDefault(); openSheet("settings"); });
+$("openunits").addEventListener("click", function (e) { e.preventDefault(); tekenUnits(); openSheet("units"); });
+$("openlang").addEventListener("click", function (e) { e.preventDefault(); tekenLangs(); openSheet("lang"); });
+$("openaccent").addEventListener("click", function (e) { e.preventDefault(); tekenAccents(); openSheet("accent"); });
+$("openlimits").addEventListener("click", function (e) { e.preventDefault(); tekenLimits(); openSheet("limits"); });
+$("thememode").addEventListener("click", function (e) {
   e.preventDefault();
   cfg.theme = cfg.theme === "night" ? "day" : "night";
   applyTheme(); bewaar();

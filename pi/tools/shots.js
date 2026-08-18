@@ -49,7 +49,7 @@ const SCHOON = {
     await page.goto(BASIS + "/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);
   };
-  /* force: de app luistert op pointerdown en vangt de tik met closest(), dus
+  /* force: de app vangt de tik met closest() op een voorouder, dus
      een treffer op een kind is prima — Playwright weigert die anders. */
   const tik = (sel) => page.click(sel, { force: true });
   const foto = async (naam) => {

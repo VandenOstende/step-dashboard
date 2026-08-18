@@ -478,6 +478,17 @@ design and are worth knowing before you move something:
   `:active` anywhere in this UI, so the only way you learned you had missed was
   that the screen stayed put — and then you tapped again. `.back`, `.iconbtn`
   and `.chip` now go to `--surface` while pressed.
+- **A tap fires on release, a swipe never fires.** Everything used to activate
+  on `pointerdown` — the moment the finger touched the glass. Start a swipe on
+  a row in a scrollable list and that row fired before the scroll could begin:
+  swiping through the settings opened sheets, swiping the language list
+  changed the language. Everything now listens to `click`, which the browser
+  only delivers when the gesture wasn't a scroll — that distinction between a
+  tap and a swipe is precisely what `click` exists for. The one exception is
+  the keyboard, which stays on `pointerdown`: typing should respond on the
+  keystroke, and there is nothing to scroll there. The scroll boxes also got
+  `overscroll-behavior: contain`, so a swipe that reaches the end of a list
+  doesn't leak into whatever is underneath.
 
 ### Light enough for the panel
 
@@ -1289,6 +1300,17 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   nergens een `:active` in deze UI, dus je merkte alleen dat je ernaast zat
   doordat het scherm bleef staan — en dan tikte je nog een keer. `.back`,
   `.iconbtn` en `.chip` gaan tijdens het indrukken naar `--surface`.
+- **Een tik vuurt bij het loslaten, een veeg vuurt nooit.** Alles reageerde op
+  `pointerdown` — het moment dat de vinger het glas raakt. Begon een veeg op
+  een rij in een scrollbare lijst, dan vuurde die rij nog voor het scrollen
+  kon beginnen: door de instellingen vegen opende schermen, over de taallijst
+  vegen veranderde de taal. Alles luistert nu naar `click`, die de browser
+  alleen aflevert als het gebaar geen scroll was — dat onderscheid tussen tik
+  en veeg is precies waar `click` voor bestaat. De ene uitzondering is het
+  toetsenbord, dat op `pointerdown` blijft: typen hoort op de aanslag te
+  reageren, en daar valt niets te scrollen. De scrollvakken kregen ook
+  `overscroll-behavior: contain`, zodat een veeg die het einde van een lijst
+  bereikt niet doorlekt naar wat eronder ligt.
 
 ### Licht genoeg voor het schermpje
 
