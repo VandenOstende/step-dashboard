@@ -36,6 +36,7 @@ const { Charge } = require("./charge");
 const { SetupWatch } = require("./setup");
 const modes = require("./modes");
 const { Cruise } = require("./cruise");
+const { Ride } = require("./ride");
 const sys = require("./system");
 
 const cfg = loadConfig();
@@ -50,17 +51,27 @@ const cruise = new Cruise(cfg);
 
 const log = (...a) => console.log("[step]", ...a);
 
+/* De meetlus. Alles wat per VESC-meting hoort te gebeuren zit hierin; de route
+   GET /data geeft alleen nog het klaarliggende antwoord terug. */
+const ride = new Ride({
+  cfg, state, telemetry, setup, charge, cruise,
+  saveStep: saveConfigStep, log
+});
+/* Meteen een geldig offline-contract neerleggen: is er nooit verbinding, dan
+   komt er ook nooit een statusgebeurtenis. */
+ride.weg();
+
 /* ── VESC ───────────────────────────────────────────────────────────────── */
 const vesc = new Vesc(cfg.vesc);
 vesc.on("log", (m) => log(m));
-/* Cruisecontrol wordt afgeleid uit een reeks metingen, dus die reeks moet de
-   pollronde van de VESC volgen en niet hoe vaak de browser /data ophaalt. Zou
-   het aan het verzoek hangen, dan verschuift het tijdvenster mee met de UI —
-   en klopt de halve seconde die het patroon moet standhouden niet meer. */
-vesc.on("values", (snap) => cruise.update(snap, Date.now()));
+/* Alle metingen worden hier verwerkt, en niet in de route GET /data. Zou het
+   aan het verzoek hangen, dan hangt de kilometerstand ervan af of er een
+   browser kijkt, tellen twee browsers dubbel, en verschuift het tijdvenster
+   van de cruisecontrol mee met de UI. Zie src/ride.js. */
+vesc.on("values", (snap) => ride.meting(snap));
 vesc.on("status", (up) => {
   log(up ? "VESC verbonden" : "VESC weg");
-  if (!up) cruise.reset();
+  if (!up) { cruise.reset(); ride.weg(); }
   /* De rijmodus zit in het werkgeheugen van de VESC, dus na een stroom-
      onderbreking is hij weg en staat de step weer op wat er in de controller
      staat. Even wachten tot de verbinding echt staat, en dan terugzetten. */
@@ -161,27 +172,6 @@ const stepUit = () => ({
   learnedAt: cfg.step.learnedAt
 });
 
-/* Weet de VESC het zelf, dan schrijven we het op — één keer, en nooit over een
-   waarde heen die jij met de hand hebt gezet. */
-let leerFout = false;
-function leerVanVesc() {
-  if (cfg.step.source === "hand" || leerFout) return;
-  const patch = setup.patch();
-  if (!patch) return;
-  patch.source = "vesc";
-  patch.learnedAt = Date.now();
-  try {
-    saveConfigStep(cfg, patch);
-    telemetry.cells = cfg.step.batteryCells;
-    log("stepgegevens van de VESC overgenomen:", JSON.stringify(patch));
-  } catch (err) {
-    /* Staat config.json op alleen-lezen, dan is dat geen reden om het elke
-       150 ms opnieuw te proberen. */
-    leerFout = true;
-    log("kon config.json niet bijwerken: " + err.message);
-  }
-}
-
 const num = (v, lo, hi, fallback) => {
   const n = Number(v);
   return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
@@ -190,39 +180,12 @@ const num = (v, lo, hi, fallback) => {
 /* ── routes ─────────────────────────────────────────────────────────────── */
 const routes = {
   "GET /data": (req, res) => {
-    const snap = vesc.connected ? vesc.snapshot() : null;
-    /* Meekijken of de VESC zelf weet hoe de step in elkaar zit. Dat is alleen
-       te zien terwijl de motor draait, dus het moet in de lus mee. */
-    setup.observe(snap);
-    /* Eén keer rijdend gezien = onthouden, zodat de status een herstart
-       overleeft; ziet een latere rit "missing", dan wordt dat ook onthouden. */
-    if (setup.status === "ok" && !state.data.setupSeen) state.patch({ setupSeen: true });
-    else if (setup.status === "missing" && state.data.setupSeen) state.patch({ setupSeen: false });
-    leerVanVesc();
-    /* De VESC meldt cruisecontrol niet; dit leidt het af uit de hendelstand,
-       de motorstroom en een vlakke snelheid. Bijhouden gebeurt op de
-       "values"-gebeurtenis hierboven; hier lezen we alleen de stand. */
-    const cc = cruise.state();
-    const data = telemetry.build(snap);
-    data.cruise = cc.active;
-    data.cruise_supported = cc.supported;
-    if (data.connected && data.speed_kmh > state.data.topSpeed) {
-      state.patch({ topSpeed: data.speed_kmh });
-    }
-    /* Laden herkennen we aan de spanning die stijgt terwijl de step stilstaat;
-       een gewone lader hangt rechtstreeks aan de accu en loopt niet via de
-       VESC, dus stroom meten alleen is niet genoeg. */
-    const ch = charge.update(data, Date.now());
-    data.charging = ch.charging;
-    data.charge_eta_min = ch.etaMin;
-    data.charge_full = ch.full;
-    data.charge_session = ch.session;
-    /* Laadstroom alleen als de lader via de controller loopt. Hangt hij
-       rechtstreeks aan de accu — bij de meeste steps is dat zo — dan ziet de
-       VESC er niets van en zet de UI n.v.t. neer. */
-    data.charge_a = ch.charging && data.battery_current < -0.2 ? -data.battery_current : null;
-    data.top_kmh = state.data.topSpeed || 0;
-    send(res, 200, data);
+    /* Vangnet. De statusgebeurtenis hoort dit te doen — de watchdog van vesc.js
+       vuurt binnen 1,2 s en port.on("close") ook — maar als er ooit één
+       doorheen glipt zou het contract bevriezen op de laatste meting. Eén
+       booleaanse vergelijking per verzoek is dat waard. */
+    if (!vesc.connected && ride.data().connected) ride.weg();
+    send(res, 200, ride.data());
   },
 
   "GET /setup": (req, res) => {
@@ -302,11 +265,16 @@ const routes = {
 
   "POST /reset-trip": (req, res) => {
     telemetry.resetTrip(vesc.connected ? vesc.snapshot() : null);
+    /* Meteen hertellen, anders staat de oude waarde er nog tot de volgende
+       meting — en dat is precies de tik waarop je kijkt. */
+    ride.hertel();
     send(res, 200, { ok: true });
   },
 
   "POST /reset-top": (req, res) => {
     state.patch({ topSpeed: 0 });
+    ride.top = 0;
+    ride.hertel();
     send(res, 200, { ok: true });
   },
 

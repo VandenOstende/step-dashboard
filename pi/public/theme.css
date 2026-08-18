@@ -46,6 +46,29 @@
   --green:#3f8b52;
 
   --font:"Inter",system-ui,-apple-system,"DejaVu Sans",sans-serif;
+  /* De cijfers. JetBrains Mono heeft van huis uit even brede cijfers en een
+     nul met een streep erdoor — op een instrument leest dat sneller dan een
+     proportionele letter, en een 8 die van een 0 te onderscheiden is scheelt
+     op een schermpje van 3,5 duim. De woorden blijven Inter. */
+  --mono:"JetBrains Mono",ui-monospace,"DejaVu Sans Mono",monospace;
+}
+
+/* Twee gewichten, meer heeft deze UI niet nodig: 400 voor de meeste cijfers en
+   500 voor de grote (snelheid, laadpercentage, de meetwaarden). Het zwaarste
+   wat er op het scherm staat is het woord WARNING, en dat is Inter.
+
+   font-display: swap — komt het bestand niet, dan staat er meteen de
+   terugvalletter in plaats van een leeg vak. Op een step die net opstart is
+   een cijfer in de verkeerde letter oneindig veel beter dan geen cijfer. */
+@font-face{
+  font-family:"JetBrains Mono";
+  src:url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"JetBrains Mono";
+  src:url("fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight:500;font-style:normal;font-display:swap;
 }
 body[data-theme="night"]{
   --ground:linear-gradient(180deg,#1c1f30 0%,#161826 62%,#101220 100%);
@@ -105,7 +128,7 @@ p{margin:0}
 #cellgrp{display:flex;align-items:center;gap:3px;color:var(--off)}
 #cellgrp.on{color:var(--accent)}
 #celltxt{font-size:12px;letter-spacing:.06em}
-#clock{font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+#clock{font-size:15px;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
 
 /* ── rijscherm ───────────────────────────────────────────────────────────── */
 #ride{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
@@ -164,7 +187,7 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 #speed{
   position:relative;z-index:1;
   font-weight:500;font-size:132px;line-height:1.69;letter-spacing:.04em;
-  font-variant-numeric:tabular-nums;transition:color .2s;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;transition:color .2s;
 }
 #speed.sport{color:var(--red)}
 #speedunit{margin-top:8px;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--dim)}
@@ -181,11 +204,11 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 .battmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .battline{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
 .battline .val{flex:1;min-width:0;display:flex;align-items:baseline;gap:3px}
-#battpct{font-size:28px;line-height:1;font-variant-numeric:tabular-nums;color:var(--batt)}
+#battpct{font-size:28px;line-height:1;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--batt)}
 .battline .u{font-size:13px;color:var(--dim)}
 #battva{
   flex:none;white-space:nowrap;font-size:14px;line-height:1;color:var(--dim);
-  font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.02em;
 }
 #batttrack{height:6px;border-radius:99px;background:var(--track);overflow:hidden}
 #battfill{
@@ -196,7 +219,7 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
 .battrange{text-align:right;flex:none}
 .battrange .micro{letter-spacing:.14em}
 .battrange .val{display:flex;align-items:baseline;gap:3px;justify-content:flex-end;margin-top:2px}
-#range{font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+#range{font-size:28px;line-height:1;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .battrange .u{font-size:10px;color:var(--dim)}
 
 /* ── de drie kaarten ─────────────────────────────────────────────────────── */
@@ -211,7 +234,7 @@ body[data-theme="night"] #modes .mode[data-mode="eco"].on{border-color:#4f9e63;b
    eens iets over de rand, zoals "Ø VERBRUIK" op de trip-kaart, dan is dat
    beter dan een beletselteken: het woord blijft leesbaar. */
 #cards .card .micro{font-size:11px;letter-spacing:.14em}
-#cards .big{font-size:17px;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:3px}
+#cards .big{font-size:17px;line-height:1.1;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:3px}
 #cards .sub{font-size:8px;color:var(--faint);margin-top:2px;letter-spacing:.04em}
 #tripcard{cursor:pointer}
 #motortemp.warn{color:var(--amber)}
@@ -350,7 +373,7 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 .stat .ico{width:19px;height:19px}
 .stat .lbl{flex:1;font-size:13px;color:var(--dim)}
 .stat .num{display:flex;align-items:baseline;gap:4px}
-.stat .num b{font-weight:500;font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.stat .num b{font-weight:500;font-size:26px;line-height:1;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .stat .num span{font-size:11px;color:var(--faint)}
 
 /* ── aan/uit ─────────────────────────────────────────────────────────────── */
@@ -396,7 +419,7 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 .limhead .left .lbl{font-size:13px;color:var(--ink)}
 .limhead .right{display:flex;align-items:center;gap:12px}
 .limval{display:flex;align-items:baseline;justify-content:flex-end;gap:3px;min-width:62px}
-.limval b{font-weight:500;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}
+.limval b{font-weight:500;font-size:22px;line-height:1;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .limval.hit b{color:var(--red)}
 .limval span{font-size:11px;color:var(--dim)}
 .limrow{display:flex;align-items:center;gap:10px}
@@ -421,7 +444,7 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 .stepitem .lbl{flex:1;min-width:0;font-size:13px;color:var(--ink)}
 .stepitem .num{
   min-width:66px;text-align:right;font-size:20px;line-height:1;
-  font-variant-numeric:tabular-nums;color:var(--ink);
+  font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);
 }
 .stepitem .step{
   width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;
@@ -443,7 +466,7 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 .chargehead .ico{width:18px;height:18px;color:var(--charge)}
 .chargemid{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .chargepct{display:flex;align-items:baseline;gap:6px}
-#chargeval{font-weight:500;font-size:104px;line-height:1;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--charge)}
+#chargeval{font-weight:500;font-size:104px;line-height:1;letter-spacing:.02em;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--charge)}
 .chargepct .u{font-size:22px;color:var(--dim)}
 #chargetrack{height:8px;border-radius:99px;background:var(--track);overflow:hidden}
 #chargefill{
@@ -454,9 +477,16 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 .chargecards{flex:none;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .chargecards .card{padding:9px 10px}
 .chargecards .micro{font-size:9px;letter-spacing:.12em}
-.chargecards .big{margin-top:3px;font-size:22px;line-height:1;white-space:nowrap;
-  font-variant-numeric:tabular-nums;color:var(--ink)}
-.chargecards .big .u{font-size:11px;color:var(--dim)}
+.chargecards .big{margin-top:3px;font-size:22px;line-height:1.15;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+/* Alleen de resterende tijd mag niet breken: "1h 18m" hoort bij elkaar. De
+   winst mag zijn eenheid wél op een tweede regel zetten — "0.35 km/min" past
+   niet in 69 px en afkappen zou het getal onleesbaar maken. */
+#chargeeta{white-space:nowrap}
+/* De eenheid achter het cijfer is een woord, geen getal — dus Inter, en niet
+   de mono die het cijfer ervoor erft. Scheelt ook net de breedte die "km/min"
+   nodig heeft om in zijn kaart van 95 px te passen. */
+.chargecards .big .u{font-family:var(--font);font-size:10px;color:var(--dim)}
 .tapclose{flex:none;margin-top:10px;text-align:center;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 
 /* ── temperatuuralarm ────────────────────────────────────────────────────── */
@@ -485,7 +515,7 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
   display:flex;gap:8px;padding:9px 10px;
   border:1px solid var(--border);border-radius:9px;background:var(--surface);
 }
-.note .sha{flex:none;font-size:10px;color:var(--accent-ink);font-variant-numeric:tabular-nums;padding-top:1px}
+.note .sha{flex:none;font-size:10px;color:var(--accent-ink);font-family:var(--mono);font-variant-numeric:tabular-nums;padding-top:1px}
 .note .msg{flex:1;min-width:0;font-size:12px;line-height:1.35;color:var(--ink)}
 
 /* ── wachtwoord en schermtoetsenbord ─────────────────────────────────────── */

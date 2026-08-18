@@ -15,6 +15,13 @@ WorkingDirectory=/opt/step-dashboard
 ExecStart=/usr/bin/node /opt/step-dashboard/src/server.js
 Environment=NODE_ENV=production
 Environment=STEP_STATE=/var/lib/step-dashboard/state.json
+# De seriële lezing houdt permanent één van de vier standaard-threadpoolslots
+# bezet: stty staat op "min 0 time 1", dus elke read komt pas na hoogstens
+# 100 ms terug en er staat er altijd een open. Daar strijden het serveren van
+# bestanden, de DNS-lookups voor het weer en GitHub, en het wegschrijven van
+# state.json om de overige drie. Threads die niets doen kosten alleen wat
+# stackruimte; vier extra is op een Pi 4 gratis.
+Environment=UV_THREADPOOL_SIZE=8
 Restart=always
 RestartSec=2
 

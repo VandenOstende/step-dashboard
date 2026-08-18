@@ -47,6 +47,41 @@ set -- \
   --password-store=basic \
   --no-first-run
 
+# Afstelling voor een traag paneel en een SD-kaart. Uit te zetten met
+# STEP_KIOSK_TUNING=0 in de unit — dan hoef je bij een zwart scherm geen editor
+# over SSH open te trekken.
+#
+#   --disable-background-networking
+#       De Pi staat vaak buiten bereik. Zonder dit blijft Chromium op de
+#       achtergrond varianten, safebrowsing-lijsten en tijdzones ophalen, en
+#       loopt elk van die verzoeken in een timeout.
+#   --disable-sync, --disable-domain-reliability, --disable-breakpad
+#       Diensten die alleen zin hebben met een account en een netwerk.
+#   --disk-cache-size=1, --disable-gpu-shader-disk-cache
+#       De pagina wordt met Cache-Control: no-store geserveerd, dus deze twee
+#       caches leveren niets op en schrijven alleen naar de SD-kaart.
+#   --renderer-process-limit=1
+#       Eén pagina, dus één renderer. Meer processen kosten alleen geheugen.
+#   --enable-low-end-device-mode, --num-raster-threads=1
+#       Kleinere rastertegels en zuiniger met geheugen. Op 320 x 480 heeft meer
+#       rasterwerk geen zin.
+#
+# Bewust NIET: --single-process, --disable-gpu, --in-process-gpu. Die leveren
+# meer op maar pakken per opstelling anders uit; zie de README als je ze wilt
+# proberen.
+if [ "${STEP_KIOSK_TUNING:-1}" != "0" ]; then
+  set -- "$@" \
+    --disable-background-networking \
+    --disable-sync \
+    --disable-domain-reliability \
+    --disable-breakpad \
+    --disk-cache-size=1 \
+    --disable-gpu-shader-disk-cache \
+    --renderer-process-limit=1 \
+    --enable-low-end-device-mode \
+    --num-raster-threads=1
+fi
+
 if command -v cage >/dev/null 2>&1 && [ -n "${XDG_RUNTIME_DIR:-}" ]; then
   exec cage -d -- "$CHROME" --ozone-platform=wayland "$@"
 elif command -v xinit >/dev/null 2>&1; then

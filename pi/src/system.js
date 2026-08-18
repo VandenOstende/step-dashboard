@@ -34,6 +34,44 @@ function run(cmd, args, timeout, input) {
   });
 }
 
+/* ── de statuscache ─────────────────────────────────────────────────────────
+   wifiStatus, btStatus en modem starten elk een child process, en de topbalk
+   vraagt ze alle drie op een vaste cadans op. Op een Pi 4 kost het opstarten
+   van nmcli of mmcli tientallen tot honderden milliseconden CPU — D-Bus
+   verbinden, glib initialiseren — en dat voor drie icoontjes die bijna nooit
+   veranderen. Zonder cache was dat de duurste bezigheid van het hele apparaat,
+   met afstand: het rekenwerk van de hele meetlus is er 6 microseconden naast.
+
+   Hetzelfde patroon als weather.js: een uitkomst met een houdbaarheidsdatum,
+   plus een lopende belofte zodat twee gelijktijdige vragen één proces delen.
+   Fouten worden óók bewaard — is er geen mmcli geïnstalleerd, dan moet dat
+   niet twaalf keer per minuut opnieuw worden vastgesteld.
+
+   De houdbaarheid ligt bewust nét onder de cadans waarmee de UI vraagt. Op
+   precies dezelfde waarde valt een vraag nu eens net binnen en dan eens net
+   buiten, en dan levert de cache de helft van de tijd niets op. */
+function ttlCache(fn, ms, msVoor) {
+  let cache = null;
+  let cachedAt = 0;
+  let pending = null;
+
+  const wrapped = function (force) {
+    const ttl = (cache && msVoor) ? msVoor(cache) : ms;
+    if (!force && cache && Date.now() - cachedAt < ttl) return Promise.resolve(cache);
+    if (pending) return pending;
+    pending = Promise.resolve()
+      .then(() => fn())
+      .then((uit) => { cache = uit; cachedAt = Date.now(); return uit; })
+      .finally(() => { pending = null; });
+    return pending;
+  };
+  /* Na een actie van de gebruiker klopt de cache niet meer. Dat ongeldig maken
+     gebeurt hier in system.js en niet in de route, zodat het ook werkt voor een
+     pagina die na een update niet herladen is. */
+  wrapped.invalidate = function () { cache = null; cachedAt = 0; };
+  return wrapped;
+}
+
 /** nmcli -t ontsnapt een letterlijke dubbelepunt als "\:" — splits daarop. */
 function splitTerse(line) {
   const out = [];
@@ -55,7 +93,7 @@ const lines = (s) => s.split("\n").map((l) => l.trim()).filter(Boolean);
 /** nmcli-signaal (0..100) naar de drie bogen van het wifi-icoon. */
 const wifiLevel = (signal) => (signal >= 67 ? 3 : signal >= 34 ? 2 : signal > 0 ? 1 : 0);
 
-async function wifiStatus() {
+async function wifiStatusRaw() {
   const r = await run("nmcli", ["-t", "-f", "ACTIVE,SSID,SIGNAL", "device", "wifi", "list", "--rescan", "no"]);
   if (!r.ok) return { connected: false, ssid: "", level: 0 };
   for (const line of lines(r.out)) {
@@ -155,6 +193,8 @@ async function runPlan(steps) {
   return last;
 }
 
+/* Verbinden en verbreken maken de cache ongeldig; anders zou de topbalk tot
+   een halve minuut het oude beeld blijven tonen terwijl jij net iets deed. */
 async function wifiConnect(ssid, password) {
   const known = (await knownConnections()).has(ssid);
   let r = await runPlan(wifiConnectPlan(ssid, password, known));
@@ -164,7 +204,7 @@ async function wifiConnect(ssid, password) {
   if (!r.ok && password && /unknown option|--ask|usage:/i.test(r.err || "")) {
     r = await runPlan(wifiConnectPlanFallback(ssid, password, known));
   }
-  if (r.ok) return { ok: true };
+  if (r.ok) { wifiStatus.invalidate(); return { ok: true }; }
 
   if (SECRET_RE.test(r.err || "")) {
     return password
@@ -176,6 +216,7 @@ async function wifiConnect(ssid, password) {
 
 async function wifiDisconnect(ssid) {
   const r = await run("nmcli", ["connection", "down", "id", ssid], 15000);
+  wifiStatus.invalidate();
   return r.ok ? { ok: true } : { ok: false, error: "verbreken mislukt" };
 }
 
@@ -208,7 +249,7 @@ async function btConnected() {
   return out;
 }
 
-async function btStatus() {
+async function btStatusRaw() {
   const conn = await btConnected();
   if (!conn.length) return { connected: false, name: "", mac: "" };
   return { connected: true, name: conn[0].name, mac: conn[0].mac };
@@ -235,6 +276,9 @@ async function btStartScan(seconds) {
   const sec = Math.max(4, Math.min(30, seconds || BT_SCAN_S));
   btScanUntil = Date.now() + sec * 1000;
   btScanError = "";
+  /* Zoeken kan op een herkoppeling uitlopen, dus de bewaarde status is vanaf
+     nu verdacht. */
+  btStatus.invalidate();
   // Staat de adapter uit, dan levert zoeken niets op. Aanzetten is idempotent.
   await run("bluetoothctl", ["power", "on"], 5000);
   run("bluetoothctl", ["--timeout", String(sec), "scan", "on"], (sec + 5) * 1000)
@@ -286,12 +330,14 @@ function btScanState() {
 
 async function btConnect(mac) {
   const r = await run("bluetoothctl", ["connect", mac], 25000);
+  btStatus.invalidate();
   if (r.ok && !/Failed/i.test(r.out)) return { ok: true };
   return { ok: false, error: "koppelen mislukt" };
 }
 
 async function btDisconnect(mac) {
   const r = await run("bluetoothctl", ["disconnect", mac], 15000);
+  btStatus.invalidate();
   return r.ok ? { ok: true } : { ok: false, error: "verbreken mislukt" };
 }
 
@@ -315,7 +361,7 @@ function techName(list) {
    ModemManager — laat de UI het hele mobiele stukje weg in plaats van "geen
    bereik" te melden over iets wat er niet is. Een modem die er wél is maar
    niks ontvangt geeft present:true met bars:0. */
-async function modem() {
+async function modemRaw() {
   const r = await run("mmcli", ["-J", "-m", "any"], 6000);
   if (!r.ok) return { present: false, bars: 0, tech: null };
   let j;
@@ -400,7 +446,26 @@ async function setBacklight(level, sysCfg) {
   }
 }
 
+/* ── de ingepakte statusfuncties ────────────────────────────────────────────
+   De UI vraagt deze drie elke 30 seconden op (public/app.js). De houdbaarheid
+   staat op 25 s: net eronder, zodat elke vraag een misser is en er precies één
+   proces per 30 s per soort draait — en niet, bij een gelijke waarde, de ene
+   keer wel en de andere keer niet.
+
+   Van 36 processen per minuut naar 6.
+
+   De modem is de uitzondering. Zit er geen dongle in, dan is dat de eerstvolgende
+   maanden ook zo; dat elke halve minuut opnieuw vaststellen met mmcli — het
+   duurste van de drie — is weggegooid werk. */
+const STATUS_TTL = 25000;
+const GEEN_MODEM_TTL = 5 * 60 * 1000;
+
+const wifiStatus = ttlCache(wifiStatusRaw, STATUS_TTL);
+const btStatus = ttlCache(btStatusRaw, STATUS_TTL);
+const modem = ttlCache(modemRaw, STATUS_TTL, (c) => (c && c.present ? STATUS_TTL : GEEN_MODEM_TTL));
+
 module.exports = {
+  ttlCache,
   wifiStatus, wifiList, wifiConnect, wifiDisconnect,
   wifiConnectPlan, wifiConnectPlanFallback,
   btStatus, btList, btConnect, btDisconnect, btStartScan, btScanState,

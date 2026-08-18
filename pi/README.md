@@ -22,6 +22,7 @@ public/index.html    portrait, 320 × 480   ← output, don't edit
 public/theme.css     the design language and the sizing
 public/app.js        the behaviour
 public/i18n.js       the four languages and the eight accent colours
+public/fonts/        JetBrains Mono, for the digits
 src/serial.js        serial port without npm modules
 src/vesc.js          VESC protocol: framing, CRC16, packets
 src/telemetry.js     raw values → what the UI expects
@@ -32,12 +33,15 @@ src/config.js        config.json, the stored state, and sanitising the settings
 src/setup.js         does the VESC know how the scooter is put together?
 src/modes.js         riding modes: the limits packet for the VESC
 src/cruise.js        inferring whether cruise control is on
+src/ride.js          the measurement loop: everything that happens per reading
 src/update.js        comparing the version with GitHub, and the release notes
 src/server.js        the HTTP server
 install/step-update  the script that updates as root
 tools/design.js      design environment: the UI with faked hardware
 tools/shots.js       the screenshots in docs/ui/
 tools/bench.js       how much work the UI makes the browser do
+tools/bench-loop.js  the same question for the server side
+tools/pi-load.sh     what it all costs on the Pi itself
 tools/vesc-probe.js  seeing what your VESC has to say
 tools/selftest.js    tests, no hardware needed
 ```
@@ -435,6 +439,14 @@ design and are worth knowing before you move something:
   the number is centred on the panel and the bell floats in the left margin.
 - **The keys** are ten per row on 296 px, so about 26 px wide, and 52 px tall.
   Narrow, but there's height to spare and you aim with your thumb vertically.
+- **The digits are JetBrains Mono**, the words are Inter. Two weights, 400 and
+  500; that is everything this UI needs, since the heaviest thing on screen is
+  the word WARNING and that stays Inter. The assignment is surgical: the twelve
+  rules in `theme.css` that carry `font-variant-numeric: tabular-nums` are
+  exactly the elements that hold numbers, and those twelve got
+  `font-family: var(--mono)`. One exception: the unit *behind* a number is a
+  word, not a figure — `km/min` in the charging card goes back to Inter, which
+  is also just narrow enough to fit.
 - **The card labels** get about nine characters at 11 px with `.14em` of
   tracking. The design had "KILOMETERSTAND" there and it ran over the edge;
   it's **ODO** now, in all four languages. Where something still overflows — the
@@ -522,6 +534,100 @@ One warning about the tool: an earlier version counted frames with
 `requestAnimationFrame`, which keeps the browser awake and then measures its
 own presence — it reported a confident 60 fps in every situation. It counts
 nothing but Chromium's own metrics now.
+
+### The other side: what the server costs
+
+The browser was the obvious place to look, and it was the wrong one to stop at.
+`tools/bench-loop.js` runs the whole measurement chain against a fake state and
+reports microseconds per reading and per request:
+
+```bash
+node tools/bench-loop.js
+```
+
+The answer, with 236 samples in the charging history — the branch I expected to
+be expensive:
+
+```
+meting        4.3 µs/stuk    bij 6,7/s: 0.03 ms/s
+verzoek       6.4 µs/stuk    bij 6,7/s: 0.04 ms/s
+laden         6.7 µs/stuk    bij 6,7/s: 0.04 ms/s
+```
+
+All of it is noise. Ten times slower on a Pi it is still noise. **The
+computation was never the problem.** What was:
+
+**Three child processes every five seconds.** `/wifi`, `/bt` and `/modem` each
+ran `nmcli`, `bluetoothctl` and `mmcli`, with no cache anywhere in
+`system.js` — 0.6 fork/exec per second, around the clock, to draw three icons in
+the top bar that hardly ever change. On a Pi 4 each of those has to open a D-Bus
+connection and initialise glib; that is tens to hundreds of milliseconds of CPU
+per launch. Against 6 microseconds of arithmetic.
+
+So `ttlCache()` in `system.js`, in the same shape as `weather.js`: a result with
+an expiry, plus a shared promise so two simultaneous questions run one process.
+Errors are cached too — a missing `mmcli` should not be rediscovered twelve
+times a minute. The client polls every 30 s and the expiry sits at 25 s,
+deliberately *under* the polling interval: set them equal and a request lands
+just inside the window as often as just outside, and the cache earns its keep
+half the time. The modem gets five minutes once it reports `present: false`; no
+dongle stays no dongle.
+
+**36 processes a minute became 6.** The cache is dropped inside `system.js`
+itself — at the end of `wifiConnect`, `wifiDisconnect`, `btConnect`,
+`btDisconnect` and `btStartScan` — and not in the route, so it also works for a
+page that wasn't reloaded after an update. `wifiList()` and `btList()` are not
+cached at all: you only fetch those while looking straight at them.
+
+### The measurement loop is not a request
+
+`GET /data` used to do the arithmetic. That is cheap, as measured above — but
+it's the wrong place, and one of the things it did there was a bug.
+
+`telemetry.build()` integrates the odometer and the riding time from time
+deltas. Hang that off an HTTP request and the odometer only counts while a
+browser is watching: kiosk closed, counter stopped. Two browsers, and it counts
+twice. The wheel-size samples in `setup.js` had the same defect — collected at
+the browser's cadence instead of the VESC's, so two requests between two
+readings counted the same reading twice.
+
+That is exactly the fault that was in the cruise control before, which is why
+that one already hangs off `vesc.on("values")`. Now the rest does too, in
+`src/ride.js`. In its own module, for one reason: `server.js` opens a port and
+starts a VESC, so it can't be `require`d from the self-test. Every other
+building block here is a testable module — the measurement loop was the only one
+that wasn't, and that is not a coincidence about where the faults were.
+
+Three things it has to get right:
+
+- **The VESC going away.** Three layers: the `status` event (the watchdog fires
+  within 1.2 s, and `port.on("close")` too), a `ride.weg()` at startup because
+  there is no status event if there was never a connection, and a one-boolean
+  safety net in the route. Miss the event and the contract would freeze on the
+  last reading.
+- **`telemetry.pause()` on disconnect.** Without it the first reading after a
+  gap adds the capped two seconds of riding time for a gap in which nobody rode.
+  The distance counter deliberately keeps its reference: if the USB plug wiggles
+  mid-ride the VESC keeps counting and that distance genuinely belongs.
+- **Learning has to be able to stop without losing relearning.** The old
+  `leerVanVesc` ran forever: its early return tested for `source === "hand"`, but
+  after learning `source` becomes `"vesc"`, so it never fired. A plain "done"
+  flag would take too much away — if the derived wheel size later drifts more
+  than 2 % (different tyre, different gearing) it *should* learn again. So
+  `SetupWatch` counts revisions and `Ride` skips while that counter stands still.
+
+**State is written asynchronously now.** `writeFileSync` in a timer stops the
+event loop, VESC reading included, for as long as the SD card takes. The
+`JSON.stringify` still happens synchronously at the start of the write — that is
+the whole trick, because everything that changes afterwards can no longer end up
+in the file being written — and a revision counter is checked just before the
+rename so a slow writer can never bury what `flush()` just put down.
+
+And one line in the unit: `UV_THREADPOOL_SIZE=8`. The serial read keeps one of
+the four default threadpool slots permanently occupied (`stty min 0 time 1`, so
+a read returns after at most 100 ms and there is always one open), and file
+serving, DNS lookups and the state writes fight over the remaining three.
+Threads that do nothing cost stack space and no more.
 
 ### The design environment
 
@@ -631,7 +737,7 @@ them.
 npm test
 ```
 
-102 tests, no hardware needed: CRC against the known test vector, framing,
+124 tests, no hardware needed: CRC against the known test vector, framing,
 fragmented and mangled packets, the conversion from erpm to km/h and from
 tachometer to distance, zeroing the trip counter (including when the VESC
 restarts and resets its own counters), the odometer that carries on across such
@@ -643,6 +749,15 @@ the power screen can never produce anything other than `systemctl reboot` or
 that a single outlier doesn't skew the derived wheel size and that writing to
 `config.json` leaves the rest of the file alone — and the riding-mode packet,
 byte for byte, including that `store` is never anything but zero.
+
+Nine of them are about the measurement loop, and two of those exist because of
+a real fault: **the odometer keeps counting without a browser**, and **two
+browsers do not count twice**. Another checks that `config.json` is written once
+and not on every reading, and another that a read-only `config.json` is not
+retried forever. Five more are about writing the state: three patches in quick
+succession make one file, a patch during a write is not lost, the file is always
+valid JSON after two hundred random patches, `flush()` is not buried by a slow
+writer, and writing does not stall the event loop. Seven cover the status cache.
 
 Six of them are about the UI without opening a browser: all four languages have
 the same keys, none of the translations is empty, every `data-t` in the page
@@ -675,6 +790,7 @@ public/index.html    staand, 320 × 480   ← uitvoer, niet bewerken
 public/theme.css     de vormtaal en de maatvoering
 public/app.js        het gedrag
 public/i18n.js       de vier talen en de acht accentkleuren
+public/fonts/        JetBrains Mono, voor de cijfers
 src/serial.js        seriële poort zonder npm-modules
 src/vesc.js          VESC-protocol: framing, CRC16, pakketten
 src/telemetry.js     ruwe waarden → wat de UI verwacht
@@ -685,12 +801,15 @@ src/config.js        config.json, de opgeslagen staat en het schonen van de inst
 src/setup.js         weet de VESC hoe de step in elkaar zit?
 src/modes.js         rijmodi: het grenzenpakket voor de VESC
 src/cruise.js        afleiden of cruisecontrol aanstaat
+src/ride.js          de meetlus: alles wat er per meting gebeurt
 src/update.js        versie vergelijken met GitHub, en de release-notities
 src/server.js        de HTTP-server
 install/step-update  het script dat als root bijwerkt
 tools/design.js      designomgeving: de UI met nagemaakte hardware
 tools/shots.js       de schermafdrukken in docs/ui/
 tools/bench.js       hoeveel werk de UI de browser geeft
+tools/bench-loop.js  dezelfde vraag voor de serverkant
+tools/pi-load.sh     wat het geheel op de Pi zelf kost
 tools/vesc-probe.js  kijken wat je VESC vertelt
 tools/selftest.js    tests, zonder hardware
 ```
@@ -1099,6 +1218,14 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   linkermarge.
 - **De toetsen** zijn er tien per rij op 296 px, dus zo'n 26 px breed, en 52 px
   hoog. Smal, maar er is hoogte over en met je duim mik je verticaal.
+- **De cijfers zijn JetBrains Mono**, de woorden Inter. Twee gewichten, 400 en
+  500; meer heeft deze UI niet nodig, want het zwaarste op het scherm is het
+  woord WARNING en dat blijft Inter. De toewijzing is chirurgisch: de twaalf
+  regels in `theme.css` met `font-variant-numeric: tabular-nums` zijn precies de
+  elementen die cijfers dragen, en die twaalf kregen `font-family: var(--mono)`.
+  Eén uitzondering: de eenheid *achter* een getal is een woord en geen cijfer —
+  `km/min` op de laadkaart gaat terug naar Inter, en dat is meteen net smal
+  genoeg om te passen.
 - **De kaartlabels** hebben ruimte voor zo'n negen tekens op 11 px met `.14em`
   spatiëring. In het ontwerp stond daar "KILOMETERSTAND" en dat liep over de
   rand; het is nu **ODO**, in alle vier de talen. Loopt er toch nog iets over —
@@ -1186,6 +1313,104 @@ Eén waarschuwing over het gereedschap: een eerdere versie telde frames met
 `requestAnimationFrame`, en die lus houdt de browser zelf wakker en meet dan
 zijn eigen aanwezigheid — hij meldde in elke situatie stellig 60 fps. Hij telt
 nu niets anders dan de tellers van Chromium.
+
+### De andere kant: wat de server kost
+
+De browser was de voor de hand liggende plek om te kijken, en de verkeerde om
+te stoppen. `tools/bench-loop.js` jaagt de hele meetketen langs een neppe staat
+en meldt microseconden per meting en per verzoek:
+
+```bash
+node tools/bench-loop.js
+```
+
+Het antwoord, met 236 monsters in de laadhistorie — de tak waarvan ik dacht dat
+hij duur was:
+
+```
+meting        4,3 µs/stuk    bij 6,7/s: 0,03 ms/s
+verzoek       6,4 µs/stuk    bij 6,7/s: 0,04 ms/s
+laden         6,7 µs/stuk    bij 6,7/s: 0,04 ms/s
+```
+
+Het is allemaal ruis. Tien keer trager op een Pi is het nog steeds ruis. **Het
+rekenwerk was nooit het probleem.** Wat wel:
+
+**Drie child processes per vijf seconden.** `/wifi`, `/bt` en `/modem` startten
+elk `nmcli`, `bluetoothctl` en `mmcli`, zonder enige cache in `system.js` — 0,6
+fork/exec per seconde, dag en nacht, om drie icoontjes in de bovenbalk te
+tekenen die bijna nooit veranderen. Op een Pi 4 moet elk van die commando's een
+D-Bus-verbinding opzetten en glib initialiseren; dat zijn tientallen tot
+honderden milliseconden CPU per keer. Tegenover 6 microseconden rekenwerk.
+
+Dus `ttlCache()` in `system.js`, in dezelfde vorm als `weather.js`: een uitkomst
+met een houdbaarheidsdatum, plus een gedeelde belofte zodat twee gelijktijdige
+vragen één proces draaien. Fouten worden ook bewaard — een ontbrekende `mmcli`
+hoeft niet twaalf keer per minuut opnieuw ontdekt te worden. De client vraagt
+elke 30 s en de houdbaarheid staat op 25 s, bewust *onder* die cadans: zet je ze
+gelijk, dan valt een vraag even vaak net binnen als net buiten het venster en
+levert de cache de helft van de tijd niets op. De modem krijgt vijf minuten
+zodra hij `present: false` meldt; geen dongle blijft geen dongle.
+
+**36 processen per minuut werden er 6.** De cache wordt ongeldig gemaakt in
+`system.js` zelf — aan het eind van `wifiConnect`, `wifiDisconnect`,
+`btConnect`, `btDisconnect` en `btStartScan` — en niet in de route, zodat het
+ook werkt voor een pagina die na een update niet herladen is. `wifiList()` en
+`btList()` worden helemaal niet gecached: die haal je alleen op terwijl je er
+recht naar kijkt.
+
+### De meetlus is geen verzoek
+
+`GET /data` deed het rekenwerk. Dat is goedkoop, zoals hierboven gemeten — maar
+het is de verkeerde plek, en één van de dingen die daar gebeurden was een fout.
+
+`telemetry.build()` telt de kilometerstand en de rijtijd op uit tijdsverschillen.
+Hang dat aan een HTTP-verzoek en de teller loopt alleen als er een browser
+kijkt: kiosk dicht, teller stil. Twee browsers, en hij telt dubbel. De
+wielmaat-monsters in `setup.js` hadden hetzelfde mankement — verzameld op de
+cadans van de browser in plaats van die van de VESC, dus twee verzoeken tussen
+twee metingen telden dezelfde meting dubbel.
+
+Dat is precies de fout die eerder in de cruisecontrol zat, en daarom hangt die
+al aan `vesc.on("values")`. Nu de rest ook, in `src/ride.js`. In een eigen
+module, om één reden: `server.js` opent een poort en start een VESC, dus die
+valt niet te `require`-en in de zelftest. Elke andere bouwsteen hier is een
+testbare module — de meetlus was de enige die dat niet was, en het is geen
+toeval waar de fouten dan zaten.
+
+Drie dingen die goed moeten:
+
+- **De VESC die wegvalt.** Drie lagen: de `status`-gebeurtenis (de watchdog
+  vuurt binnen 1,2 s, en `port.on("close")` ook), een `ride.weg()` bij het
+  opstarten omdat er geen statusgebeurtenis komt als er nooit verbinding was, en
+  een vangnet van één booleaanse vergelijking in de route. Mis je die
+  gebeurtenis, dan zou het contract bevriezen op de laatste meting.
+- **`telemetry.pause()` bij verlies van verbinding.** Zonder dat telt de eerste
+  meting na een gat de afgetopte twee seconden rijtijd mee voor een gat waarin
+  niemand reed. De afstandsteller houdt bewust zijn ijkpunt: wiebelt de
+  USB-stekker tijdens het rijden, dan telt de VESC door en hoort die afstand er
+  echt bij.
+- **Leren moet kunnen stoppen zonder het herleren te verliezen.** De oude
+  `leerVanVesc` draaide voor altijd: zijn vroege return testte op
+  `source === "hand"`, maar na het leren wordt `source` `"vesc"`, dus die greep
+  nooit. Een simpele "klaar"-vlag zou te veel wegnemen — wijkt de afgeleide
+  wielmaat later meer dan 2 % af (andere band, andere overbrenging), dan hóórt
+  hij opnieuw te leren. Dus telt `SetupWatch` revisies en slaat `Ride` over
+  zolang die teller stilstaat.
+
+**De staat gaat nu asynchroon naar schijf.** `writeFileSync` in een timer legt
+de eventloop stil, inclusief het lezen van de VESC, zolang de SD-kaart erover
+doet. De `JSON.stringify` gebeurt nog steeds synchroon aan het begin van de
+schrijfactie — dat is de hele truc, want alles wat daarna verandert kan niet
+meer in het bestand terechtkomen dat nu geschreven wordt — en vlak voor de
+hernoeming wordt een revisieteller gecontroleerd, zodat een trage schrijver
+nooit kan begraven wat `flush()` net heeft neergezet.
+
+En één regel in de unit: `UV_THREADPOOL_SIZE=8`. De seriële lezing houdt
+permanent één van de vier standaard-threadpoolslots bezet (`stty min 0 time 1`,
+dus een read komt na hoogstens 100 ms terug en er staat er altijd een open), en
+het serveren van bestanden, de DNS-lookups en de state-schrijfacties vechten om
+de overige drie. Threads die niets doen kosten stackruimte en verder niets.
 
 ### De designomgeving
 
@@ -1297,7 +1522,7 @@ reageerden en je zag ze niet.
 npm test
 ```
 
-102 tests, zonder hardware: CRC tegen de bekende testvector, framing, pakketten
+124 tests, zonder hardware: CRC tegen de bekende testvector, framing, pakketten
 in stukjes en met een kapotte CRC, de omrekening van erpm naar km/u en van
 tachometer naar afstand, de ritteller op nul (ook als de VESC herstart en zijn
 eigen tellers terugzet), de kilometerstand die over zo'n herstart heen doortelt,
@@ -1309,6 +1534,16 @@ en hoe de setup-staat van de VESC wordt herkend — inclusief dat één uitschie
 de afgeleide wielmaat niet scheeftrekt en dat schrijven naar `config.json` de
 rest van dat bestand met rust laat — en het rijmoduspakket, byte voor byte,
 inclusief dat `store` nooit iets anders is dan nul.
+
+Negen ervan gaan over de meetlus, en twee daarvan bestaan door een echte fout:
+**de kilometerstand telt door zonder browser**, en **twee browsers tellen niet
+dubbel**. Weer een andere controleert dat `config.json` één keer geschreven
+wordt en niet bij elke meting, en nog een dat een alleen-lezen `config.json`
+niet eeuwig opnieuw geprobeerd wordt. Vijf gaan over het wegschrijven van de
+staat: drie patches vlak na elkaar leveren één bestand op, een patch tijdens het
+schrijven gaat niet verloren, het bestand is na tweehonderd willekeurige patches
+altijd geldige JSON, `flush()` wordt niet begraven door een trage schrijver, en
+schrijven legt de eventloop niet stil. Zeven gaan over de statuscache.
 
 Zes ervan gaan over de UI zonder een browser te openen: alle vier de talen hebben
 dezelfde sleutels, geen enkele vertaling is leeg, elke `data-t` in de pagina

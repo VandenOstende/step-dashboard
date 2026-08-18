@@ -110,12 +110,20 @@ Inter is the typeface. `install.sh` installs it (`fonts-inter`); without it the
 UI falls back to system-ui, which is readable but pushes the digits out of their
 columns.
 
+Inter carries the words, **JetBrains Mono the digits** — even widths, a slashed
+zero, and an 8 you can tell from a 0 on a 3.5" panel.
+
 The display is slow — it hangs off SPI, so every repaint has to be pushed over
 that bus. So the UI paints only what actually changed, has no transitions on
 anything that updates while you ride, no CSS animation that runs forever, and
 doesn't paint the ride screen at all while something covers it. `npm run bench`
-measures it; the numbers and the reasoning are in
-[`pi/README.md`](pi/README.md#light-enough-for-the-panel).
+measures the browser and `node tools/bench-loop.js` the server; the numbers and
+the reasoning are in [`pi/README.md`](pi/README.md#light-enough-for-the-panel).
+
+The biggest saving turned out to be somewhere else entirely: three child
+processes every five seconds, to draw three icons in the top bar. Those are
+cached now — 36 process launches a minute became 6. `tools/pi-load.sh` shows
+what the whole thing costs on the Pi itself.
 
 ### Installing
 
@@ -369,7 +377,7 @@ does happen automatically — that's `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 102 tests: VESC protocol, CRC, framing, the conversions, the UI contract
+npm test     # 124 tests: VESC protocol, CRC, framing, the conversions, the UI contract
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — the UI with faked hardware
 ```
@@ -388,6 +396,8 @@ The page is built from its parts, so after changing the markup or the icons:
 ```bash
 node tools/build-page.js    # tools/page.html + tools/icons/*.svg → public/index.html
 node tools/shots.js         # the screenshots in docs/ui/ (needs playwright)
+node tools/bench.js         # what the browser is doing
+node tools/bench-loop.js    # what the server is doing
 ```
 
 ### Still to do
@@ -519,12 +529,22 @@ Inter is het lettertype. `install.sh` installeert het (`fonts-inter`); zonder
 valt de UI terug op system-ui, wat leesbaar is maar de cijfers uit hun kolommen
 duwt.
 
+Inter draagt de woorden, **JetBrains Mono de cijfers** — even brede cijfers, een
+nul met een streep erdoor, en een 8 die je op 3,5 duim van een 0 kunt
+onderscheiden.
+
 Het schermpje is traag — het hangt aan SPI, dus elke hertekening moet over die
 bus. Daarom tekent de UI alleen wat echt veranderd is, staat er geen transitie
 op iets dat tijdens het rijden bijwerkt, loopt er geen CSS-animatie eeuwig door,
 en wordt het rijscherm helemaal niet getekend zolang er iets overheen ligt.
-`npm run bench` meet het; de cijfers en de redenering staan in
+`npm run bench` meet de browser en `node tools/bench-loop.js` de server; de
+cijfers en de redenering staan in
 [`pi/README.md`](pi/README.md#licht-genoeg-voor-het-schermpje).
+
+De grootste winst bleek ergens heel anders te zitten: drie child processes per
+vijf seconden, om drie icoontjes in de bovenbalk te tekenen. Die worden nu
+gecachet — 36 processtarts per minuut werden er 6. `tools/pi-load.sh` laat zien
+wat het geheel op de Pi zelf kost.
 
 ### Installeren
 
@@ -781,7 +801,7 @@ gebeurt wel automatisch, dat is `update.checkOnStart`.
 
 ```bash
 cd pi
-npm test     # 102 tests: VESC-protocol, CRC, framing, de omrekeningen, het UI-contract
+npm test     # 124 tests: VESC-protocol, CRC, framing, de omrekeningen, het UI-contract
 npm start    # http://127.0.0.1:8080
 npm run design   # http://127.0.0.1:8081/design — de UI met nagemaakte hardware
 ```
@@ -801,6 +821,8 @@ of de iconen:
 ```bash
 node tools/build-page.js    # tools/page.html + tools/icons/*.svg → public/index.html
 node tools/shots.js         # de schermafdrukken in docs/ui/ (heeft playwright nodig)
+node tools/bench.js         # wat de browser doet
+node tools/bench-loop.js    # wat de server doet
 ```
 
 ### Nog te doen

@@ -62,14 +62,25 @@ class SetupWatch {
     this.monsters = [];
     this.wheel = null;      // afgeleide wielmaat in meter
     this.cells = null;      // afgeleid aantal cellen in serie
+    /* Hoogt op zodra er echt iets nieuws is afgeleid. De meetlus schrijft
+       config.json alleen bij als deze teller verschoven is; zonder dat draait
+       hij die vergelijking bij élke meting, voor altijd. */
+    this.rev = 0;
+    this._vLaatst = null;
   }
 
   /** Eén momentopname van de VESC bekijken. */
   observe(snap) {
     if (!snap) return;
 
+    /* De VESC meldt de spanning in stappen van 0,1 V, dus het antwoord
+       verandert bijna nooit — en guessCells is een lus van 28 stappen. */
     const v = snap.vIn || 0;
-    if (v > 5) this.cells = guessCells(v);
+    if (v > 5 && v !== this._vLaatst) {
+      this._vLaatst = v;
+      const c = guessCells(v);
+      if (c !== this.cells) { this.cells = c; this.rev++; }
+    }
 
     /* Beantwoordt de firmware het setup-pakket niet, dan is er niets om op te
        wachten: dan moeten de constanten uit config.json komen. */
@@ -89,7 +100,10 @@ class SetupWatch {
     if (wiel > 0.08 && wiel < 0.8) {
       this.monsters.push(wiel);
       if (this.monsters.length > MONSTERS * 3) this.monsters.shift();
-      if (this.monsters.length >= MONSTERS) this.wheel = mediaan(this.monsters);
+      if (this.monsters.length >= MONSTERS) {
+        const w = mediaan(this.monsters);
+        if (w !== this.wheel) { this.wheel = w; this.rev++; }
+      }
     }
   }
 

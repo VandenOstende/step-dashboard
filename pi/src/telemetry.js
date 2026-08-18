@@ -87,6 +87,15 @@ class Telemetry {
     return wheelRpm / 60 * (s.wheelDiameterM * Math.PI) * 3.6;   // km/u
   }
 
+  /* De verbinding is weg. De rijtijd mag niet doortellen over het gat heen:
+     zonder dit telt de eerste meting na een hervatting de afgetopte twee
+     seconden mee terwijl er niet gereden is. De afstandsteller blijft bewust
+     staan — wiebelt de stekker tijdens het rijden, dan telt de VESC gewoon
+     door en hoort die afstand er alsnog bij. */
+  pause() {
+    this.lastTick = null;
+  }
+
   /** Nulpunt van de rit-teller op de huidige stand zetten. */
   resetTrip(snap) {
     const raw = snap ? this._raw(snap) : { distanceM: 0, wattHours: 0 };

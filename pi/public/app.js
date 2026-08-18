@@ -1104,7 +1104,13 @@ fetch("/settings", { cache: "no-store" }).then(function (r) { return r.json(); }
     setInterval(knipper, 550);
     poll();
     pollNet();
-    setInterval(pollNet, 5000);
+    /* Elke 30 seconden, niet elke vijf. Wifi, bluetooth en de modem opvragen
+       start op de Pi drie processen, en dat is veruit het duurste wat het
+       apparaat doet — voor drie icoontjes die bijna nooit veranderen. De
+       server houdt de uitkomst 25 seconden vast en gooit die weg zodra jij
+       zelf iets verbindt of verbreekt, dus het verbindingsscherm blijft even
+       snel aanvoelen als het was. */
+    setInterval(pollNet, 30000);
     haalModi();
     haalSetup();
     setInterval(haalSetup, 30000);

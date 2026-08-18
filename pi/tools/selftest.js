@@ -1065,6 +1065,292 @@ await atest("status meldt dat er een installatie loopt", async () => {
     assert.strictEqual(schoneSettings({ warnBatt: "nee" }, STD).warnBatt, true);
   });
 
+  /* ── de meetlus ─────────────────────────────────────────────────────── */
+  console.log("\nmeetlus");
+
+  const { Ride } = require("../src/ride");
+  const { Charge: Charge2 } = require("../src/charge");
+  const { SetupWatch: SetupWatch2 } = require("../src/setup");
+  const { Cruise: Cruise2 } = require("../src/cruise");
+
+  const ritCfg = () => ({
+    step: { batteryCells: 13, packWh: 1147, polePairs: 15,
+            wheelDiameterM: 0.254, gearRatio: 1, source: null, learnedAt: null },
+    cruise: { enabled: true, minCurrentA: 3, holdMs: 600 }
+  });
+
+  function nieuweRit(extra) {
+    const cfg2 = ritCfg();
+    const st = fakeState();
+    st.data.setupSeen = false;
+    const tel = new Telemetry(cfg2, st);
+    const bewaard = [];
+    const r = new Ride(Object.assign({
+      cfg: cfg2, state: st, telemetry: tel,
+      setup: new SetupWatch2(cfg2, false),
+      charge: new Charge2(),
+      cruise: new Cruise2(cfg2),
+      saveStep: (c, patch) => { bewaard.push(patch); Object.assign(c.step, patch); },
+      log: () => {}
+    }, extra || {}));
+    return { rit: r, staat: st, tel, bewaard, cfg: cfg2 };
+  }
+
+  const rijSnap = (i) => ({
+    vIn: 50.4, erpm: 6000, duty: 0.5, currentIn: 14, currentMotor: 30,
+    tempFet: 41, tempMotor: 48, wattHours: 100, wattHoursCharged: 0,
+    tachometer: i * 90, tachometerAbs: i * 90, fault: null,
+    speedMs: 8, distanceM: i * 0.24, batteryLevel: 0.68
+  });
+
+  test("zonder browser telt de kilometerstand gewoon door", () => {
+    /* Dit is de fout die dit hele bestand bestaansrecht geeft: de optelling zat
+       in de route, dus met de kiosk dicht stond de teller stil. */
+    const { rit } = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 40; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    const na = rit.data().odo_km;
+    assert.ok(na > 0, "er is geen meter geteld");
+  });
+
+  test("twee browsers tellen niet dubbel", () => {
+    /* Tien keer data() opvragen tussen twee metingen door mag geen enkele
+       meter extra opleveren. */
+    const a = nieuweRit(), b = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 30; i++) {
+      nu += 150;
+      a.rit.meting(rijSnap(i), nu);
+      b.rit.meting(rijSnap(i), nu);
+      for (let k = 0; k < 10; k++) b.rit.data();
+    }
+    assert.strictEqual(a.rit.data().odo_km, b.rit.data().odo_km);
+  });
+
+  test("de VESC weg levert een geldig offline-contract, met de tellers erin", () => {
+    const { rit } = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 30; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    const odo = rit.data().odo_km;
+    const d = rit.weg(nu + 150);
+    assert.strictEqual(d.connected, false);
+    assert.strictEqual(d.odo_km, odo, "de kilometerstand hoort te blijven staan");
+    assert.ok("trip_s" in d && "temp_batt" in d, "het contract is niet volledig");
+  });
+
+  test("na een gat telt de rijtijd niets in", () => {
+    const { rit } = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 20; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    const voor = rit.data().trip_s;
+    rit.weg(nu);
+    nu += 60000;                       // een minuut zonder verbinding
+    rit.meting(rijSnap(21), nu);
+    assert.strictEqual(rit.data().trip_s, voor,
+      "er is rijtijd bijgeteld over een gat waarin niet gereden werd");
+  });
+
+  test("de topsnelheid wordt onthouden zonder dat er iemand kijkt", () => {
+    const { rit } = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 10; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    assert.ok(rit.data().top_kmh > 28, "top_kmh = " + rit.data().top_kmh);
+  });
+
+  test("de topsnelheid gaat niet bij elke meting naar de schijf", () => {
+    const { rit, staat } = nieuweRit();
+    let nu = 1700000000000;
+    let patches = 0;
+    const echt = staat.patch.bind(staat);
+    staat.patch = (p) => { if ("topSpeed" in p) patches++; echt(p); };
+    /* Steeds harder, dus elke meting is een nieuwe top. */
+    for (let i = 1; i <= 60; i++) {
+      nu += 150;
+      const s = rijSnap(i);
+      s.speedMs = 5 + i * 0.2;
+      rit.meting(s, nu);
+    }
+    assert.ok(patches <= 3, "de topsnelheid ging " + patches + " keer naar de schijf");
+  });
+
+  test("reset-top werkt meteen door in het klaarliggende antwoord", () => {
+    /* Stilstaand resetten hoort nul op te leveren. Doe je het terwijl je rijdt,
+       dan staat je huidige snelheid er meteen weer — dat is geen fout maar de
+       bedoeling, en het is ook wat de oude route deed. */
+    const { rit } = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 10; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    assert.ok(rit.data().top_kmh > 28);
+
+    const stil = rijSnap(11);
+    stil.speedMs = 0;
+    stil.erpm = 0;
+    nu += 150;
+    rit.meting(stil, nu);
+
+    rit.top = 0;
+    rit.hertel(nu);
+    assert.strictEqual(rit.data().top_kmh, 0);
+  });
+
+  test("er wordt maar één keer geleerd als er niets nieuws is", () => {
+    /* De oude leerVanVesc draaide voor altijd door: de vroege return testte op
+       source "hand", maar na het leren wordt source "vesc". */
+    const { rit, bewaard } = nieuweRit();
+    let nu = 1700000000000;
+    for (let i = 1; i <= 200; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    assert.ok(bewaard.length <= 1, "config.json werd " + bewaard.length + " keer geschreven");
+  });
+
+  test("een config.json die niet te schrijven is wordt niet elke meting opnieuw geprobeerd", () => {
+    let pogingen = 0;
+    const { rit } = nieuweRit({
+      saveStep: () => { pogingen++; throw new Error("EROFS"); }
+    });
+    let nu = 1700000000000;
+    for (let i = 1; i <= 200; i++) { nu += 150; rit.meting(rijSnap(i), nu); }
+    assert.strictEqual(pogingen, 1, "er waren " + pogingen + " schrijfpogingen");
+  });
+
+  /* ── de staat wegschrijven ──────────────────────────────────────────── */
+  console.log("\nstaat bewaren");
+
+  const { State } = require("../src/config");
+  const fs = require("fs");
+  const path = require("path");
+  const os = require("os");
+
+  const nieuweStaat = () => {
+    const map = fs.mkdtempSync(path.join(os.tmpdir(), "step-state-"));
+    return new State(path.join(map, "state.json"));
+  };
+  const lees = (st) => JSON.parse(fs.readFileSync(st.file, "utf8"));
+
+  await atest("drie patches vlak na elkaar leveren één bestand op", async () => {
+    const st = nieuweStaat();
+    st.patch({ topSpeed: 1 });
+    st.patch({ topSpeed: 2 });
+    st.patch({ topSpeed: 3 });
+    await st.klaar();
+    assert.strictEqual(lees(st).topSpeed, 3);
+  });
+
+  await atest("een patch tijdens het schrijven gaat niet verloren", async () => {
+    const st = nieuweStaat();
+    st.patch({ topSpeed: 1 });
+    /* Meteen nog een, terwijl de eerste onderweg is naar de schijf. */
+    await new Promise((k) => setTimeout(k, 2010));
+    st.patch({ topSpeed: 99 });
+    await st.klaar();
+    assert.strictEqual(lees(st).topSpeed, 99);
+  });
+
+  await atest("het bestand is na tweehonderd patches altijd geldige JSON", async () => {
+    const st = nieuweStaat();
+    for (let i = 0; i < 200; i++) st.patch({ topSpeed: i, trip: { seconds: i } });
+    await st.klaar();
+    const j = lees(st);
+    assert.strictEqual(j.topSpeed, 199);
+    assert.strictEqual(j.trip.seconds, 199);
+  });
+
+  await atest("flush wordt niet overschreven door een trage schrijver", async () => {
+    /* Het enige echte gevaar van asynchroon schrijven: een langzame schrijver
+       die zijn oudere .tmp over het verse bestand van flush() heen hernoemt. */
+    const st = nieuweStaat();
+    st.patch({ topSpeed: 1 });
+    await new Promise((k) => setTimeout(k, 2010));   // schrijfactie loopt
+    st.patch({ topSpeed: 42 });
+    st.flush();                                      // synchroon, wint
+    await st.klaar();
+    assert.strictEqual(lees(st).topSpeed, 42);
+  });
+
+  await atest("wegschrijven blokkeert de eventloop niet", async () => {
+    /* De oude versie deed writeFileSync in de timer; dan staat alles stil,
+       ook het lezen van de VESC. */
+    const st = nieuweStaat();
+    st.patch({ topSpeed: 7 });
+    let tikken = 0;
+    const tik = setInterval(() => { tikken++; }, 5);
+    await st.klaar();
+    clearInterval(tik);
+    assert.ok(tikken > 100, "de lus liep maar " + tikken + " keer door tijdens het schrijven");
+    assert.strictEqual(lees(st).topSpeed, 7);
+  });
+
+  /* ── de statuscache ─────────────────────────────────────────────────── */
+  console.log("\nstatuscache");
+
+  const { ttlCache } = require("../src/system");
+
+  await atest("twee gelijktijdige vragen delen één proces", async () => {
+    let n = 0;
+    const traag = ttlCache(() => new Promise((k) => {
+      n++;
+      setTimeout(() => k({ n }), 20);
+    }), 1000);
+    const [a, b] = await Promise.all([traag(), traag()]);
+    assert.strictEqual(n, 1, "het onderliggende commando draaide " + n + " keer");
+    assert.strictEqual(a, b, "beide vragen horen hetzelfde object te krijgen");
+  });
+
+  await atest("binnen de houdbaarheid start er niets nieuws", async () => {
+    let n = 0;
+    const f = ttlCache(async () => ({ n: ++n }), 1000);
+    for (let i = 0; i < 10; i++) await f();
+    assert.strictEqual(n, 1);
+  });
+
+  await atest("erbuiten wel", async () => {
+    let n = 0;
+    const f = ttlCache(async () => ({ n: ++n }), 5);
+    await f();
+    await new Promise((k) => setTimeout(k, 15));
+    await f();
+    assert.strictEqual(n, 2);
+  });
+
+  await atest("na een gebruikersactie geldt de cache niet meer", async () => {
+    let n = 0;
+    const f = ttlCache(async () => ({ n: ++n }), 60000);
+    await f();
+    await f();
+    assert.strictEqual(n, 1);
+    f.invalidate();
+    await f();
+    assert.strictEqual(n, 2, "invalidate() moet een verse aanroep afdwingen");
+  });
+
+  await atest("een fout wordt ook bewaard", async () => {
+    /* Zonder dit zou een ontbrekende mmcli twaalf keer per minuut opnieuw
+       geprobeerd worden — precies wat deze cache moet voorkomen. */
+    let n = 0;
+    const f = ttlCache(async () => { n++; return { present: false, bars: 0, tech: null }; }, 60000);
+    for (let i = 0; i < 5; i++) await f();
+    assert.strictEqual(n, 1);
+  });
+
+  await atest("de houdbaarheid mag van de uitkomst afhangen", async () => {
+    /* Zo krijgt "er zit geen modem in" een veel langere houdbaarheid dan
+       "er zit er een en dit is het bereik". */
+    let n = 0;
+    const f = ttlCache(async () => ({ present: false, n: ++n }), 5,
+      (c) => (c.present ? 5 : 60000));
+    await f();
+    await new Promise((k) => setTimeout(k, 15));
+    await f();
+    assert.strictEqual(n, 1, "zonder modem hoort de lange houdbaarheid te gelden");
+  });
+
+  await atest("force omzeilt de cache", async () => {
+    let n = 0;
+    const f = ttlCache(async () => ({ n: ++n }), 60000);
+    await f();
+    await f(true);
+    assert.strictEqual(n, 2);
+  });
+
   /* ── vertalingen en opmaak ──────────────────────────────────────────── */
   console.log("\nvertalingen");
 
@@ -1110,6 +1396,17 @@ await atest("status meldt dat er een installatie loopt", async () => {
         hex + " wordt door de server geweigerd");
     }
     assert.strictEqual(uitUi.length, 8);
+  });
+
+  test("de lettertypebestanden staan er waar de opmaak ze zoekt", () => {
+    /* Een @font-face die nergens heen wijst geeft geen fout — de browser valt
+       stilletjes terug op de systeemletter en de maatvoering schuift. */
+    const css = fsx.readFileSync(pathx.join(PUBX, "theme.css"), "utf8");
+    const paden = [...css.matchAll(/url\("([^"]+\.woff2)"\)/g)].map((m) => m[1]);
+    assert.ok(paden.length >= 2, "verwacht minstens twee woff2-verwijzingen");
+    for (const rel of paden) {
+      assert.ok(fsx.existsSync(pathx.join(PUBX, rel)), "ontbreekt: public/" + rel);
+    }
   });
 
   test("elk id dat app.js aanraakt staat in de pagina", () => {

@@ -211,6 +211,10 @@ class State {
       if (err.code !== "ENOENT") console.error("[state] " + file + " is ongeldig: " + err.message);
     }
     this.timer = null;
+    this.bezig = false;      // er loopt een schrijfactie
+    this.vuil = false;       // er is iets veranderd sinds de laatste
+    this.rev = 0;            // hoogt op bij elke patch
+    this.gedaan = -1;        // hoogste rev die op schijf staat
   }
 
   get settings() { return this.data.settings; }
@@ -219,31 +223,81 @@ class State {
   /** Samenvoegen en (ontdubbeld) wegschrijven — de UI stuurt bij elke tik. */
   patch(part) {
     this.data = deepMerge(this.data, part);
+    this.rev++;
     this.save();
   }
 
+  /* Wegschrijven gebeurt asynchroon. De oude versie deed writeFileSync in een
+     timer, en dat legt de eventloop stil zolang de SD-kaart erover doet —
+     inclusief het lezen van de VESC. Op een kaart die even nadenkt is dat een
+     hapering van tientallen milliseconden, elke keer.
+
+     De vertraging staat op twee seconden en wordt niet opnieuw gestart bij een
+     volgende patch. De oude debounce van 500 ms herstartte wél, en omdat de
+     telemetrie sowieso elke tien seconden patcht kwam hij nooit toe aan
+     schrijven zolang je reed. */
   save() {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => {
-      const tmp = this.file + ".tmp";
-      try {
-        fs.mkdirSync(path.dirname(this.file), { recursive: true });
-        fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
-        fs.renameSync(tmp, this.file);
-      } catch (err) {
-        console.error("[state] opslaan mislukt: " + err.message);
-      }
-    }, 500);
+    this.vuil = true;
+    if (this.timer || this.bezig) return;
+    this.timer = setTimeout(() => { this.timer = null; this._schrijf(); }, 2000);
   }
 
+  _schrijf() {
+    if (this.bezig) return;
+    this.bezig = true;
+    this.vuil = false;
+
+    /* De tekst wordt hier gemaakt, synchroon. Dat is de kern van het hele
+       ontwerp: alles wat hierna aan this.data verandert kan niet meer in het
+       bestand terechtkomen dat nu wordt weggeschreven. Zonder dit zou een
+       asynchrone schrijver een object serialiseren dat onder hem verandert. */
+    const rev = this.rev;
+    const tekst = JSON.stringify(this.data);
+    const tmp = this.file + ".tmp";
+
+    const klaar = (err) => {
+      if (err) console.error("[state] opslaan mislukt: " + err.message);
+      else this.gedaan = Math.max(this.gedaan, rev);
+      this.bezig = false;
+      if (this.vuil) this.save();
+    };
+
+    fs.mkdir(path.dirname(this.file), { recursive: true }, (err) => {
+      if (err && err.code !== "EEXIST") return klaar(err);
+      fs.writeFile(tmp, tekst, (err2) => {
+        if (err2) return klaar(err2);
+        /* flush() kan er tijdens het schrijven tussen zijn gekomen en iets
+           nieuwers hebben neergezet. Dan dit oudere bestand niet eroverheen
+           hernoemen. */
+        if (this.gedaan > rev) return fs.unlink(tmp, () => klaar(null));
+        fs.rename(tmp, this.file, klaar);
+      });
+    });
+  }
+
+  /* Bij het afsluiten synchroon: daar valt niet op te wachten. */
   flush() {
-    if (!this.timer) return;
     clearTimeout(this.timer);
     this.timer = null;
+    if (!this.vuil && this.gedaan >= this.rev) return;
+    const rev = this.rev;
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+      fs.writeFileSync(this.file, JSON.stringify(this.data));
+      this.gedaan = Math.max(this.gedaan, rev);
+      this.vuil = false;
     } catch { /* afsluiten mag hier niet op stuklopen */ }
+  }
+
+  /** Alleen voor de test: wacht tot er niets meer gepland of bezig is. */
+  klaar() {
+    return new Promise((k) => {
+      const kijk = () => {
+        if (!this.timer && !this.bezig && !this.vuil) return k();
+        setTimeout(kijk, 5);
+      };
+      kijk();
+    });
   }
 }
 
@@ -253,6 +307,6 @@ function loadState() {
 }
 
 module.exports = {
-  loadConfig, loadState, saveConfigStep, schoneSettings,
+  loadConfig, loadState, saveConfigStep, schoneSettings, State,
   DEFAULT_CONFIG, DEFAULT_STATE, ROOT
 };
