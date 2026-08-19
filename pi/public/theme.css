@@ -549,7 +549,10 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 #alarmack{
   margin-top:4px;padding:12px 30px;border:2px solid #fff;
   font-size:12px;letter-spacing:.24em;cursor:pointer;color:#fff;
-  opacity:0;animation:ackIn .35s ease-out 2.9s forwards;
+  /* De knop komt pas na 2,9 s op — die wachttijd dwingt je de waarschuwing te
+     zien. Zolang hij onzichtbaar is mag hij ook niet luisteren, anders
+     bevestigt een toevallige tik het alarm blind. */
+  opacity:0;pointer-events:none;animation:ackIn .35s ease-out 2.9s forwards;
 }
 
 /* ── release-notities ────────────────────────────────────────────────────── */
@@ -641,4 +644,4 @@ body[data-theme="night"] .alert.err{background:rgba(194,69,63,.14);border-color:
 /* Deze drie lopen één keer af en blijven dus niet op de achtergrond tikken. */
 @keyframes alertIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes warnBlink{0%,100%{opacity:1}50%{opacity:0}}
-@keyframes ackIn{from{opacity:0}to{opacity:1}}
+@keyframes ackIn{from{opacity:0;pointer-events:none}to{opacity:1;pointer-events:auto}}

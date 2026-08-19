@@ -159,9 +159,14 @@ function openSheet(id) { show(id, true); }
    loslaten, en de browser slikt hem in zodra de vinger onderweg gescrold
    heeft — precies het verschil tussen een tik en een veeg. Op pointerdown was
    dat verschil er niet: een veegbeweging die op een rij begon, activeerde die
-   rij op het moment van aanraken, nog voor het scrollen kon beginnen. Alleen
-   het toetsenbord blijft op pointerdown: typen hoort op de aanslag te
-   reageren, en in het toetsenbord valt niets te scrollen. */
+   rij op het moment van aanraken, nog voor het scrollen kon beginnen.
+
+   Ook het toetsenbord doet mee, en niet alleen voor de eenvoud: de OK-toets
+   sloot het scherm ooit op pointerdown, en de click die bij het loslaten
+   hoort landde dan op de netwerklijst die eronder tevoorschijn kwam — die
+   opende het wachtwoordscherm meteen weer, leeg. preventDefault op
+   pointerdown houdt die click niet tegen. Typen op loslaten is bovendien wat
+   elk telefoontoetsenbord doet; :active markeert de aanslag. */
 document.addEventListener("click", function (e) {
   var c = e.target.closest("[data-close]");
   if (c) { e.preventDefault(); hide(c.getAttribute("data-close")); }
@@ -953,11 +958,11 @@ function tekenKeys() {
     }).join("") + "</div>";
   });
   rijen.push('<div class="keyrow">'
-    + '<button class="key small grey" data-k="sym" style="flex:1.6 1 0">' + (pw.sym ? "abc" : "?123") + "</button>"
-    + '<button class="key grey' + (pw.shift ? " on" : "") + '" data-k="shift">⇧</button>'
+    + '<button class="key small grey" data-k="sym" style="flex:1.6 1 0">' + (pw.sym ? "abc" : "?123") + "</button>"
+    + '<button class="key grey' + (pw.shift ? " on" : "") + '" data-k="shift">⇧</button>'
     + '<button class="key small" data-k=" " style="flex:3 1 0">' + esc(t.space) + "</button>"
-    + '<button class="key grey" data-k="back">⌫</button>'
-    + '<button class="key ok" data-k="ok" style="flex:1.4 1 0">✓</button>'
+    + '<button class="key grey" data-k="back">⌫</button>'
+    + '<button class="key ok" data-k="ok" style="flex:1.4 1 0">✓</button>'
     + "</div>");
   $("keyrows").innerHTML = rijen.join("");
 }
@@ -977,15 +982,17 @@ function openPw(soort, id, naam) {
   tekenKeys(); paintPw(); openSheet("pw");
 }
 
-$("keyrows").addEventListener("pointerdown", function (e) {
+$("keyrows").addEventListener("click", function (e) {
   var b = e.target.closest("[data-k]");
   if (!b) return;
   e.preventDefault();
   var k = b.getAttribute("data-k");
-  if (k === "sym") { pw.sym = !pw.sym; return tekenKeys(); }
-  if (k === "shift") { pw.shift = !pw.shift; return tekenKeys(); }
-  if (k === "back") { pw.tekst = pw.tekst.slice(0, -1); return paintPw(); }
-  if (k === "ok") {
+  /* De namen van de stuurtoetsen kunnen niet botsen met een getypte toets:
+     elke lettertoets draagt precies een teken, deze woorden zijn langer. */
+  if (k === "sym") { pw.sym = !pw.sym; return tekenKeys(); }
+  if (k === "shift") { pw.shift = !pw.shift; return tekenKeys(); }
+  if (k === "back") { pw.tekst = pw.tekst.slice(0, -1); return paintPw(); }
+  if (k === "ok") {
     /* WPA wil er minstens acht; korter accepteert NetworkManager niet en dan
        krijg je een foutmelding die nergens op slaat. */
     if (pw.tekst.length < (pw.soort === "wifi" ? 8 : 4)) { pw.fout = true; return paintPw(); }

@@ -491,9 +491,13 @@ design and are worth knowing before you move something:
   swiping through the settings opened sheets, swiping the language list
   changed the language. Everything now listens to `click`, which the browser
   only delivers when the gesture wasn't a scroll — that distinction between a
-  tap and a swipe is precisely what `click` exists for. The one exception is
-  the keyboard, which stays on `pointerdown`: typing should respond on the
-  keystroke, and there is nothing to scroll there. The scroll boxes also got
+  tap and a swipe is precisely what `click` exists for. The keyboard too, and
+  not just for uniformity: the ✓ key used to close the sheet on `pointerdown`,
+  and the click that belongs to the release then landed on the network list
+  that appeared underneath — which reopened the password sheet, empty.
+  `preventDefault` on pointerdown does not stop that click. Committing a key
+  on release is also what every phone keyboard does; `:active` marks the
+  press. The scroll boxes also got
   `overscroll-behavior: contain`, so a swipe that reaches the end of a list
   doesn't leak into whatever is underneath.
 
@@ -1321,9 +1325,13 @@ ontwerp en zijn goed om te weten voor je iets verschuift:
   kon beginnen: door de instellingen vegen opende schermen, over de taallijst
   vegen veranderde de taal. Alles luistert nu naar `click`, die de browser
   alleen aflevert als het gebaar geen scroll was — dat onderscheid tussen tik
-  en veeg is precies waar `click` voor bestaat. De ene uitzondering is het
-  toetsenbord, dat op `pointerdown` blijft: typen hoort op de aanslag te
-  reageren, en daar valt niets te scrollen. De scrollvakken kregen ook
+  en veeg is precies waar `click` voor bestaat. Ook het toetsenbord, en niet
+  alleen voor de eenvoud: de ✓-toets sloot het scherm ooit op `pointerdown`,
+  en de click die bij het loslaten hoort landde dan op de netwerklijst die
+  eronder tevoorschijn kwam — die opende het wachtwoordscherm meteen weer,
+  leeg. `preventDefault` op pointerdown houdt die click niet tegen. Typen op
+  loslaten is bovendien wat elk telefoontoetsenbord doet; `:active` markeert
+  de aanslag. De scrollvakken kregen ook
   `overscroll-behavior: contain`, zodat een veeg die het einde van een lijst
   bereikt niet doorlekt naar wat eronder ligt.
 
